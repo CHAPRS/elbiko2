@@ -1,0 +1,76 @@
+datasource db {
+  provider = "mysql" // Было "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum BikeStatus {
+  FREE
+  RENTED
+  MAINTENANCE
+  BLOCKED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+model User {
+  id        String   @id @default(uuid())
+  phone     String   @unique
+  telegramChatId String?
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  rents     Rent[]
+}
+
+model Bike {
+  id           Int        @id @default(autoincrement()) // Возвращаем Int для фронтенда
+  name         String
+  status       BikeStatus @default(FREE)                // Оставляем крутой enum
+  speed        String                                   // Возвращаем имена полей из ТЗ
+  range        String
+  motor        String
+  isWaterproof Boolean    @default(false)               // Добавляем флаг влагозащиты
+  pricePerDay  Int        @default(0)                   // Сохраняем для будущей аренды
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  rents        Rent[]
+}
+
+
+model Rent {
+  id         String    @id @default(uuid())
+  userId     String
+  bikeId     Int
+  startDate  DateTime  @default(now())
+  endDate    DateTime
+  totalPrice Int
+  isActive   Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bike       Bike      @relation(fields: [bikeId], references: [id], onDelete: Restrict)
+  payments   Payment[]
+}
+
+model Payment {
+  id            String        @id @default(uuid())
+  rentId        String
+  amount        Int
+  status        PaymentStatus @default(PENDING)
+  providerId    String?
+  paymentUrl    String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  rent          Rent          @relation(fields: [rentId], references: [id], onDelete: Cascade)
+}

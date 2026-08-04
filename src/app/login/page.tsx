@@ -1,85 +1,104 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
-  const [username, setUsername] = useState('');
+  const router = useRouter();
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
-  const [errorMsg, setErrorMsg] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMsg('');
+    setError('');
+    setLoading(true);
 
     try {
-      const res = await fetch('/api/auth/login', {
+      const response = await fetch('/api/auth/courier/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ phone, password }),
       });
 
-      if (res.ok) {
-        // Если логин успешен, Middleware теперь пропустит нас в админку
-        window.location.href = '/admin';
-      } else {
-        const data = await res.json();
-        setErrorMsg(data.error || 'Ошибка авторизации');
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || 'Ошибка авторизации');
+        setLoading(false);
+        return;
       }
+
+      // Перенаправляем в защищенный личный кабинет курьера
+      router.push('/dashboard');
     } catch (err) {
-      setErrorMsg('Не удалось связаться с сервером');
+      setError('Не удалось связаться с сервером');
+      setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4 font-sans">
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[400px] h-[400px] bg-amber-500/5 rounded-full blur-[100px] pointer-events-none" />
-      
-      <div className="w-full max-w-md bg-slate-900/50 border border-slate-800 backdrop-blur-md p-8 rounded-2xl shadow-2xl relative">
+    <div className="min-h-screen bg-[#0F0F12] text-white flex flex-col justify-center items-center px-4">
+      {/* Стеклянная карточка формы */}
+      <div className="w-full max-w-md bg-[#16161F]/80 backdrop-blur-xl border border-white/10 rounded-3xl p-8 shadow-2xl">
+        
+        {/* Хедер формы */}
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-black bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">
-            Вход в панель Elbiko
+          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">
+            ELBIKO
           </h1>
-          <p className="text-xs text-slate-500 mt-1">Доступ только для сотрудников компании</p>
+          <p className="text-gray-400 text-sm mt-2">
+            Вход в кабинет курьера
+          </p>
         </div>
 
+        {/* Вывод ошибки (без тернарного оператора внутри общего return) */}
+        {error && (
+          <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-xl text-center">
+            {error}
+          </div>
+        )}
+
+        {/* Форма */}
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1">Имя пользователя</label>
-            <input 
-              type="text" 
-              required 
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="admin" 
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-amber-500 transition-all" 
+            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">
+              Номер телефона
+            </label>
+            <input
+              type="tel"
+              placeholder="+7 (999) 111-22-33"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              required
+              className="w-full h-12 px-4 rounded-xl bg-[#1C1C24] border border-white/5 focus:border-amber-500/50 text-white placeholder-gray-600 focus:outline-none transition-all"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1">Пароль</label>
-            <input 
-              type="password" 
-              required 
+            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">
+              Пароль
+            </label>
+            <input
+              type="password"
+              placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••" 
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-amber-500 transition-all" 
+              required
+              className="w-full h-12 px-4 rounded-xl bg-[#1C1C24] border border-white/5 focus:border-amber-500/50 text-white placeholder-gray-600 focus:outline-none transition-all"
             />
           </div>
 
-          {errorMsg && (
-            <div className="text-xs bg-rose-950/50 border border-rose-900 text-rose-400 p-3 rounded-xl text-center font-medium">
-              ⚠️ {errorMsg}
-            </div>
-          )}
-
-          <button 
-            type="submit" 
-            className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 font-bold shadow-lg shadow-orange-500/10 transition-all duration-200 mt-2"
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full h-12 mt-4 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-[#0F0F12] font-bold tracking-wide transition-all shadow-lg shadow-orange-500/10 disabled:opacity-50"
           >
-            Войти в систему
+            {loading ? 'Загрузка...' : 'Войти в систему'}
           </button>
         </form>
+
       </div>
     </div>
   );

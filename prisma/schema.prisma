@@ -1,5 +1,5 @@
 datasource db {
-  provider = "mysql" // Было "postgresql"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
@@ -7,70 +7,55 @@ generator client {
   provider = "prisma-client-js"
 }
 
-enum BikeStatus {
-  FREE
-  RENTED
-  MAINTENANCE
-  BLOCKED
+// Существующая модель Bike с добавлением обратной связи для сессий
+model Bike {
+  id            Int             @id @default(autoincrement())
+  speed         String          // Строковый стандарт из техпаспорта v3.3
+  range         String          // Строковый стандарт из техпаспорта v3.3
+  motor         String          // Строковый стандарт из техпаспорта v3.3
+  isWaterproof  Boolean         // Булевый стандарт из техпаспорта v3.3
+  status        String          // Статусы: "AVAILABLE", "RENTED", "MAINTENANCE"
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  // Связь: Один байк может фигурировать в разных сессиях аренды (история + текущая)
+  rentalSessions RentalSession[]
 }
 
-enum PaymentStatus {
-  PENDING
-  PAID
-  FAILED
-  REFUNDED
-}
-
+// Новая модель Курьера (User)
 model User {
-  id        String   @id @default(uuid())
+  id        Int      @id @default(autoincrement())
   phone     String   @unique
-  telegramChatId String?
-  name      String?
+  password  String   @default("") // Временно добавили дефолт для прохождения миграции
+  name      String   @default("Курьер") // Временно добавили дефолт для существующих строк
+  balance   Decimal  @default(0.00) @db.Decimal(10, 2)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  rents     Rent[]
-}
 
-model Bike {
-  id           Int        @id @default(autoincrement()) // Возвращаем Int для фронтенда
-  name         String
-  status       BikeStatus @default(FREE)                // Оставляем крутой enum
-  speed        String                                   // Возвращаем имена полей из ТЗ
-  range        String
-  motor        String
-  isWaterproof Boolean    @default(false)               // Добавляем флаг влагозащиты
-  pricePerDay  Int        @default(0)                   // Сохраняем для будущей аренды
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-  rents        Rent[]
+  rentalSessions RentalSession[]
 }
 
 
-model Rent {
-  id         String    @id @default(uuid())
-  userId     String
-  bikeId     Int
-  startDate  DateTime  @default(now())
-  endDate    DateTime
-  totalPrice Int
-  isActive   Boolean   @default(true)
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+// Новая модель Сессии Аренды (RentalSession)
+model RentalSession {
+  id        Int       @id @default(autoincrement())
+  tariff    String    // Тариф курьера (например: "DAILY", "WEEKLY")
+  status    String    // Статус сессии (например: "ACTIVE", "COMPLETED")
+  startDate DateTime  @default(now()) // Дата старта аренды
+  endDate   DateTime? // Дата завершения (null, пока аренда активна)
   
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  bike       Bike      @relation(fields: [bikeId], references: [id], onDelete: Restrict)
-  payments   Payment[]
-}
+  // Внешние ключи для связи One-to-Many
+  userId    Int
+  bikeId    Int
 
-model Payment {
-  id            String        @id @default(uuid())
-  rentId        String
-  amount        Int
-  status        PaymentStatus @default(PENDING)
-  providerId    String?
-  paymentUrl    String?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  // Отношения (Relations) с каскадным удалением
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bike      Bike      @relation(fields: [bikeId], references: [id], onDelete: Cascade)
 
-  rent          Rent          @relation(fields: [rentId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  // Индексы для оптимизации частых выборок в ЛК курьера со смартфона
+  @@index([userId])
+  @@index([bikeId])
 }

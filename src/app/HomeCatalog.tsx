@@ -1,160 +1,128 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from "react";
 
-// Строгий интерфейс для соответствия схеме СУБД
 interface Bike {
   id: number;
   name: string;
-  status: 'FREE' | 'RENTED' | 'MAINTENANCE';
-  speed: string;
-  range: string;
-  motor: string;
-  isWaterproof: boolean;
+  price: string;
+  status: string;
 }
 
 export default function HomeCatalog() {
   const [bikes, setBikes] = useState<Bike[]>([]);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedBike, setSelectedBike] = useState<Bike | null>(null);
-  const [clientName, setClientName] = useState('');
-  const [clientPhone, setClientPhone] = useState('');
+  const [loading, setLoading] = useState<boolean>(true);
+  const [actionLoading, setActionLoading] = useState<number | null>(null);
 
   useEffect(() => {
-    fetch('/api/admin/bikes')
+    fetch("/api/admin/bikes") // Действующий GET-роут для получения списка байков
       .then((res) => res.json())
       .then((data) => {
-        if (Array.isArray(data)) {
-          setBikes(data);
-        }
+        setBikes(data);
+        setLoading(false);
       })
-      .catch((err) => console.error('Ошибка СУБД:', err));
+      .catch(() => setLoading(false));
   }, []);
 
-  // Безопасное поиндексное извлечение данных из MySQL с автоподстановкой MVP-заглушек
-  const b1: Bike = (bikes && bikes.length > 0) 
-    ? bikes[0] 
-    : { id: 1, name: 'Monster Long Range PRO', speed: 'до 50 км/ч', range: 'до 80 км', motor: '500W', isWaterproof: true, status: 'FREE' };
+  // --- ИЗОЛЯЦИЯ РАЗМЕТКИ (Жесткое архитектурное ограничение) ---
+  // Генерируем массив элементов через плоский цикл строго ВЫШЕ блока return.
+  
+  const bikeCards: React.JSX.Element[] = [];
 
-  const b2: Bike = (bikes && bikes.length > 1) 
-    ? bikes[1] 
-    : { id: 2, name: 'Monster Heavy Duty', speed: 'до 45 км/ч', range: 'до 70 км', motor: '450W', isWaterproof: true, status: 'FREE' };
+  if (loading) {
+    bikeCards.push(
+      <div key="loading" className="col-span-full text-center text-zinc-400 py-12 animate-pulse text-sm">
+        Загрузка доступных электровелосипедов...
+      </div>
+    );
+  } else {
+    for (let i = 0; i < bikes.length; i++) {
+      const bike = bikes[i];
+      const isFree = bike.status === "FREE";
+      
+      // Настройка отображения статуса
+      const statusText = isFree ? "Доступен" : "В аренде";
+      const statusClass = isFree 
+        ? "bg-lime-400/10 text-lime-400 border-lime-400/20" 
+        : "bg-zinc-800 text-zinc-500 border-zinc-700";
 
-  const b3: Bike = (bikes && bikes.length > 2) 
-    ? bikes[2] 
-    : { id: 3, name: 'Monster Eco Delivery', speed: 'до 40 км/ч', range: 'до 60 км', motor: '350W', isWaterproof: false, status: 'FREE' };
+      // Флаг того, что именно этот байк сейчас отправляется на сервер
+      const isCurrentLoading = actionLoading === bike.id;
+      const buttonText = isCurrentLoading ? "Оформление..." : "Оформить";
 
-  const handleBookingSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    const cleanName = String(clientName).trim();
-    const cleanPhone = String(clientPhone).trim();
-    const cleanBikeName = String(selectedBike?.name || 'Электровелосипед').trim();
-
+      // Функция отправки POST-запроса на аренду
+      const handleOrder = async () => {
+        setActionLoading(bike.id);
+        
         try {
-      // ИСПРАВЛЕНО: Стучимся на новый чистый адрес роута
-      const res = await fetch('/api/leads', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: cleanName,
-          phone: cleanPhone,
-          bikeName: cleanBikeName
-        }),
-      });
+          const response = await fetch("/api/user/rent", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ bikeId: bike.id }),
+          });
 
-      if (res.ok) {
-        alert('🎉 Спасибо! Ваша заявка успешно отправлена менеджерам Elbiko.');
-      } else {
-        alert('⚠️ Произошла ошибка при отправке заявки.');
-      }
-    } catch (err) {
-      console.error('Ошибка отправки:', err);
+          const result = await response.json();
+
+          if (!response.ok) {
+            throw new Error(result.error || "Не удалось оформить аренду");
+          }
+
+          // Если аренда успешна, перенаправляем курьера прямо в личный кабинет
+          window.location.href = "/dashboard";
+
+        } catch (error: any) {
+          alert(`Ошибка: ${error.message}`);
+          setActionLoading(null);
+        }
+      };
+
+      bikeCards.push(
+        <div 
+          key={bike.id} 
+          className="rounded-2xl bg-slate-950 border border-slate-800/80 overflow-hidden transition-all hover:border-slate-700 duration-200 shadow-xl"
+        >
+          {/* Имитация блока фото с заглушкой (стили подходят под MonStar) */}
+          <div className="relative w-full h-40 bg-gradient-to-br from-slate-900 to-slate-950 flex items-center justify-center border-b border-slate-900 p-4 text-center">
+            <span className="text-4xl">⚡</span>
+            <span className={`absolute top-3 right-3 text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border ${statusClass}`}>
+              {statusText}
+            </span>
+          </div>
+
+          {/* Контент карточки */}
+          <div className="p-5">
+            <h3 className="text-lg font-black text-white tracking-tight uppercase mb-1">
+              {bike.name}
+            </h3>
+            <p className="text-zinc-500 text-[11px] mb-4 uppercase tracking-widest font-medium">
+              Для долгих курьерских смен
+            </p>
+            
+            <div className="flex items-center justify-between pt-2 border-t border-slate-900">
+              <div>
+                <span className="text-[10px] text-zinc-500 uppercase tracking-wider block">Цена аренды</span>
+                <span className="text-base font-black text-lime-400">{bike.price} ₽ <span className="text-xs font-normal text-zinc-400">/ сут</span></span>
+              </div>
+              
+              <button
+                onClick={handleOrder}
+                disabled={!isFree || actionLoading !== null}
+                className="px-4 py-2 bg-white hover:bg-slate-100 disabled:bg-zinc-900 disabled:text-zinc-600 text-slate-950 text-xs font-black rounded-xl transition-all"
+              >
+                {buttonText}
+              </button>
+            </div>
+          </div>
+        </div>
+      );
     }
-
-    
-    setClientName('');
-    setClientPhone('');
-    setIsModalOpen(false);
-  };
+  }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      
-      {/* Карточка 1 */}
-      <div className="border border-slate-800 bg-slate-900/40 p-6 rounded-2xl">
-        <div className="flex justify-between items-start mb-4">
-          <h3 className="text-xl font-bold text-slate-100">{b1.name}</h3>
-          <span className="text-xs px-2 py-0.5 rounded bg-emerald-950 text-emerald-400">{b1.status}</span>
-        </div>
-        <div className="space-y-1 text-sm text-slate-400 mb-6">
-          <div>🚀 Скорость: {b1.speed}</div>
-          <div>🔋 Запас: {b1.range}</div>
-          <div>⚡ Мотор: {b1.motor}</div>
-          <div className="text-cyan-400 pt-1">
-            {b1.isWaterproof ? '☔ Полная аквазащита' : 'Базовая влагозащита'}
-          </div>
-        </div>
-        <button onClick={() => { setSelectedBike(b1); setIsModalOpen(true); }} className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-bold">
-          Забронировать
-        </button>
-      </div>
-
-      {/* Карточка 2 */}
-      <div className="border border-slate-800 bg-slate-900/40 p-6 rounded-2xl">
-        <div className="flex justify-between items-start mb-4">
-          <h3 className="text-xl font-bold text-slate-100">{b2.name}</h3>
-          <span className="text-xs px-2 py-0.5 rounded bg-emerald-950 text-emerald-400">{b2.status}</span>
-        </div>
-        <div className="space-y-1 text-sm text-slate-400 mb-6">
-          <div>🚀 Скорость: {b2.speed}</div>
-          <div>🔋 Запас: {b2.range}</div>
-          <div>⚡ Мотор: {b2.motor}</div>
-          <div className="text-cyan-400 pt-1">
-            {b2.isWaterproof ? '☔ Полная аквазащита' : 'Базовая влагозащита'}
-          </div>
-        </div>
-        <button onClick={() => { setSelectedBike(b2); setIsModalOpen(true); }} className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-bold">
-          Забронировать
-        </button>
-      </div>
-
-      {/* Карточка 3 */}
-      <div className="border border-slate-800 bg-slate-900/40 p-6 rounded-2xl">
-        <div className="flex justify-between items-start mb-4">
-          <h3 className="text-xl font-bold text-slate-100">{b3.name}</h3>
-          <span className="text-xs px-2 py-0.5 rounded bg-emerald-950 text-emerald-400">{b3.status}</span>
-        </div>
-        <div className="space-y-1 text-sm text-slate-400 mb-6">
-          <div>🚀 Скорость: {b3.speed}</div>
-          <div>🔋 Запас: {b3.range}</div>
-          <div>⚡ Мотор: {b3.motor}</div>
-          <div className="text-cyan-400 pt-1">
-            {b3.isWaterproof ? '☔ Полная аквазащита' : 'Базовая влагозащита'}
-          </div>
-        </div>
-        <button onClick={() => { setSelectedBike(b3); setIsModalOpen(true); }} className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-bold">
-          Забронировать
-        </button>
-      </div>
-
-      {/* Модальное окно */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6">
-            <h3 className="text-xl font-bold text-slate-100 mb-4">Бронирование {selectedBike?.name}</h3>
-            <form onSubmit={handleBookingSubmit} className="space-y-4">
-              <input type="text" required value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Имя" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-white" />
-              <input type="tel" required value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} placeholder="Telephone" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-white" />
-              <div className="flex space-x-3 pt-2">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="w-1/2 py-2.5 rounded-xl border border-slate-800 text-slate-400">Отмена</button>
-                <button type="submit" className="w-1/2 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-bold">Отправить заказ</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 p-2">
+      {bikeCards}
     </div>
   );
 }

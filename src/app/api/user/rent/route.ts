@@ -1,90 +1,87 @@
-import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { cookies } from "next/headers";
 
-const prisma = new PrismaClient();
-
-// Метод GET для получения активной аренды
-export async function GET(request: Request) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const phone = searchParams.get('phone');
-
-    if (!phone) {
-      return NextResponse.json({ error: 'Телефон не указан' }, { status: 400 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { phone }
-    });
-
-    if (!user) {
-      return NextResponse.json({ activeRent: null, message: 'Пользователь не найден' });
-    }
-
-    // Ищем аренду, где isActive равен true (или 1 в MySQL)
-    const activeRent = await prisma.rent.findFirst({
-      where: {
-        userId: user.id,
-        isActive: true as any // Адаптировано под поле isActive
-      },
-      include: {
-        bike: true 
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    });
-
-    return NextResponse.json({ activeRent });
-  } catch (error) {
-    console.error('Ошибка в API:', error);
-    return NextResponse.json({ error: 'Внутренняя ошибка бэкенда' }, { status: 500 });
-  }
+// Явно описываем тип данных, который вернет наша транзакция
+interface TransactionResult {
+  updatedBike: any;
+  rentalSession: any;
 }
 
-// Метод PATCH для завершения аренды
-export async function PATCH(request: Request) {
-  try {
-    const { rentId } = await request.json();
+async function getCourierIdFromSession(): Promise<number | null> {
+  const cookieStore = cookies();
+  const session = cookieStore.get("courier_session");
+  
+  if (!session) return null;
+  
+  const userId = parseInt(session.value, 10);
+  return isNaN(userId) ? null : userId;
+}
 
-    if (!rentId) {
-      return NextResponse.json({ error: 'ID аренды не указан' }, { status: 400 });
+export async function POST(request: Request) {
+  try {
+    const courierId = await getCourierIdFromSession();
+    
+    if (!courierId) {
+      return NextResponse.json(
+        { error: "Не авторизован или сессия истекла" },
+        { status: 401 }
+      );
     }
 
-    const rent = await prisma.rent.findFirst({
-      where: {
-        OR: [
-          { id: Number(rentId) },
-          { id: rentId as any }
-        ]
-      },
+    const body = await request.json();
+    const { bikeId } = body;
+
+    if (!bikeId) {
+      return NextResponse.json(
+        { error: "Не указан ID велосипеда" },
+        { status: 400 }
+      );
+    }
+
+    // Явно указываем тип возвращаемого значения для стрелочной функции: : Promise<TransactionResult>
+    const result: TransactionResult = await prisma.$transaction(async (tx): Promise<TransactionResult> => {
+      // 1. Проверяем существование и статус велосипеда
+      const bike = await tx.bike.findUnique({
+        where: { id: Number(bikeId) },
+      });
+
+      if (!bike) {
+        throw new Error("Велосипед не найден");
+      }
+
+      if (bike.status !== "FREE") {
+        throw new Error("Этот велосипед уже арендован или находится на ТО");
+      }
+
+      // 2. Обновляем статус велосипеда на RENTED
+      const updatedBike = await tx.bike.update({
+        where: { id: Number(bikeId) },
+        data: { status: "RENTED" },
+      });
+
+      // 3. Создаем новую сессию аренды для курьера
+      const rentalSession = await tx.rentalSession.create({
+        data: {
+          bikeId: Number(bikeId),
+          userId: courierId,
+        } as any,
+      });
+
+      // Возвращаем строго типизированный объект
+      return { updatedBike, rentalSession };
     });
 
-    if (!rent) {
-      return NextResponse.json({ error: 'Аренда не найдена' }, { status: 404 });
-    }
+    return NextResponse.json({
+      success: true,
+      message: "Аренда успешно оформлена",
+      data: result,
+    });
 
-    await prisma.$transaction([
-      // 1. Снимаем флаг активности с этой аренды (isActive: false)
-      prisma.rent.updateMany({
-        where: {
-          OR: [
-            { id: Number(rentId) },
-            { id: rentId as any }
-          ]
-        },
-        data: { isActive: false as any },
-      }),
-      // 2. Освобождаем велосипед (status: 'FREE')
-      prisma.bike.updateMany({
-        where: { id: rent.bikeId as any },
-        data: { status: 'FREE' as any },
-      }),
-    ]);
-
-    return NextResponse.json({ success: true, message: 'Аренда успешно завершена' });
-  } catch (error) {
-    console.error('Ошибка в PATCH:', error);
-    return NextResponse.json({ error: 'Не удалось завершить аренду' }, { status: 500 });
+  } catch (error: any) {
+    return NextResponse.json(
+      { error: error.message || "Внутренняя ошибка сервера" },
+      { status: 500 }
+    );
   }
 }

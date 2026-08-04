@@ -1,52 +1,55 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // 1. ЗАЩИТА ЛИЧНОГО КАБИНЕТА КУРЬЕРА (/dashboard)
-  if (pathname.startsWith('/dashboard')) {
-    const courierSession = request.cookies.get('courier_session');
-
-    // Если куки нет, отправляем курьера авторизоваться на страницу /login
-    if (!courierSession) {
-      const loginUrl = new URL('/login', request.url);
-      return NextResponse.redirect(loginUrl);
-    }
+  // 1. Позволяем свободно загружать системные файлы Next.js, картинки, API и главную
+  if (
+    pathname.startsWith("/_next") || 
+    pathname.startsWith("/api") || 
+    pathname === "/" ||
+    pathname.includes(".")
+  ) {
+    return NextResponse.next();
   }
 
-  // 2. ЗАЩИТА АДМИН-ПАНЕЛИ (/admin)
-  if (pathname.startsWith('/admin')) {
-    const adminSession = request.cookies.get('admin_session');
+  // Читаем сессионные куки
+  const hasCourierSession = request.cookies.has("courier_session");
+  const hasAdminSession = request.cookies.has("admin_session");
 
-    // Если куки админа нет, отправляем на страницу входа
-    if (!adminSession) {
-      const loginUrl = new URL('/login', request.url);
-      return NextResponse.redirect(loginUrl);
+  // 2. ЗАЩИТА ОТ ЦИКЛА: Если пользователь УЖЕ идет на страницу логина, не трогаем его
+  if (pathname === "/login") {
+    // Если он уже авторизован, можно сразу перекинуть в ЛК
+    if (hasCourierSession) {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
     }
+    if (hasAdminSession) {
+      return NextResponse.redirect(new URL("/admin", request.url));
+    }
+    return NextResponse.next();
   }
 
-  // 3. ЗАЩИТА ПРИВАТНЫХ API-РОУТОВ
-  // Если неавторизованный пользователь стучится в API курьера напрямую
-  if (pathname.startsWith('/api/courier') && !pathname.includes('/login')) {
-    const courierSession = request.cookies.get('courier_session');
-    
-    if (!courierSession) {
-      return NextResponse.json(
-        { error: 'Доступ запрещен: требуется авторизация' },
-        { status: 401 }
-      );
+  // 3. Защита панели администратора
+  if (pathname.startsWith("/admin")) {
+    if (!hasAdminSession) {
+      return NextResponse.redirect(new URL("/login", request.url));
     }
+    return NextResponse.next();
+  }
+
+  // 4. Защита личного кабинета курьера
+  if (pathname.startsWith("/dashboard")) {
+    if (!hasCourierSession) {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
+    return NextResponse.next();
   }
 
   return NextResponse.next();
 }
 
-// Конфигурация путей, которые перехватывает Middleware
+// Конфигурируем перехватчик для всех путей
 export const config = {
-  matcher: [
-    '/admin/:path*',
-    '/dashboard/:path*',
-    '/api/courier/:path*'
-  ],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
 };

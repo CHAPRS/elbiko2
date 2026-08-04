@@ -1,61 +1,102 @@
 import { NextResponse } from 'next/server';
+// Импортируем созданный синглтон вместо создания нового экземпляра
 import { prisma } from '@/lib/prisma';
 
-// Новое: Отдаем список всех велосипедов из базы данных для главной страницы
+// ==========================================
+// GET: Получение списка всех велосипедов
+// ==========================================
 export async function GET() {
   try {
-    const bikes = await prisma.bike.findMany();
-    return NextResponse.json(bikes);
+    const bikes = await prisma.bike.findMany({
+      orderBy: {
+        id: 'desc', // Новые велосипеды будут вверху списка
+      },
+    });
+    return NextResponse.json(bikes, { status: 200 });
   } catch (error) {
-    return NextResponse.json({ error: 'Ошибка при получении данных из БД' }, { status: 500 });
+    console.error('Ошибка GET /api/admin/bikes:', error);
+    return NextResponse.json(
+      { error: 'Не удалось загрузить список велосипедов' },
+      { status: 500 }
+    );
   }
 }
 
-// 1. Создание нового велосипеда в базе
+// ==========================================
+// POST: Создание нового велосипеда
+// ==========================================
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { name, model, power, maxSpeed, batteryLife, pricePerDay } = body;
+    const { name, speed, range, motor, isWaterproof } = body;
 
-    if (!name || !model || !power || !maxSpeed || !batteryLife || !pricePerDay) {
-      return NextResponse.json({ error: 'Заполните все поля характеристики' }, { status: 400 });
+    // Валидация обязательных полей
+    if (!name || !speed || !range || !motor) {
+      return NextResponse.json(
+        { error: 'Отсутствуют обязательные поля (name, speed, range, motor)' },
+        { status: 400 }
+      );
     }
 
+    // Создание записи в БД с дефолтным статусом FREE
     const newBike = await prisma.bike.create({
       data: {
         name,
-        model,
-        power,
-        maxSpeed,
-        batteryLife,
-        pricePerDay: Number(pricePerDay),
+        speed,
+        range,
+        motor,
+        isWaterproof: Boolean(isWaterproof), // Принудительное приведение к Boolean
         status: 'FREE',
       },
     });
 
-    return NextResponse.json({ success: true, bike: newBike });
+    return NextResponse.json(newBike, { status: 201 });
   } catch (error) {
-    return NextResponse.json({ error: 'Ошибка при добавлении в БД' }, { status: 500 });
+    console.error('Ошибка POST /api/admin/bikes:', error);
+    return NextResponse.json(
+      { error: 'Не удалось создать велосипед' },
+      { status: 500 }
+    );
   }
 }
 
-// 2. Изменение статуса велосипеда (FREE, MAINTENANCE, BLOCKED)
+// ==========================================
+// PATCH: Обновление статуса велосипеда
+// ==========================================
 export async function PATCH(request: Request) {
   try {
     const body = await request.json();
-    const { bikeId, status } = body;
+    const { id, status } = body;
 
-    if (!bikeId || !status) {
-      return NextResponse.json({ error: 'Не передан ID или статус' }, { status: 400 });
+    // Валидация входных данных
+    if (!id || !status) {
+      return NextResponse.json(
+        { error: 'Отсутствуют обязательные параметры (id, status)' },
+        { status: 400 }
+      );
     }
 
+    // Проверка валидности передаваемого статуса
+    const validStatuses = ['FREE', 'RENTED', 'MAINTENANCE'];
+    if (!validStatuses.includes(status)) {
+      return NextResponse.json(
+        { error: 'Передан невалидный статус' },
+        { status: 400 }
+      );
+    }
+
+    // Обновление статуса в БД
     const updatedBike = await prisma.bike.update({
-      where: { id: bikeId },
+      where: { id: Number(id) },
       data: { status },
     });
 
-    return NextResponse.json({ success: true, bike: updatedBike });
+    return NextResponse.json(updatedBike, { status: 200 });
   } catch (error) {
-    return NextResponse.json({ error: 'Ошибка обновления статуса' }, { status: 500 });
+    console.error('Ошибка PATCH /api/admin/bikes:', error);
+    return NextResponse.json(
+      { error: 'Не удалось обновить статус велосипеда' },
+      { status: 500 }
+    );
   }
 }

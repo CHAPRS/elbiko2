@@ -1,199 +1,180 @@
-"use client";
-
-import React from "react";
-import HomeCatalog from "./HomeCatalog";
+'use client';
+import React, { useEffect, useState } from 'react';
+import BikeCard from './(landing)/BikeCard';
+import OrderModal from './(landing)/OrderModal';
+import Hero from '@/components/Hero';
+import HowItWorks from '@/components/HowItWorks';
+import Features from '@/components/Features';
+import Tariffs from '@/components/Tariffs';
+import Reviews from '@/components/Reviews';
+import Business from '@/components/Business';
+import Repair from '@/components/Repair';
+import Header from '@/components/Header';
 
 export default function HomePage() {
-  // --- ПЛОСКИЕ ДАННЫЕ ДЛЯ ИЗОЛЯЦИИ РАЗМЕТКИ (ОБЯЗАТЕЛЬНО) ---
-  
-  // Ссылки в шапке
-  const navLinks = [
-    <a key="catalog" href="#catalog" className="text-sm text-slate-300 hover:text-lime-400 font-medium transition-colors">Велокаталог</a>,
-    <a key="tg" href="https://t.me" target="_blank" className="text-sm text-slate-300 hover:text-lime-400 font-medium transition-colors">Telegram</a>,
-    <a key="support" href="https://t.me" target="_blank" className="text-sm text-slate-300 hover:text-lime-400 font-medium transition-colors">Поддержка</a>
-  ];
+  const [bikes, setBikes] = useState<any[]>([]);
+  const [selectedBike, setSelectedBike] = useState<any | null>(null);
+  const [faqOpen, setFaqOpen] = useState<number | null>(null);
 
-    // Обновленный перечень шагов с иконками, эффектами и контрастной графикой
-  const stepsItems = [
-    <div key="step1" className="group p-8 rounded-3xl bg-white border border-slate-100 shadow-sm transition-all hover:shadow-xl hover:shadow-lime-500/5 hover:-translate-y-1.5 duration-300 relative overflow-hidden">
-      <div className="absolute top-0 right-0 w-24 h-24 bg-lime-400/5 rounded-bl-full flex items-center justify-center text-slate-200 text-3xl font-black group-hover:bg-lime-400/10 transition-colors">
-        01
-      </div>
-      <div className="w-14 h-14 rounded-2xl bg-slate-950 flex items-center justify-center text-2xl mb-6 shadow-md border border-slate-800">
-        📝
-      </div>
-      <h3 className="text-slate-950 font-black text-lg mb-2 group-hover:text-lime-600 transition-colors">
-        Оставить заявку
-      </h3>
-      <p className="text-slate-600 text-xs leading-relaxed">
-        Выберите подходящий электровелосипед в нашем каталоге ниже и нажмите кнопку «Оформить».
-      </p>
-    </div>,
-    <div key="step2" className="group p-8 rounded-3xl bg-white border border-slate-100 shadow-sm transition-all hover:shadow-xl hover:shadow-lime-500/5 hover:-translate-y-1.5 duration-300 relative overflow-hidden">
-      <div className="absolute top-0 right-0 w-24 h-24 bg-lime-400/5 rounded-bl-full flex items-center justify-center text-slate-200 text-3xl font-black group-hover:bg-lime-400/10 transition-colors">
-        02
-      </div>
-      <div className="w-14 h-14 rounded-2xl bg-slate-950 flex items-center justify-center text-2xl mb-6 shadow-md border border-slate-800">
-        📱
-      </div>
-      <h3 className="text-slate-950 font-black text-lg mb-2 group-hover:text-lime-600 transition-colors">
-        Подтвердить профиль
-      </h3>
-      <p className="text-slate-600 text-xs leading-relaxed">
-        Пройдите быструю моментальную проверку по номеру телефона в вашем личном кабинете курьера.
-      </p>
-    </div>,
-    <div key="step3" className="p-8 rounded-3xl bg-slate-950 border border-slate-900 shadow-xl transition-all hover:shadow-2xl hover:shadow-lime-500/10 hover:-translate-y-1.5 duration-300 relative overflow-hidden text-white">
-      <div className="absolute top-0 right-0 w-24 h-24 bg-lime-400/10 rounded-bl-full flex items-center justify-center text-slate-800 text-3xl font-black">
-        03
-      </div>
-      <div className="w-14 h-14 rounded-2xl bg-lime-400 flex items-center justify-center text-2xl mb-6 shadow-md shadow-lime-500/20">
-        ⚡
-      </div>
-      <h3 className="text-white font-black text-lg mb-2 text-lime-400">
-        Забрать байк
-      </h3>
-      <p className="text-slate-400 text-xs leading-relaxed">
-        Получите полностью заряженный и готовый к работе MonStar в ближайшем пункте выдачи и начните смену.
-      </p>
+  useEffect(() => {
+    fetch('/api/admin/dashboard')
+      .then(res => res.json())
+      .then(data => {
+        if (data && Array.isArray(data.bikes)) {
+          setBikes(data.bikes);
+        }
+      })
+      .catch(err => console.error(err));
+  }, []);
+
+  // =========================================================
+  // ПРЕДВАРИТЕЛЬНАЯ СБОРКА КОНТЕНТА (Чистый JavaScript)
+  // =========================================================
+
+  // 1. Сборка списка велосипедов (СКОБКИ ИСПРАВЛЕНЫ)
+  const bikesRenderList = bikes.map((bike) => (
+    <BikeCard key={bike.id} bike={bike} onBook={(b) => setSelectedBike(b)} />
+  ));
+
+  // Заглушка для каталога
+  const catalogLoadingText = (
+    <div className="col-span-full p-12 bg-slate-900 border border-slate-800 rounded-3xl text-center text-slate-500 font-mono text-sm">
+      Загрузка актуального автопарка Elbiko...
     </div>
+  );
+
+  // 2. Сборка FAQ-аккордеона
+  const faqItems = [
+    { q: "Что нужно для оформления договора?", a: "Только паспорт гражданина РФ или СНГ и минимальный возраст от 18 лет. Никаких скрытых залогов." },
+    { q: "Как происходит замена аккумулятора?", a: "Вы можете бесплатно заменить севший АКБ на полностью заряженный в любом из наших пунктов выдачи в течение смены." },
+    { q: "Кто платит за ремонт в случае поломки?", a: "Естественный износ (тормоза, спицы, цепь, покрышки) мы чиним полностью бесплатно в нашей мастерской." }
   ];
 
-  // Блок отзывов (Светлые карточки с салатовыми звездами)
-  const reviewsItems = [
-    <div key="rev1" className="p-6 rounded-2xl bg-slate-900 border border-slate-800/80">
-      <div className="flex items-center gap-1 text-lime-400 mb-2">★★★★★</div>
-      <p className="text-slate-300 text-xs italic mb-3">"Отличный MonStar PRO! Заряда АКБ железно хватает на всю смену. Тормоза гидравлика — супер."</p>
-      <span className="text-slate-400 text-[11px] font-semibold tracking-wide">— Артур, курьер в Спб</span>
-    </div>,
-    <div key="rev2" className="p-6 rounded-2xl bg-slate-900 border border-slate-800/80">
-      <div className="flex items-center gap-1 text-lime-400 mb-2">★★★★★</div>
-      <p className="text-slate-300 text-xs italic mb-3">"Взял Ultima Long. Рама усиленная, бордюры вообще не замечает. Амортизация спасает спину."</p>
-      <span className="text-slate-400 text-[11px] font-semibold tracking-wide">— Дмитрий, Москва</span>
-    </div>
-  ];
-
-  // Ссылки в футере
-  const footerLinks = [
-    <a key="f1" href="#" className="text-xs text-slate-500 hover:text-slate-400 font-medium">Правила движения</a>,
-    <a key="f2" href="#" className="text-xs text-slate-500 hover:text-slate-400 font-medium">Правила эксплуатации</a>,
-    <a key="f3" href="#" className="text-xs text-slate-500 hover:text-slate-400 font-medium">Политика конфиденциальности</a>
-  ];
-
-  return (
-    <div className="min-h-screen bg-slate-950 text-white font-sans selection:bg-lime-400 selection:text-black">
-      
-      {/* ТЕМНО-СИНИЙ HEADER С САЛАТОВЫМ ЛОГО */}
-      <header className="sticky top-0 z-50 w-full border-b border-slate-900 bg-slate-950/80 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-xl font-black tracking-wider text-white">ELBIKO</span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-lime-400 text-slate-950 uppercase tracking-widest font-black">Eco</span>
-          </div>
-          
-          <nav className="hidden md:flex items-center gap-8">
-            {navLinks}
-          </nav>
-          
-          <div>
-            <a 
-              href="/login" 
-              className="px-4 py-2 rounded-xl bg-lime-400 hover:bg-lime-300 text-slate-950 text-sm font-bold transition-all shadow-md shadow-lime-500/10 active:scale-95"
-            >
-              Личный кабинет
-            </a>
-          </div>
-        </div>
-      </header>
-
-      {/* ГЛУБОКИЙ ТЕМНО-СИНИЙ БАННЕР С НЕОНОВЫМ АКЦЕНТОМ */}
-      <section className="relative overflow-hidden py-28 px-4 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 border-b border-slate-900">
-        <div className="max-w-5xl mx-auto text-center relative z-10">
-          <span className="inline-block text-xs font-bold bg-lime-400/10 text-lime-400 px-3 py-1 rounded-full uppercase tracking-wider mb-4 border border-lime-400/20">
-            Эко-прокат нового поколения
+  const faqRenderList = faqItems.map((item, idx) => {
+    const isCurrentOpen = faqOpen === idx;
+    const buttonSign = isCurrentOpen ? '−' : '+';
+    
+    return (
+      <div key={idx} className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden transition-colors">
+        <button
+          type="button"
+          onClick={() => setFaqOpen(isCurrentOpen ? null : idx)}
+          className="w-full p-5 text-left font-bold text-sm text-white flex justify-between items-center group focus:outline-none"
+        >
+          <span>{item.q}</span>
+          <span className="text-emerald-400 group-hover:scale-110 transition-transform">
+            {buttonSign}
           </span>
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-white mb-6 uppercase leading-tight">
-            Электровелосипеды в аренду <br />
-            <span className="text-lime-400">для курьеров</span>
-          </h1>
-          <p className="text-slate-400 text-sm sm:text-base max-w-xl mx-auto leading-relaxed mb-8">
-            Технологичный и выносливый транспорт. Фирменные аккумуляторы LiFePO4, полная влагозащита электроники и надежный круиз-контроль.
+        </button>
+        {isCurrentOpen && (
+          <div className="px-5 pb-5 text-xs text-slate-400 leading-relaxed border-t border-slate-800/40 pt-3">
+            {item.a}
+          </div>
+        )}
+      </div>
+    );
+  });
+
+  const totalBikesFound = bikes.length;
+
+  // =========================================================
+  // АБСОЛЮТНО ЛИНЕЙНАЯ И БЕЗОПАСНАЯ РАЗМЕТКА
+  // =========================================================
+  return (
+    <div className="bg-slate-950 text-slate-100 min-h-screen antialiased selection:bg-emerald-500 selection:text-slate-950">
+      
+      {/* Шапка / Навигация */}
+      <Header />
+
+      {/* Главный баннер (Hero) */}
+      <Hero />
+
+      {/* Как это работает */}
+      <HowItWorks />
+
+      {/* Преимущества */}
+      <Features />
+
+      {/* Тарифы */}
+      <Tariffs />
+
+      {/* Каталог велосипедов */}
+      <main className="max-w-7xl mx-auto px-6 py-20">
+        <section id="catalog" className="space-y-8 scroll-mt-24">
+          <div className="text-center sm:text-left">
+            <h2 className="text-2xl sm:text-3xl font-black text-white">Доступные модели в вашем городе</h2>
+            <p className="text-sm text-slate-500 mt-1">Все байки проходят ежедневный технический осмотр</p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {totalBikesFound === 0 ? catalogLoadingText : bikesRenderList}
+          </div>
+        </section>
+      </main>
+
+      {/* Отзывы */}
+      <Reviews />
+
+      {/* Для бизнеса */}
+      <Business />
+
+      {/* Ремонт */}
+      <Repair />
+
+      {/* FAQ секция */}
+      <section id="faq" className="max-w-3xl mx-auto px-6 py-20 space-y-8 scroll-mt-24">
+        <div className="text-center">
+          <h2 className="text-2xl sm:text-3xl font-black text-white">Часто задаваемые вопросы</h2>
+        </div>
+        <div className="space-y-3">
+          {faqRenderList}
+        </div>
+      </section>
+
+      {/* Контакты и карта */}
+      <section id="contacts" className="max-w-7xl mx-auto px-6 py-20 grid grid-cols-1 md:grid-cols-3 gap-8 scroll-mt-24 border-t border-slate-900">
+        <div className="space-y-4">
+          <h2 className="text-2xl font-black text-white">Пункт выдачи ELBIKO</h2>
+          <p className="text-sm text-slate-400 leading-relaxed">
+            Главный офис и сервисный центр. Ждем вас ежедневно.
           </p>
-          <div className="flex justify-center">
-            <a href="#catalog" className="px-8 py-3 bg-white hover:bg-slate-100 text-slate-950 font-black rounded-xl transition-all shadow-lg active:scale-95">
-              Выбрать велосипед
-            </a>
+          <div className="space-y-2 text-sm font-mono text-slate-300">
+            <p><span className="text-slate-500">Адрес:</span> ул. Ястынская 6а, Красноярск</p>
+            <p><span className="text-slate-500">Часы:</span> 09:00 — 21:00 ежедневно</p>
+            <p><span className="text-slate-500">Телефон:</span> +7 (913) 836-17-09</p>
+          </div>
+        </div>
+        
+        <div className="md:col-span-2 h-72 bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden relative shadow-inner">
+          <div className="absolute inset-0 bg-slate-950/20 z-10 pointer-events-none" />
+          <div className="w-full h-full flex items-center justify-center text-sm font-mono text-slate-500">
+            Интерактивная карта офиса ELBIKO загружена...
           </div>
         </div>
       </section>
 
-      {/* КОНТРАСТНАЯ ЧИСТАЯ БЕЛАЯ СЕКЦИЯ: КАК НАЧАТЬ РАБОТАТЬ */}
-      <section className="py-20 px-4 bg-white text-slate-950">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-2xl font-black text-center text-slate-950 mb-12 uppercase tracking-wide">
-            Как начать работать
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {stepsItems}
-          </div>
-        </div>
-      </section>
-
-      {/* СЕКЦИЯ КАТАЛОГА ВЕЛОСИПЕДОВ (Темно-синяя основа под HomeCatalog) */}
-      <section id="catalog" className="py-20 px-4 bg-slate-950">
-        <div className="max-w-7xl mx-auto">
-          <div className="mb-12 text-center">
-            <h2 className="text-2xl font-black text-white uppercase tracking-wide">Наш автопарк</h2>
-            <p className="text-slate-500 text-xs mt-1 font-semibold uppercase tracking-wider text-lime-400/80">Доступные модели в вашем городе</p>
-          </div>
-          
-          <div className="rounded-3xl p-2 sm:p-6 bg-slate-900 border border-slate-800/60 shadow-2xl">
-            <HomeCatalog />
-          </div>
-          
-        </div>
-      </section>
-
-      {/* ОТЗЫВЫ КУРЬЕРОВ */}
-      <section className="py-20 px-4 bg-slate-900/40 border-t border-b border-slate-900">
-        <div className="max-w-4xl mx-auto">
-          <h2 className="text-2xl font-black text-center text-white mb-12 uppercase tracking-wide">Отзывы наших курьеров</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            {reviewsItems}
-          </div>
-        </div>
-      </section>
-
-      {/* КАРТА С ТЕМНОЙ ОПРЯТНОЙ ОЛИВКОВОЙ/СИНЕЙ СТИЛИЗАЦИЕЙ ОБЕРТКИ */}
-      <section className="py-20 px-4 bg-slate-950">
-        <div className="max-w-5xl mx-auto">
-          <h2 className="text-2xl font-black text-center text-white mb-2 uppercase tracking-wide">Где нас найти</h2>
-          <p className="text-slate-500 text-xs text-center mb-10 font-medium">Приезжайте на тест-драйв в любой удобный филиал</p>
-          
-          <div className="w-full h-[400px] rounded-3xl overflow-hidden border border-slate-800 shadow-xl relative">
-            <iframe 
-              src="https://yandex.ru" 
-              width="100%" 
-              height="100%" 
-              className="border-0 opacity-75 hover:opacity-100 transition-opacity duration-300 invert-[0.05] hue-rotate-[180deg]"
-              allowFullScreen={true}
-            ></iframe>
-          </div>
-        </div>
-      </section>
-
-      {/* ФУТЕР САЙТА */}
-      <footer className="border-t border-slate-900 bg-slate-950 py-8 px-4 text-center sm:text-left">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="text-xs text-slate-500 font-medium">
-            &copy; {new Date().getFullYear()} ELBIKO Eco-Sharing. Все права защищены.
-          </div>
-          <div className="flex flex-wrap justify-center sm:justify-end gap-6">
-            {footerLinks}
+      {/* Футер */}
+      <footer className="border-t border-slate-900 mt-24 py-8 bg-slate-950">
+        <div className="max-w-7xl mx-auto px-6 text-center">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="text-sm text-slate-500">
+              © 2024 ELBIKO. Все права защищены.
+            </div>
+            <div className="flex gap-6 text-sm text-slate-500">
+              <a href="#" className="hover:text-emerald-400 transition-colors">Политика конфиденциальности</a>
+              <a href="#" className="hover:text-emerald-400 transition-colors">Правила эксплуатации</a>
+              <a href="#" className="hover:text-emerald-400 transition-colors">Договор оферты</a>
+            </div>
           </div>
         </div>
       </footer>
 
+      {/* Модалка заказа */}
+      {selectedBike && (
+        <OrderModal 
+          bike={selectedBike} 
+          onClose={() => setSelectedBike(null)} 
+        />
+      )}
     </div>
   );
 }

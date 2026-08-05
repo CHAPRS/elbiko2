@@ -2,6 +2,14 @@
 import React, { useEffect, useState } from 'react';
 import BikeCard from './BikeCard';
 import OrderModal from './OrderModal';
+import Hero from '@/components/Hero';
+import HowItWorks from '@/components/HowItWorks';
+import Features from '@/components/Features';
+import Tariffs from '@/components/Tariffs';
+import Reviews from '@/components/Reviews';
+import Business from '@/components/Business';
+import Repair from '@/components/Repair';
+import Header from '@/components/Header';
 
 export default function HomePage() {
   const [bikes, setBikes] = useState<any[]>([]);
@@ -73,43 +81,25 @@ export default function HomePage() {
   // АБСОЛЮТНО ЛИНЕЙНАЯ И БЕЗОПАСНАЯ РАЗМЕТКА
   // =========================================================
   return (
-    <div className="bg-slate-950 text-slate-100 min-h-screen antialiased selection:bg-yellow-500 selection:text-slate-950">
+    <div className="bg-slate-950 text-slate-100 min-h-screen antialiased selection:bg-emerald-500 selection:text-slate-950">
       
       {/* Шапка / Навигация */}
-      <header className="border-b border-slate-900 bg-slate-950/80 backdrop-blur-md sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-6 h-20 flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <span className="text-2xl font-black text-white tracking-tighter font-mono">ELBIKO.</span>
-          </div>
-          <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-400">
-            <a href="#catalog" className="hover:text-white transition-colors">Каталог</a>
-            <a href="#steps" className="hover:text-white transition-colors">Как начать</a>
-            <a href="#faq" className="hover:text-white transition-colors">Вопросы</a>
-            <a href="#contacts" className="hover:text-white transition-colors">Контакты</a>
-          </nav>
-          <a href="/admin" className="text-xs bg-slate-900 border border-slate-800 text-slate-300 hover:border-yellow-500/50 px-4 py-2 rounded-xl transition-all">
-            Диспетчерская
-          </a>
-        </div>
-      </header>
+      <Header />
 
       {/* Главный баннер (Hero) */}
-      <main className="max-w-7xl mx-auto px-6 py-16 sm:py-24 space-y-24">
-        <section className="text-center max-w-3xl mx-auto space-y-6">
-          <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-white leading-tight">
-            Аренда мощных электровелосипедов для курьеров
-          </h1>
-          <p className="text-slate-400 text-base sm:text-lg max-w-xl mx-auto">
-            Зарабатывай больше с надежным транспортом Elbiko. Полное обслуживание, подменные АКБ и ремонт за наш счет.
-          </p>
-          <div className="pt-4">
-            <a href="#catalog" className="px-8 py-4 bg-gradient-to-r from-yellow-500 to-amber-500 text-slate-950 font-black rounded-xl text-sm shadow-xl inline-block hover:shadow-yellow-500/10 transition-all active:scale-98">
-              Выбрать электровелосипед
-            </a>
-          </div>
-        </section>
+      <Hero />
 
-        {/* Раздел 1. КАТАЛОГ */}
+      {/* Как это работает */}
+      <HowItWorks />
+
+      {/* Преимущества */}
+      <Features />
+
+      {/* Тарифы */}
+      <Tariffs />
+
+      {/* Каталог велосипедов */}
+      <main className="max-w-7xl mx-auto px-6 py-20">
         <section id="catalog" className="space-y-8 scroll-mt-24">
           <div className="text-center sm:text-left">
             <h2 className="text-2xl sm:text-3xl font-black text-white">Доступные модели в вашем городе</h2>
@@ -119,72 +109,72 @@ export default function HomePage() {
             {totalBikesFound === 0 ? catalogLoadingText : bikesRenderList}
           </div>
         </section>
-
-        {/* Раздел 2. КАК НАЧАТЬ РАБОТАТЬ (Onboarding) */}
-        <section id="steps" className="bg-slate-900 border border-slate-800 rounded-3xl p-8 sm:p-12 space-y-12 scroll-mt-24">
-          <div className="text-center">
-            <h2 className="text-2xl sm:text-3xl font-black text-white">4 шага до первой доставки</h2>
-            <p className="text-sm text-slate-500 mt-1">Выход на смену в день обращения за 15 минут</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 relative">
-            <div className="space-y-3 relative">
-              <div className="w-10 h-10 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 font-mono font-black flex items-center justify-center text-sm shadow-md">01</div>
-              <h4 className="font-bold text-white text-base">Оставьте заявку</h4>
-              <p className="text-xs text-slate-400 leading-relaxed">Выберите подходящую модель в каталоге выше и забронируйте её в один клик.</p>
-            </div>
-            <div className="space-y-3">
-              <div className="w-10 h-10 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 font-mono font-black flex items-center justify-center text-sm shadow-md">02</div>
-              <h4 className="font-bold text-white text-base">Подтвердите СМС</h4>
-              <p className="text-xs text-slate-400 leading-relaxed">Наш менеджер мгновенно свяжется с вами для верификации профиля.</p>
-            </div>
-            <div className="space-y-3">
-              <div className="w-10 h-10 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 font-mono font-black flex items-center justify-center text-sm shadow-md">03</div>
-              <h4 className="font-bold text-white text-base">Заберите байк</h4>
-              <p className="text-xs text-slate-400 leading-relaxed">Приходите в наш офис выдачи с паспортом, оформление займет не более 10 минут.</p>
-            </div>
-            <div className="space-y-3">
-              <div className="w-10 h-10 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 font-mono font-black flex items-center justify-center text-sm shadow-md">04</div>
-              <h4 className="font-bold text-white text-base">Получайте доход</h4>
-              <p className="text-xs text-slate-400 leading-relaxed">Катайтесь без ограничений по пробегу. Ремонт и замена расходников — бесплатно.</p>
-            </div>
-          </div>
-        </section>
-
-        {/* Раздел 3. БЛОК FAQ */}
-        <section id="faq" className="max-w-3xl mx-auto space-y-8 scroll-mt-24">
-          <div className="text-center">
-            <h2 className="text-2xl sm:text-3xl font-black text-white">Часто задаваемые вопросы</h2>
-          </div>
-          <div className="space-y-3">
-            {faqRenderList}
-          </div>
-        </section>
-
-        {/* Раздел 4. КОНТАКТЫ И КАРТА */}
-        <section id="contacts" className="grid grid-cols-1 md:grid-cols-3 gap-8 scroll-mt-24 border-t border-slate-900 pt-16">
-          <div className="space-y-4">
-            <h2 className="text-2xl font-black text-white">Пункт выдачи Elbiko</h2>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Главный офис и сервисный центр расположены в Уфе. Ждем вас ежедневно.
-            </p>
-            <div className="space-y-2 text-xs font-mono text-slate-300">
-              <p><span className="text-slate-500">Адрес:</span> ул. Менделеева, д. 134</p>
-              <p><span className="text-slate-500">Часы:</span> 09:00 — 21:00 ежедневно</p>
-              <p><span className="text-slate-500">Телефон:</span> +7 (347) 200-00-00</p>
-            </div>
-          </div>
-          
-          <div className="md:col-span-2 h-72 bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden relative shadow-inner">
-            <div className="absolute inset-0 bg-slate-950/20 z-10 pointer-events-none" />
-            <div className="w-full h-full flex items-center justify-center text-xs font-mono text-slate-500">
-              Интерактивная карта офиса Elbiko загружена...
-            </div>
-          </div>
-        </section>
-
       </main>
+
+      {/* Отзывы */}
+      <Reviews />
+
+      {/* Для бизнеса */}
+      <Business />
+
+      {/* Ремонт */}
+      <Repair />
+
+      {/* FAQ секция */}
+      <section id="faq" className="max-w-3xl mx-auto px-6 py-20 space-y-8 scroll-mt-24">
+        <div className="text-center">
+          <h2 className="text-2xl sm:text-3xl font-black text-white">Часто задаваемые вопросы</h2>
+        </div>
+        <div className="space-y-3">
+          {faqRenderList}
+        </div>
+      </section>
+
+      {/* Контакты и карта */}
+      <section id="contacts" className="max-w-7xl mx-auto px-6 py-20 grid grid-cols-1 md:grid-cols-3 gap-8 scroll-mt-24 border-t border-slate-900">
+        <div className="space-y-4">
+          <h2 className="text-2xl font-black text-white">Пункт выдачи ELBIKO</h2>
+          <p className="text-sm text-slate-400 leading-relaxed">
+            Главный офис и сервисный центр. Ждем вас ежедневно.
+          </p>
+          <div className="space-y-2 text-sm font-mono text-slate-300">
+            <p><span className="text-slate-500">Адрес:</span> ул. Ястынская 6а, Красноярск</p>
+            <p><span className="text-slate-500">Часы:</span> 09:00 — 21:00 ежедневно</p>
+            <p><span className="text-slate-500">Телефон:</span> +7 (913) 836-17-09</p>
+          </div>
+        </div>
+        
+        <div className="md:col-span-2 h-72 bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden relative shadow-inner">
+          <div className="absolute inset-0 bg-slate-950/20 z-10 pointer-events-none" />
+          <div className="w-full h-full flex items-center justify-center text-sm font-mono text-slate-500">
+            Интерактивная карта офиса ELBIKO загружена...
+          </div>
+        </div>
+      </section>
 
       {/* Футер */}
       <footer className="border-t border-slate-900 mt-24 py-8 bg-slate-950">
+        <div className="max-w-7xl mx-auto px-6 text-center">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="text-sm text-slate-500">
+              © 2024 ELBIKO. Все права защищены.
+            </div>
+            <div className="flex gap-6 text-sm text-slate-500">
+              <a href="#" className="hover:text-emerald-400 transition-colors">Политика конфиденциальности</a>
+              <a href="#" className="hover:text-emerald-400 transition-colors">Правила эксплуатации</a>
+              <a href="#" className="hover:text-emerald-400 transition-colors">Договор оферты</a>
+            </div>
+          </div>
+        </div>
+      </footer>
 
-</footer>
+      {/* Модалка заказа */}
+      {selectedBike && (
+        <OrderModal 
+          bike={selectedBike} 
+          onClose={() => setSelectedBike(null)} 
+        />
+      )}
+    </div>
+  );
+}

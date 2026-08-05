@@ -1,21 +1,66 @@
 import React from 'react';
 
 const benefits = [
-  { title: '⚡ Зарядка в подарок', desc: 'Второй аккумулятор или быстрая зарядка всегда в комплекте.' },
-  { title: '🛠️ Ремонт за 2 часа', desc: 'Сломался на заказе? Приедем и заменим байк на новый бесплатно.' },
-  { title: '🎒 Полная экипировка', desc: 'Шлем, держатель для смартфона и замок уже включены в стоимость.' },
+  { 
+    icon: '⚡',
+    title: 'Мощные АКБ',
+    description: '2 аккумулятора от 21 до 30 Ah — меняй на ходу и не останавливай смену. Зарядные станции на точке выдачи.'
+  },
+  { 
+    icon: '🔧',
+    title: 'Надёжная техника',
+    description: 'Все велосипеды проходят техосмотр перед выдачей. Работает в любую погоду — доставки не останавливаются.'
+  },
+  { 
+    icon: '📝',
+    title: 'Гибкий договор',
+    description: 'Аренда от одной недели. Продли или верни велосипед в любое время — без штрафов и лишних вопросов.'
+  },
+  { 
+    icon: '💬',
+    title: 'Поддержка по связи',
+    description: 'Вопросы по аренде и технике — отвечаем в мессенджерах и по телефону в рабочее время.'
+  },
+  { 
+    icon: '🚀',
+    title: 'Премиум для долгих смен',
+    description: 'Эргономичное седло, амортизаторы и бортовой дисплей в тарифе Премиум. Специально для смен 10–14 часов.'
+  },
+  { 
+    icon: '📍',
+    title: 'Одна точка в Красноярске',
+    description: 'Выдача, возврат и технические вопросы — всё по одному адресу: ул. Ястынская 6а. Удобно и без лишних поездок.'
+  }
 ];
 
 export default function Features() {
   return (
-    <section className="px-4 py-16 bg-slate-900">
-      <div className="mx-auto max-w-5xl">
-        <h2 className="text-3xl font-bold text-center text-slate-100 sm:text-4xl">Всё включено в аренду</h2>
-        <div className="grid gap-6 mt-12 sm:grid-cols-3">
-          {benefits.map((b, i) => (
-            <div key={i} className="p-6 bg-slate-800/50 rounded-2xl border border-slate-700/50 backdrop-blur-sm">
-              <h3 className="text-xl font-bold text-yellow-400">{b.title}</h3>
-              <p className="mt-3 text-sm leading-relaxed text-slate-400">{b.desc}</p>
+    <section id="advantages" className="py-20 px-4 bg-slate-900">
+      <div className="max-w-6xl mx-auto">
+        <div className="text-center mb-16">
+          <h2 className="text-3xl sm:text-4xl font-black text-slate-100 mb-4">
+            Преимущества аренды электровелосипеда ELBIKO
+          </h2>
+          <p className="text-slate-400 text-sm sm:text-base max-w-2xl mx-auto">
+            Никакого бензина, пробок и штрафов за парковку
+          </p>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {benefits.map((benefit, index) => (
+            <div 
+              key={index} 
+              className="p-6 rounded-2xl bg-slate-800/50 border border-slate-700/50 backdrop-blur-sm transition-all duration-300 hover:border-emerald-500/30 hover:bg-slate-800/80 group"
+            >
+              <div className="text-4xl mb-4 group-hover:scale-110 transition-transform">
+                {benefit.icon}
+              </div>
+              <h3 className="text-xl font-bold text-emerald-400 mb-3">
+                {benefit.title}
+              </h3>
+              <p className="text-sm leading-relaxed text-slate-400">
+                {benefit.description}
+              </p>
             </div>
           ))}
         </div>

@@ -30,7 +30,7 @@ export default function Calculator() {
         <div className="mt-8">
           <div className="flex justify-between text-sm font-medium text-slate-400">
             <span>Срок аренды</span>
-            <span className="text-yellow-400 font-bold">{days} дней</span>
+            <span className="text-emerald-400 font-bold">{days} дней</span>
           </div>
           <input
             type="range"
@@ -38,7 +38,7 @@ export default function Calculator() {
             max="30"
             value={days}
             onChange={(e) => setDays(Number(e.target.value))}
-            className="w-full h-2 mt-4 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-yellow-500"
+            className="w-full h-2 mt-4 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-emerald-500"
           />
           <div className="flex justify-between mt-2 text-xs text-slate-500">
             <span>1 день</span>
@@ -54,16 +54,16 @@ export default function Calculator() {
           </div>
           <div className="flex justify-between items-center">
             <span className="text-slate-400 text-sm">Итого к оплате:</span>
-            <span className="text-3xl font-black text-yellow-400">{totalPrice} ₽</span>
+            <span className="text-3xl font-black text-emerald-400">{totalPrice} ₽</span>
           </div>
           {economy > 0 && (
-            <div className="p-3 bg-green-500/10 border border-green-500/20 text-green-400 text-xs text-center rounded-xl font-medium">
+            <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs text-center rounded-xl font-medium">
               Экономия по сравнению с покупкой: ~{economy.toLocaleString()} ₽
             </div>
           )}
         </div>
 
-        <button onClick={handleBooking} className="w-full mt-6 py-4 bg-yellow-500 hover:bg-yellow-400 text-slate-950 font-bold rounded-xl transition-transform active:scale-95">
+        <button onClick={handleBooking} className="w-full mt-6 py-4 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-bold rounded-xl transition-all shadow-lg shadow-emerald-500/20 active:scale-95">
           Забронировать на {days} дн.
         </button>
       </div>

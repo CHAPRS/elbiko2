@@ -1,5 +1,6 @@
 'use client';
 import React from 'react';
+import { useRentStore } from '@/store/useRentStore';
 
 // Временные данные - будут заменены на данные из Sanity
 const tariffs = [
@@ -47,6 +48,12 @@ const tariffs = [
 ];
 
 export default function Tariffs() {
+  const { toggleContactModal } = useRentStore();
+
+  const handleSelectTariff = () => {
+    toggleContactModal(true, 'tariff');
+  };
+
   return (
     <section id="tariffs" className="py-20 px-4 bg-slate-950">
       <div className="max-w-6xl mx-auto">
@@ -93,7 +100,9 @@ export default function Tariffs() {
                 ))}
               </ul>
               
-              <button className={`w-full py-4 rounded-xl font-bold transition-all active:scale-95 ${
+              <button 
+                onClick={handleSelectTariff}
+                className={`w-full py-4 rounded-xl font-bold transition-all active:scale-95 ${
                 tariff.popular
                   ? 'bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 hover:shadow-lg hover:shadow-emerald-500/20'
                   : 'bg-slate-800 text-slate-200 border border-slate-700 hover:bg-slate-700'

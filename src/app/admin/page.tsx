@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 
 interface Bike {
   id: number;
@@ -80,6 +81,22 @@ export default function AdminPage() {
     }
   };
 
+  const handleDeleteBike = async (id: number) => {
+    if (!confirm('Удалить велосипед?')) return;
+
+    try {
+      const res = await fetch(`/api/admin/bikes?id=${id}`, {
+        method: 'DELETE',
+      });
+
+      if (res.ok) {
+        fetchBikes();
+      }
+    } catch (err) {
+      console.error('Ошибка при удалении:', err);
+    }
+  };
+
   // =========================================================================
   // ПРИНЦИП ИЗОЛИРОВАННОГО ПЛОСКОГО JSX (Изолированные переменные выше return)
   // =========================================================================
@@ -141,6 +158,12 @@ export default function AdminPage() {
                 Сервис
               </button>
             )}
+            <button
+              onClick={() => handleDeleteBike(bike.id)}
+              className="px-2 py-1 bg-slate-700 hover:bg-slate-600 text-white rounded text-xs transition-colors"
+            >
+              Удалить
+            </button>
           </td>
         </tr>
       );
@@ -154,6 +177,28 @@ export default function AdminPage() {
         <h1 className="text-3xl font-bold bg-gradient-to-r from-amber-500 to-orange-500 bg-clip-text text-transparent mb-8">
           Панель администратора Elbiko
         </h1>
+
+        {/* Навигация */}
+        <div className="mb-8 flex gap-4">
+          <Link
+            href="/admin"
+            className="px-4 py-2 bg-amber-500 text-slate-950 rounded-lg font-medium hover:bg-amber-400 transition-colors"
+          >
+            🚲 Велосипеды
+          </Link>
+          <Link
+            href="/admin/leads"
+            className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg font-medium hover:bg-slate-700 transition-colors"
+          >
+            📋 Заявки
+          </Link>
+          <Link
+            href="/admin/rents"
+            className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg font-medium hover:bg-slate-700 transition-colors"
+          >
+            📊 Аренды
+          </Link>
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="bg-slate-900/50 border border-slate-800 backdrop-blur-md p-6 rounded-xl">

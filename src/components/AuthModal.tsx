@@ -20,10 +20,15 @@ export function AuthModal() {
   useEffect(() => {
     if (isAuthModalOpen) {
       document.body.style.overflow = 'hidden';
+      document.body.style.pointerEvents = 'none';
     } else {
       document.body.style.overflow = 'unset';
+      document.body.style.pointerEvents = 'auto';
     }
-    return () => { document.body.style.overflow = 'unset'; };
+    return () => {
+      document.body.style.overflow = 'unset';
+      document.body.style.pointerEvents = 'auto';
+    };
   }, [isAuthModalOpen]);
 
   if (!isAuthModalOpen) return null;

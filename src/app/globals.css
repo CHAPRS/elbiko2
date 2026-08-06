@@ -1,3 +1,14 @@
-@tailwind base; 
-@tailwind components; 
+@tailwind base;
+@tailwind components;
 @tailwind utilities;
+
+/* Принудительная разблокировка скролла */
+body {
+  overflow: auto !important;
+  pointer-events: auto !important;
+}
+
+/* Оверлеи модальных окон должны пропускать клики только при закрытии */
+.modal-overlay {
+  pointer-events: auto;
+}

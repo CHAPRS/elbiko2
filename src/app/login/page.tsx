@@ -7,8 +7,10 @@ export default function LoginPage() {
   const router = useRouter();
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [username, setUsername] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -16,22 +18,41 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const response = await fetch('/api/auth/courier/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, password }),
-      });
+      if (isAdmin) {
+        // Вход админа
+        const response = await fetch('/api/auth/admin/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password }),
+        });
 
-      const data = await response.json();
+        const data = await response.json();
 
-      if (!response.ok) {
-        setError(data.error || 'Ошибка авторизации');
-        setLoading(false);
-        return;
+        if (!response.ok) {
+          setError(data.error || 'Ошибка авторизации');
+          setLoading(false);
+          return;
+        }
+
+        router.push('/admin');
+      } else {
+        // Вход курьера
+        const response = await fetch('/api/auth/courier/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone, password }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          setError(data.error || 'Ошибка авторизации');
+          setLoading(false);
+          return;
+        }
+
+        router.push('/dashboard');
       }
-
-      // Перенаправляем в защищенный личный кабинет курьера
-      router.push('/dashboard');
     } catch (err) {
       setError('Не удалось связаться с сервером');
       setLoading(false);
@@ -49,8 +70,34 @@ export default function LoginPage() {
             ELBIKO
           </h1>
           <p className="text-gray-400 text-sm mt-2">
-            Вход в кабинет курьера
+            {isAdmin ? 'Вход в панель администратора' : 'Вход в кабинет курьера'}
           </p>
+        </div>
+
+        {/* Переключатель между админом и курьером */}
+        <div className="mb-6 flex gap-2">
+          <button
+            type="button"
+            onClick={() => setIsAdmin(false)}
+            className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
+              !isAdmin
+                ? 'bg-amber-500 text-[#0F0F12]'
+                : 'bg-[#1C1C24] text-gray-400 border border-white/5'
+            }`}
+          >
+            Курьер
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsAdmin(true)}
+            className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
+              isAdmin
+                ? 'bg-amber-500 text-[#0F0F12]'
+                : 'bg-[#1C1C24] text-gray-400 border border-white/5'
+            }`}
+          >
+            Администратор
+          </button>
         </div>
 
         {/* Вывод ошибки (без тернарного оператора внутри общего return) */}
@@ -62,19 +109,35 @@ export default function LoginPage() {
 
         {/* Форма */}
         <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">
-              Номер телефона
-            </label>
-            <input
-              type="tel"
-              placeholder="+7 (999) 111-22-33"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              required
-              className="w-full h-12 px-4 rounded-xl bg-[#1C1C24] border border-white/5 focus:border-amber-500/50 text-white placeholder-gray-600 focus:outline-none transition-all"
-            />
-          </div>
+          {isAdmin ? (
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">
+                Логин администратора
+              </label>
+              <input
+                type="text"
+                placeholder="admin"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required
+                className="w-full h-12 px-4 rounded-xl bg-[#1C1C24] border border-white/5 focus:border-amber-500/50 text-white placeholder-gray-600 focus:outline-none transition-all"
+              />
+            </div>
+          ) : (
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">
+                Номер телефона
+              </label>
+              <input
+                type="tel"
+                placeholder="+7 (999) 111-22-33"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                required
+                className="w-full h-12 px-4 rounded-xl bg-[#1C1C24] border border-white/5 focus:border-amber-500/50 text-white placeholder-gray-600 focus:outline-none transition-all"
+              />
+            </div>
+          )}
 
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">

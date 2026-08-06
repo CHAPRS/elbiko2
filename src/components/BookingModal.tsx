@@ -18,10 +18,15 @@ export function BookingModal() {
   useEffect(() => {
     if (isBookingModalOpen) {
       document.body.style.overflow = 'hidden';
+      document.body.style.pointerEvents = 'none';
     } else {
       document.body.style.overflow = 'unset';
+      document.body.style.pointerEvents = 'auto';
     }
-    return () => { document.body.style.overflow = 'unset'; };
+    return () => {
+      document.body.style.overflow = 'unset';
+      document.body.style.pointerEvents = 'auto';
+    };
   }, [isBookingModalOpen]);
 
   if (!isBookingModalOpen || !selectedBike) return null;

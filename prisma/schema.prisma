@@ -10,16 +10,20 @@ generator client {
 // Существующая модель Bike с добавлением обратной связи для сессий
 model Bike {
   id            Int             @id @default(autoincrement())
+  name          String          // Название модели
   speed         String          // Строковый стандарт из техпаспорта v3.3
   range         String          // Строковый стандарт из техпаспорта v3.3
   motor         String          // Строковый стандарт из техпаспорта v3.3
   isWaterproof  Boolean         // Булевый стандарт из техпаспорта v3.3
-  status        String          // Статусы: "AVAILABLE", "RENTED", "MAINTENANCE"
+  status        String          @default("AVAILABLE") // Статусы: "AVAILABLE", "RENTED", "MAINTENANCE"
+  pricePerDay   Decimal         @default(0.00) @db.Decimal(10, 2) // Цена за день
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
 
-  // Связь: Один байк может фигурировать в разных сессиях аренды (история + текущая)
+  // Связи
   rentalSessions RentalSession[]
+  rents          Rent[]
+  leads          Lead[]
 }
 
 // Новая модель Курьера (User)
@@ -43,7 +47,7 @@ model RentalSession {
   status    String    // Статус сессии (например: "ACTIVE", "COMPLETED")
   startDate DateTime  @default(now()) // Дата старта аренды
   endDate   DateTime? // Дата завершения (null, пока аренда активна)
-  
+
   // Внешние ключи для связи One-to-Many
   userId    Int
   bikeId    Int
@@ -58,4 +62,66 @@ model RentalSession {
   // Индексы для оптимизации частых выборок в ЛК курьера со смартфона
   @@index([userId])
   @@index([bikeId])
+}
+
+// Модель Заявки (Lead)
+model Lead {
+  id          Int       @id @default(autoincrement())
+  name        String
+  phone       String
+  bikeName    String?
+  status      String    @default("NEW") // Статусы: "NEW", "IN_PROGRESS", "CONFIRMED", "REJECTED"
+  message     String?   // Дополнительное сообщение от клиента
+  bikeId      Int?      // Связь с велосипедом (если выбран конкретный)
+
+  // Отношения
+  bike        Bike?     @relation(fields: [bikeId], references: [id], onDelete: SetNull)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status])
+  @@index([phone])
+}
+
+// Модель Аренды (Rent)
+model Rent {
+  id          Int       @id @default(autoincrement())
+  userId      Int
+  bikeId      Int
+  startDate   DateTime  @default(now())
+  endDate     DateTime
+  totalPrice  Decimal   @db.Decimal(10, 2)
+  isActive    Boolean   @default(true)
+  status      String    @default("ACTIVE") // Статусы: "ACTIVE", "COMPLETED", "CANCELLED", "OVERDUE"
+
+  // Отношения
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bike        Bike      @relation(fields: [bikeId], references: [id], onDelete: Cascade)
+  payment     Payment?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([bikeId])
+  @@index([status])
+}
+
+// Модель Платежа (Payment)
+model Payment {
+  id          Int       @id @default(autoincrement())
+  rentId      Int       @unique
+  amount      Decimal   @db.Decimal(10, 2)
+  status      String    @default("PENDING") // Статусы: "PENDING", "COMPLETED", "FAILED", "REFUNDED"
+  paymentUrl  String?
+  paymentId   String?   // ID платежа в платежной системе
+
+  // Отношения
+  rent        Rent      @relation(fields: [rentId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status])
 }

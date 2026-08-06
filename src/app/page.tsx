@@ -10,11 +10,21 @@ import Reviews from '@/components/Reviews';
 import Business from '@/components/Business';
 import Repair from '@/components/Repair';
 import Header from '@/components/Header';
+import { ContactModal } from '@/components/ContactModal';
+import { useRentStore } from '@/store/useRentStore';
 
 export default function HomePage() {
   const [bikes, setBikes] = useState<any[]>([]);
   const [selectedBike, setSelectedBike] = useState<any | null>(null);
   const [faqOpen, setFaqOpen] = useState<number | null>(null);
+  const { toggleContactModal, toggleAuthModal, toggleBookingModal } = useRentStore();
+
+  // Сброс всех модальных окон при загрузке страницы
+  useEffect(() => {
+    toggleContactModal(false);
+    toggleAuthModal(false);
+    toggleBookingModal(false);
+  }, []);
 
   useEffect(() => {
     fetch('/api/admin/dashboard')
@@ -46,8 +56,8 @@ export default function HomePage() {
   // 2. Сборка FAQ-аккордеона
   const faqItems = [
     { q: "Что нужно для оформления договора?", a: "Только паспорт гражданина РФ или СНГ и минимальный возраст от 18 лет. Никаких скрытых залогов." },
-    { q: "Как происходит замена аккумулятора?", a: "Вы можете бесплатно заменить севший АКБ на полностью заряженный в любом из наших пунктов выдачи в течение смены." },
-    { q: "Кто платит за ремонт в случае поломки?", a: "Естественный износ (тормоза, спицы, цепь, покрышки) мы чиним полностью бесплатно в нашей мастерской." }
+    { q: "Как происходит замена аккумулятора?", a: "Если аккумулятор вышел из строя мы заменим его на заряженный без дополнительных плат" },
+    { q: "Кто платит за ремонт в случае поломки?", a: "Естественный износ (тормоза, спицы, цепь, покрышки) мы чиним полностью бесплатно в нашей мастерской. Если поломки являются результатом не аккуратной эксплуатации, то сумму ремонта согласовываем по факту." }
   ];
 
   const faqRenderList = faqItems.map((item, idx) => {
@@ -140,7 +150,7 @@ export default function HomePage() {
           <div className="space-y-2 text-sm font-mono text-slate-300">
             <p><span className="text-slate-500">Адрес:</span> ул. Ястынская 6а, Красноярск</p>
             <p><span className="text-slate-500">Часы:</span> 09:00 — 21:00 ежедневно</p>
-            <p><span className="text-slate-500">Телефон:</span> +7 (913) 836-17-09</p>
+            <p><span className="text-slate-500">Телефон:</span> +7 (987) 847-92-89</p>
           </div>
         </div>
         
@@ -168,13 +178,16 @@ export default function HomePage() {
         </div>
       </footer>
 
-      {/* Модалка заказа */}
+    {/* Модалка заказа */}
       {selectedBike && (
         <OrderModal 
           bike={selectedBike} 
           onClose={() => setSelectedBike(null)} 
         />
       )}
+
+      {/* Модалка выбора способа связи */}
+      <ContactModal />
     </div>
   );
 }

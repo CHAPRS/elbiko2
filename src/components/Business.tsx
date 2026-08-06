@@ -1,5 +1,6 @@
 'use client';
 import React from 'react';
+import { useRentStore } from '@/store/useRentStore';
 
 const businessFeatures = [
   {
@@ -25,6 +26,12 @@ const businessFeatures = [
 ];
 
 export default function Business() {
+  const { toggleContactModal } = useRentStore();
+
+  const handleBusinessContact = () => {
+    toggleContactModal(true, 'business');
+  };
+
   return (
     <section id="business" className="py-20 px-4 bg-slate-900">
       <div className="max-w-6xl mx-auto">
@@ -57,7 +64,10 @@ export default function Business() {
               </li>
             </ul>
             
-            <button className="px-8 py-4 bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 font-bold rounded-xl transition-all shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 active:scale-95">
+            <button 
+              onClick={handleBusinessContact}
+              className="px-8 py-4 bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 font-bold rounded-xl transition-all shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 active:scale-95"
+            >
               Обсудить сотрудничество
             </button>
           </div>

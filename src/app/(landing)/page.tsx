@@ -140,7 +140,7 @@ export default function HomePage() {
           <div className="space-y-2 text-sm font-mono text-slate-300">
             <p><span className="text-slate-500">Адрес:</span> ул. Ястынская 6а, Красноярск</p>
             <p><span className="text-slate-500">Часы:</span> 09:00 — 21:00 ежедневно</p>
-            <p><span className="text-slate-500">Телефон:</span> +7 (913) 836-17-09</p>
+            <p><span className="text-slate-500">Телефон:</span> +7 (987) 847-92-89</p>
           </div>
         </div>
         

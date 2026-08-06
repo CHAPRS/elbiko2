@@ -61,41 +61,98 @@ export async function POST(request: Request) {
 }
 
 // ==========================================
-// PATCH: Обновление статуса велосипеда
+// PATCH: Обновление статуса или данных велосипеда
 // ==========================================
 export async function PATCH(request: Request) {
   try {
     const body = await request.json();
-    const { id, status } = body;
+    const { id, status, name, speed, range, motor, isWaterproof, pricePerDay } = body;
 
     // Валидация входных данных
-    if (!id || !status) {
+    if (!id) {
       return NextResponse.json(
-        { error: 'Отсутствуют обязательные параметры (id, status)' },
+        { error: 'Отсутствует обязательный параметр (id)' },
         { status: 400 }
       );
     }
 
-    // Проверка валидности передаваемого статуса
-    const validStatuses = ['FREE', 'RENTED', 'MAINTENANCE'];
-    if (!validStatuses.includes(status)) {
-      return NextResponse.json(
-        { error: 'Передан невалидный статус' },
-        { status: 400 }
-      );
+    // Формируем объект обновления только с переданными полями
+    const updateData: any = {};
+
+    if (status) {
+      const validStatuses = ['FREE', 'RENTED', 'MAINTENANCE', 'AVAILABLE'];
+      if (!validStatuses.includes(status)) {
+        return NextResponse.json(
+          { error: 'Передан невалидный статус' },
+          { status: 400 }
+        );
+      }
+      updateData.status = status;
     }
 
-    // Обновление статуса в БД
+    if (name !== undefined) updateData.name = name;
+    if (speed !== undefined) updateData.speed = speed;
+    if (range !== undefined) updateData.range = range;
+    if (motor !== undefined) updateData.motor = motor;
+    if (isWaterproof !== undefined) updateData.isWaterproof = Boolean(isWaterproof);
+    if (pricePerDay !== undefined) updateData.pricePerDay = Number(pricePerDay);
+
+    // Обновление данных в БД
     const updatedBike = await prisma.bike.update({
       where: { id: Number(id) },
-      data: { status },
+      data: updateData,
     });
 
     return NextResponse.json(updatedBike, { status: 200 });
   } catch (error) {
     console.error('Ошибка PATCH /api/admin/bikes:', error);
     return NextResponse.json(
-      { error: 'Не удалось обновить статус велосипеда' },
+      { error: 'Не удалось обновить данные велосипеда' },
+      { status: 500 }
+    );
+  }
+}
+
+// ==========================================
+// DELETE: Удаление велосипеда
+// ==========================================
+export async function DELETE(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Отсутствует обязательный параметр (id)' },
+        { status: 400 }
+      );
+    }
+
+    // Проверяем, не связан ли велосипед с активными арендами
+    const activeRents = await prisma.rent.findMany({
+      where: {
+        bikeId: Number(id),
+        isActive: true,
+      },
+    });
+
+    if (activeRents.length > 0) {
+      return NextResponse.json(
+        { error: 'Невозможно удалить велосипед с активными арендами' },
+        { status: 400 }
+      );
+    }
+
+    // Удаляем велосипед
+    await prisma.bike.delete({
+      where: { id: Number(id) },
+    });
+
+    return NextResponse.json({ success: true }, { status: 200 });
+  } catch (error) {
+    console.error('Ошибка DELETE /api/admin/bikes:', error);
+    return NextResponse.json(
+      { error: 'Не удалось удалить велосипед' },
       { status: 500 }
     );
   }

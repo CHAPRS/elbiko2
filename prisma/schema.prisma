@@ -9,16 +9,17 @@ generator client {
 
 // Существующая модель Bike с добавлением обратной связи для сессий
 model Bike {
-  id            Int             @id @default(autoincrement())
-  name          String          // Название модели
-  speed         String          // Строковый стандарт из техпаспорта v3.3
-  range         String          // Строковый стандарт из техпаспорта v3.3
-  motor         String          // Строковый стандарт из техпаспорта v3.3
-  isWaterproof  Boolean         // Булевый стандарт из техпаспорта v3.3
-  status        String          @default("AVAILABLE") // Статусы: "AVAILABLE", "RENTED", "MAINTENANCE"
-  pricePerDay   Decimal         @default(0.00) @db.Decimal(10, 2) // Цена за день
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  id           Int      @id @default(autoincrement())
+  name         String // Название модели
+  speed        String // Строковый стандарт из техпаспорта v3.3
+  range        String // Строковый стандарт из техпаспорта v3.3
+  motor        String // Строковый стандарт из техпаспорта v3.3
+  isWaterproof Boolean // Булевый стандарт из техпаспорта v3.3
+  status       String   @default("FREE") // Статусы: "FREE", "RENTED", "MAINTENANCE"
+  pricePerDay  Decimal  @default(0.00) @db.Decimal(10, 2) // Цена за день
+  imageUrl     String? // Ссылка на фото велосипеда
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   // Связи
   rentalSessions RentalSession[]
@@ -28,36 +29,37 @@ model Bike {
 
 // Новая модель Курьера (User)
 model User {
-  id        Int      @id @default(autoincrement())
-  phone     String   @unique
-  password  String   @default("") // Временно добавили дефолт для прохождения миграции
-  name      String   @default("Курьер") // Временно добавили дефолт для существующих строк
-  balance   Decimal  @default(0.00) @db.Decimal(10, 2)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             Int      @id @default(autoincrement())
+  phone          String   @unique
+  password       String   @default("") // Временно добавили дефолт для прохождения миграции
+  name           String   @default("Курьер") // Временно добавили дефолт для существующих строк
+  balance        Decimal  @default(0.00) @db.Decimal(10, 2)
+  telegramChatId String? // Chat ID курьера для уведомлений бота
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   rentalSessions RentalSession[]
+  rents          Rent[]
 }
-
 
 // Новая модель Сессии Аренды (RentalSession)
 model RentalSession {
   id        Int       @id @default(autoincrement())
-  tariff    String    // Тариф курьера (например: "DAILY", "WEEKLY")
-  status    String    // Статус сессии (например: "ACTIVE", "COMPLETED")
+  tariff    String // Тариф курьера (например: "DAILY", "WEEKLY")
+  status    String // Статус сессии (например: "ACTIVE", "COMPLETED")
   startDate DateTime  @default(now()) // Дата старта аренды
   endDate   DateTime? // Дата завершения (null, пока аренда активна)
 
   // Внешние ключи для связи One-to-Many
-  userId    Int
-  bikeId    Int
+  userId Int
+  bikeId Int
 
   // Отношения (Relations) с каскадным удалением
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  bike      Bike      @relation(fields: [bikeId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bike Bike @relation(fields: [bikeId], references: [id], onDelete: Cascade)
 
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Индексы для оптимизации частых выборок в ЛК курьера со смартфона
   @@index([userId])
@@ -66,19 +68,23 @@ model RentalSession {
 
 // Модель Заявки (Lead)
 model Lead {
-  id          Int       @id @default(autoincrement())
-  name        String
-  phone       String
-  bikeName    String?
-  status      String    @default("NEW") // Статусы: "NEW", "IN_PROGRESS", "CONFIRMED", "REJECTED"
-  message     String?   // Дополнительное сообщение от клиента
-  bikeId      Int?      // Связь с велосипедом (если выбран конкретный)
+  id           Int       @id @default(autoincrement())
+  name         String
+  phone        String
+  bikeName     String?
+  status       String    @default("NEW") // Статусы: "NEW", "IN_PROGRESS", "CONFIRMED", "REJECTED"
+  message      String?   @db.Text // Дополнительное сообщение от клиента
+  comment      String?   @db.Text // Внутренний комментарий администратора
+  rejectReason String?   @db.Text // Причина отклонения заявки
+  processedAt  DateTime? // Момент последнего изменения статуса
+  rentId       Int? // Аренда, созданная из заявки
+  bikeId       Int? // Связь с велосипедом (если выбран конкретный)
 
   // Отношения
-  bike        Bike?     @relation(fields: [bikeId], references: [id], onDelete: SetNull)
+  bike Bike? @relation(fields: [bikeId], references: [id], onDelete: SetNull)
 
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([status])
   @@index([phone])
@@ -86,22 +92,22 @@ model Lead {
 
 // Модель Аренды (Rent)
 model Rent {
-  id          Int       @id @default(autoincrement())
-  userId      Int
-  bikeId      Int
-  startDate   DateTime  @default(now())
-  endDate     DateTime
-  totalPrice  Decimal   @db.Decimal(10, 2)
-  isActive    Boolean   @default(true)
-  status      String    @default("ACTIVE") // Статусы: "ACTIVE", "COMPLETED", "CANCELLED", "OVERDUE"
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  bikeId     Int
+  startDate  DateTime @default(now())
+  endDate    DateTime
+  totalPrice Decimal  @db.Decimal(10, 2)
+  isActive   Boolean  @default(true)
+  status     String   @default("ACTIVE") // Статусы: "ACTIVE", "COMPLETED", "CANCELLED", "OVERDUE"
 
   // Отношения
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  bike        Bike      @relation(fields: [bikeId], references: [id], onDelete: Cascade)
-  payment     Payment?
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bike    Bike     @relation(fields: [bikeId], references: [id], onDelete: Cascade)
+  payment Payment?
 
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId])
   @@index([bikeId])
@@ -110,18 +116,18 @@ model Rent {
 
 // Модель Платежа (Payment)
 model Payment {
-  id          Int       @id @default(autoincrement())
-  rentId      Int       @unique
-  amount      Decimal   @db.Decimal(10, 2)
-  status      String    @default("PENDING") // Статусы: "PENDING", "COMPLETED", "FAILED", "REFUNDED"
-  paymentUrl  String?
-  paymentId   String?   // ID платежа в платежной системе
+  id         Int     @id @default(autoincrement())
+  rentId     Int     @unique
+  amount     Decimal @db.Decimal(10, 2)
+  status     String  @default("PENDING") // Статусы: "PENDING", "COMPLETED", "FAILED", "REFUNDED"
+  paymentUrl String?
+  paymentId  String? // ID платежа в платежной системе
 
   // Отношения
-  rent        Rent      @relation(fields: [rentId], references: [id], onDelete: Cascade)
+  rent Rent @relation(fields: [rentId], references: [id], onDelete: Cascade)
 
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([status])
 }

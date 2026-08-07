@@ -1,79 +1,36 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '@/lib/prisma';
+import { createRent } from '@/lib/rent';
 
 export async function POST(request: Request) {
   try {
-    const { clientName, clientPhone, bikeId } = await request.json();
+    const body = await request.json();
+    const phone = body.clientPhone || body.phone;
+    const name = body.clientName || body.name || 'Клиент с сайта';
+    const bikeId = body.bikeId;
+    const days = Number(body.days) > 0 ? Number(body.days) : 1;
 
-    if (!clientPhone || !bikeId) {
+    if (!phone || !bikeId) {
       return NextResponse.json(
-        { error: 'Телефон и ID байка обязательны для бронирования' }, 
+        { error: 'Телефон и ID байка обязательны для бронирования' },
         { status: 400 }
       );
     }
 
     const user = await prisma.user.upsert({
-      where: { phone: clientPhone },
-      update: { name: clientName },
-      create: { phone: clientPhone, name: clientName },
+      where: { phone: String(phone) },
+      update: { name },
+      create: { phone: String(phone), name },
     });
 
-    const bike = await prisma.bike.findUnique({
-      where: { id: Number(bikeId) }
-    });
+    const rent = await createRent({ userId: user.id, bikeId: Number(bikeId), days });
 
-    if (!bike) {
-      return NextResponse.json(
-        { error: 'Выбранный электровелосипед не найден в базе данных' }, 
-        { status: 404 }
-      );
-    }
-
-    const days = 1;
-    const totalPrice = bike.pricePerDay * days;
-    const endDate = new Date();
-    endDate.setDate(endDate.getDate() + days);
-
-    const result = await prisma.$transaction(async (tx) => {
-      const updatedBike = await tx.bike.update({
-        where: { id: bike.id },
-        data: { status: 'RENTED' },
-      });
-
-      const rent = await tx.rent.create({
-        data: {
-          userId: user.id,
-          bikeId: updatedBike.id,
-          endDate,
-          totalPrice,
-          isActive: true,
-        },
-      });
-
-      const payment = await tx.payment.create({
-        data: {
-          rentId: rent.id,
-          amount: totalPrice,
-          status: 'PENDING',
-          paymentUrl: `https://yookassa.ru{rent.id}`,
-        },
-      });
-
-      return { payment };
-    });
-
-    return NextResponse.json({ 
-      success: true, 
-      paymentUrl: result.payment.paymentUrl 
-    });
-
+    return NextResponse.json({ success: true, rentId: rent.id, totalPrice: rent.totalPrice });
   } catch (error: any) {
-    console.error('Критическая ошибка транзакции в MySQL:', error);
+    console.error('Ошибка при создании аренды:', error);
     return NextResponse.json(
-      { error: 'Database transaction failed', details: error.message }, 
-      { status: 500 }
+      { error: error.message || 'Не удалось оформить аренду' },
+      { status: 400 }
     );
   }
 }

@@ -4,6 +4,14 @@ import type { NextRequest } from "next/server";
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Админские API закрыты той же сессией, что и страницы админки
+  if (pathname.startsWith("/api/admin")) {
+    if (!request.cookies.has("admin_session")) {
+      return NextResponse.json({ error: "Требуется авторизация администратора" }, { status: 401 });
+    }
+    return NextResponse.next();
+  }
+
   // 1. Позволяем свободно загружать системные файлы Next.js, картинки, API и главную
   if (
     pathname.startsWith("/_next") || 
@@ -51,5 +59,5 @@ export function middleware(request: NextRequest) {
 
 // Конфигурируем перехватчик для всех путей
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/api/admin/:path*", "/((?!api|_next/static|_next/image|favicon.ico).*)"],
 };

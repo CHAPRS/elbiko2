@@ -5,45 +5,104 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('Начало наполнения базы данных (Seeding)...');
 
-  // 1. Очищаем старые данные (опционально, чтобы избежать дубликатов при повторном запуске)
+  await prisma.payment.deleteMany({});
+  await prisma.rent.deleteMany({});
+  await prisma.lead.deleteMany({});
   await prisma.rentalSession.deleteMany({});
   await prisma.user.deleteMany({});
   await prisma.bike.deleteMany({});
 
-  // 2. Создаем тестовый электровелосипед по новому стандарту (v3.3)
-  const sampleBike = await prisma.bike.create({
-    data: {
-      speed: '50 км/ч',
-      range: '80 км',
-      motor: '500W',
-      isWaterproof: true,
-      status: 'RENTED', // Статус "Арендован"
-    },
-  });
-  console.log('✅ Тестовый велосипед создан:', sampleBike.id);
+  const bikes = await Promise.all([
+    prisma.bike.create({
+      data: {
+        name: 'Monster Long Range',
+        speed: 'до 50 км/ч',
+        range: 'до 80 км',
+        motor: '500W',
+        isWaterproof: true,
+        status: 'RENTED',
+        pricePerDay: 500,
+      },
+    }),
+    prisma.bike.create({
+      data: {
+        name: 'City Courier 48V',
+        speed: 'до 45 км/ч',
+        range: 'до 60 км',
+        motor: '350W',
+        isWaterproof: false,
+        status: 'FREE',
+        pricePerDay: 450,
+      },
+    }),
+    prisma.bike.create({
+      data: {
+        name: 'Storm Pro',
+        speed: 'до 55 км/ч',
+        range: 'до 100 км',
+        motor: '750W',
+        isWaterproof: true,
+        status: 'MAINTENANCE',
+        pricePerDay: 650,
+      },
+    }),
+  ]);
+  console.log(`✅ Создано велосипедов: ${bikes.length}`);
 
-  // 3. Создаем тестового курьера
-  const sampleCourier = await prisma.user.create({
+  const courier = await prisma.user.create({
     data: {
       phone: '+79991112233',
-      password: 'courier-password-2026', // Обязательное поле теперь заполнено
+      password: 'courier-password-2026',
       name: 'Иван Курьер',
-      balance: 1500.00, // Начальный баланс курьера
+      balance: 1500.0,
     },
   });
-  console.log('✅ Тестовый курьер создан:', sampleCourier.phone);
+  console.log('✅ Тестовый курьер создан:', courier.phone);
 
-  // 4. Закрепляем велосипед за курьером, создавая активную сессию аренды
   const activeSession = await prisma.rentalSession.create({
     data: {
       tariff: 'WEEKLY',
       status: 'ACTIVE',
-      userId: sampleCourier.id,
-      bikeId: sampleBike.id,
+      userId: courier.id,
+      bikeId: bikes[0].id,
       startDate: new Date(),
     },
   });
-  console.log('✅ Активная сессия аренды успешно запущена! ID:', activeSession.id);
+  console.log('✅ Активная сессия аренды запущена, ID:', activeSession.id);
+
+  const endDate = new Date();
+  endDate.setDate(endDate.getDate() + 7);
+
+  const rent = await prisma.rent.create({
+    data: {
+      userId: courier.id,
+      bikeId: bikes[0].id,
+      endDate,
+      totalPrice: 3500,
+      status: 'ACTIVE',
+    },
+  });
+  console.log('✅ Активная аренда создана, ID:', rent.id);
+
+  await prisma.lead.createMany({
+    data: [
+      {
+        name: 'Пётр Доставкин',
+        phone: '+79005553311',
+        bikeName: bikes[1].name,
+        bikeId: bikes[1].id,
+        message: 'Нужен байк на месяц, работаю в Яндекс Еде',
+        status: 'NEW',
+      },
+      {
+        name: 'Алексей Самокатов',
+        phone: '+79005554422',
+        bikeName: bikes[2].name,
+        status: 'IN_PROGRESS',
+      },
+    ],
+  });
+  console.log('✅ Тестовые заявки созданы');
 
   console.log('Наполнение базы данных успешно завершено!');
 }

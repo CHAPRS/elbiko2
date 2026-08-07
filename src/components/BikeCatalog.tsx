@@ -1,21 +1,11 @@
 'use client';
 import React, { useEffect, useState } from 'react';
 import { useRentStore } from '@/store/useRentStore';
-
-// Локальный интерфейс, чтобы не зависеть от внешних файлов @/types
-interface LocalBikeType {
-  id: string;
-  name: string;
-  model: string;
-  power: string;
-  maxSpeed: string;
-  batteryLife: string;
-  pricePerDay: number;
-}
+import { Bike } from '@/types';
 
 export function BikeCatalog() {
   const { selectBike, toggleBookingModal } = useRentStore();
-  const [bikes, setBikes] = useState<LocalBikeType[]>([]);
+  const [bikes, setBikes] = useState<Bike[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -28,15 +18,8 @@ export function BikeCatalog() {
       .finally(() => setLoading(false));
   }, []);
 
-  const handleSelect = (bike: LocalBikeType) => {
-    selectBike({
-      id: bike.id,
-      name: bike.name,
-      range: bike.batteryLife,
-      speed: bike.maxSpeed,
-      power: bike.power,
-      pricePerDay: bike.pricePerDay
-    });
+  const handleSelect = (bike: Bike) => {
+    selectBike(bike);
     toggleBookingModal(true);
   };
 
@@ -62,15 +45,20 @@ export function BikeCatalog() {
         <div className="grid gap-6 mt-12 sm:grid-cols-2">
           {bikes.map((bike) => (
             <div key={bike.id} className="flex flex-col bg-slate-900/60 rounded-3xl overflow-hidden border border-slate-800/80 backdrop-blur-md shadow-xl hover:border-slate-700/60 transition-all duration-300">
-              <div className="h-48 bg-slate-950/50 flex items-center justify-center text-slate-500 font-medium border-b border-slate-800/50">
-                📸 {bike.name} Фото
+              <div className="h-48 bg-slate-950/50 flex items-center justify-center text-slate-500 font-medium border-b border-slate-800/50 overflow-hidden">
+                {bike.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={bike.imageUrl} alt={bike.name} className="w-full h-full object-cover" />
+                ) : (
+                  <span>📸 {bike.name}</span>
+                )}
               </div>
               <div className="p-6 flex flex-col flex-grow">
                 <h3 className="text-xl font-bold text-slate-100">{bike.name}</h3>
                 <div className="grid grid-cols-3 gap-2 mt-4 text-center">
-                  <div className="p-3 bg-slate-950/40 rounded-xl border border-slate-850"><div className="text-xs text-slate-500 mb-1">Ход</div><div className="text-sm font-bold text-slate-300">{bike.batteryLife}</div></div>
-                  <div className="p-3 bg-slate-950/40 rounded-xl border border-slate-850"><div className="text-xs text-slate-500 mb-1">Скорость</div><div className="text-sm font-bold text-slate-300">{bike.maxSpeed}</div></div>
-                  <div className="p-3 bg-slate-950/40 rounded-xl border border-slate-850"><div className="text-xs text-slate-500 mb-1">Мотор</div><div className="text-sm font-bold text-slate-300">{bike.power}</div></div>
+                  <div className="p-3 bg-slate-950/40 rounded-xl border border-slate-850"><div className="text-xs text-slate-500 mb-1">Ход</div><div className="text-sm font-bold text-slate-300">{bike.range}</div></div>
+                  <div className="p-3 bg-slate-950/40 rounded-xl border border-slate-850"><div className="text-xs text-slate-500 mb-1">Скорость</div><div className="text-sm font-bold text-slate-300">{bike.speed}</div></div>
+                  <div className="p-3 bg-slate-950/40 rounded-xl border border-slate-850"><div className="text-xs text-slate-500 mb-1">Мотор</div><div className="text-sm font-bold text-slate-300">{bike.motor}</div></div>
                 </div>
                 <div className="mt-6 pt-4 border-t border-slate-800 flex justify-between items-center flex-wrap gap-2">
                   <div><span className="text-xs text-slate-400">Тариф:</span><div className="text-lg font-bold text-yellow-400">от {bike.pricePerDay} ₽/день</div></div>

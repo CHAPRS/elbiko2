@@ -1,9 +1,34 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
+import { LEAD_STATUSES, isLeadStatus } from '@/lib/leadStatus';
 
-const prisma = new PrismaClient();
+// GET - Карточка одной заявки
+export async function GET(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const lead = await prisma.lead.findUnique({
+      where: { id: Number(params.id) },
+      include: { bike: true },
+    });
 
-// PATCH - Обновление статуса заявки
+    if (!lead) {
+      return NextResponse.json({ error: 'Заявка не найдена' }, { status: 404 });
+    }
+
+    return NextResponse.json(lead);
+  } catch (error) {
+    console.error('Ошибка при получении заявки:', error);
+    return NextResponse.json(
+      { error: 'Ошибка при получении заявки' },
+      { status: 500 }
+    );
+  }
+}
+
+// PATCH - Обновление статуса, комментария и причины отказа
 export async function PATCH(
   request: Request,
   { params }: { params: { id: string } }
@@ -11,25 +36,54 @@ export async function PATCH(
   try {
     const id = Number(params.id);
     const body = await request.json();
-    const { status } = body;
+    const { status, comment, rejectReason, bikeId } = body;
 
-    if (!status) {
+    if (status === undefined && comment === undefined && rejectReason === undefined && bikeId === undefined) {
       return NextResponse.json(
-        { error: 'Статус обязателен' },
+        { error: 'Нет полей для обновления' },
         { status: 400 }
       );
     }
 
+    const data: Prisma.LeadUpdateInput = {};
+
+    if (status !== undefined) {
+      if (!isLeadStatus(status)) {
+        return NextResponse.json(
+          { error: `Статус должен быть одним из: ${LEAD_STATUSES.join(', ')}` },
+          { status: 400 }
+        );
+      }
+
+      if (status === 'REJECTED' && !rejectReason) {
+        return NextResponse.json(
+          { error: 'Для отклонения заявки укажите причину' },
+          { status: 400 }
+        );
+      }
+
+      data.status = status;
+      data.processedAt = status === 'NEW' ? null : new Date();
+    }
+
+    if (comment !== undefined) data.comment = comment ? String(comment) : null;
+    if (rejectReason !== undefined) data.rejectReason = rejectReason ? String(rejectReason) : null;
+
+    if (bikeId !== undefined) {
+      data.bike = bikeId ? { connect: { id: Number(bikeId) } } : { disconnect: true };
+    }
+
     const lead = await prisma.lead.update({
       where: { id },
-      data: { status },
-      include: {
-        bike: true,
-      },
+      data,
+      include: { bike: true },
     });
 
     return NextResponse.json(lead);
   } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+      return NextResponse.json({ error: 'Заявка не найдена' }, { status: 404 });
+    }
     console.error('Ошибка при обновлении заявки:', error);
     return NextResponse.json(
       { error: 'Ошибка при обновлении заявки' },
@@ -44,14 +98,15 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const id = Number(params.id);
-
     await prisma.lead.delete({
-      where: { id },
+      where: { id: Number(params.id) },
     });
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+      return NextResponse.json({ error: 'Заявка не найдена' }, { status: 404 });
+    }
     console.error('Ошибка при удалении заявки:', error);
     return NextResponse.json(
       { error: 'Ошибка при удалении заявки' },

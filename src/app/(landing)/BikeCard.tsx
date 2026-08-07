@@ -9,22 +9,20 @@ interface BikeCardProps {
 export default function BikeCard({ bike, onBook }: BikeCardProps) {
   // Безопасное извлечение и форматирование данных
   const bikeName = String(bike.name || 'Электровелосипед');
-  const bikeModel = String(bike.model || 'Базовая комплектация');
-  const bikePower = String(bike.power || '500W');
-  const bikeSpeed = String(bike.maxSpeed || '45 км/ч');
-  const bikeBattery = String(bike.batteryLife || 'до 60 км');
+  const bikePower = String(bike.motor || '500W');
+  const bikeSpeed = String(bike.speed || '45 км/ч');
+  const bikeBattery = String(bike.range || 'до 60 км');
   const bikePrice = String(bike.pricePerDay || '500');
-  
-  const isAvailable = bike.status === 'FREE' || bike.status === 'free';
+  const bikeWaterproof = bike.isWaterproof ? 'IP65 Полная' : 'Базовая';
+
+  const isAvailable = String(bike.status).toUpperCase() === 'FREE';
 
   // Текстовые константы во избежание сбоев JSX-парсера
   const txtSpeedLabel = "Макс. скорость";
   const txtBatteryLabel = "Запас хода";
   const txtPowerLabel = "Мощность мотора";
   const txtWaterLabel = "Гидроизоляция";
-  const txtWaterValue = "IP65 Полная";
   const txtPriceSuffix = " ₽ / сут";
-  const txtCurrency = " ₽";
   const txtStatusFree = "Свободен";
   const txtStatusRented = "В прокате";
   const txtBtnBook = "Забронировать";
@@ -37,7 +35,12 @@ export default function BikeCard({ bike, onBook }: BikeCardProps) {
         {/* Премиальное превью байка с неоновой подложкой */}
         <div className="w-full h-44 bg-slate-950/80 rounded-2xl flex items-center justify-center relative overflow-hidden mb-6 border border-slate-800/50 group-hover:border-slate-700/50 transition-colors">
           <div className="absolute -inset-10 bg-[radial-gradient(circle_at_center,rgba(245,158,11,0.05)_0%,transparent_70%)] opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-          <span className="text-7xl group-hover:scale-105 group-hover:-rotate-3 transition-transform duration-500 select-none">🚲</span>
+          {bike.imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={bike.imageUrl} alt={bikeName} className="w-full h-full object-cover" />
+          ) : (
+            <span className="text-7xl group-hover:scale-105 group-hover:-rotate-3 transition-transform duration-500 select-none">🚲</span>
+          )}
           
           {/* Верхний шильдик мощности */}
           <div className="absolute top-3 right-3 text-[10px] font-mono font-bold px-2.5 py-1 rounded-lg bg-slate-900/90 border border-slate-800 text-amber-400 shadow-md">
@@ -59,7 +62,6 @@ export default function BikeCard({ bike, onBook }: BikeCardProps) {
           </span>
         </div>
         
-        <p className="text-xs text-slate-500 font-mono mb-5">{bikeModel}</p>
 
         {/* Сетка фич и характеристик (Инфографика в стиле Наобгон) */}
         <div className="space-y-3 border-t border-slate-800/60 pt-4 mb-6 text-xs font-mono">
@@ -77,7 +79,7 @@ export default function BikeCard({ bike, onBook }: BikeCardProps) {
           </div>
           <div className="flex justify-between items-center py-0.5">
             <span className="text-slate-500">{txtWaterLabel}</span>
-            <span className="text-amber-400/90 font-bold">{txtWaterValue}</span>
+            <span className="text-amber-400/90 font-bold">{bikeWaterproof}</span>
           </div>
         </div>
 

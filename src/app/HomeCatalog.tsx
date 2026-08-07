@@ -15,7 +15,7 @@ export default function HomeCatalog() {
   const [actionLoading, setActionLoading] = useState<number | null>(null);
 
   useEffect(() => {
-    fetch("/api/admin/bikes") // Действующий GET-роут для получения списка байков
+    fetch("/api/bikes")
       .then((res) => res.json())
       .then((data) => {
         setBikes(data);

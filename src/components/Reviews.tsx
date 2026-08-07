@@ -46,7 +46,7 @@ export default function Reviews() {
                 {review.rating < 5 && '☆'.repeat(5 - review.rating)}
               </div>
               <p className="text-slate-300 text-sm leading-relaxed mb-6 italic">
-                "{review.text}"
+                &laquo;{review.text}&raquo;
               </p>
               <div className="border-t border-slate-700/50 pt-4">
                 <div className="font-bold text-slate-100">{review.author}</div>

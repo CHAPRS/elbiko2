@@ -1,9 +1,11 @@
 export interface Bike {
-  id: string;
+  id: number;
   name: string;
-  image?: string;
-  range: string;
   speed: string;
-  power: string;
+  range: string;
+  motor: string;
+  isWaterproof: boolean;
+  status: string;
   pricePerDay: number;
+  imageUrl?: string | null;
 }

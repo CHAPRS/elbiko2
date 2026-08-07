@@ -27,11 +27,11 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    fetch('/api/admin/dashboard')
+    fetch('/api/bikes')
       .then(res => res.json())
       .then(data => {
-        if (data && Array.isArray(data.bikes)) {
-          setBikes(data.bikes);
+        if (Array.isArray(data)) {
+          setBikes(data);
         }
       })
       .catch(err => console.error(err));

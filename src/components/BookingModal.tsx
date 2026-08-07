@@ -50,13 +50,12 @@ export function BookingModal() {
           phone: userPhone,
           bikeId: selectedBike.id,
           days: rentDays,
-          totalPrice,
         }),
       });
 
       const data = await response.json();
-      if (data.success && data.paymentUrl) {
-        window.location.href = data.paymentUrl;
+      if (data.success) {
+        alert(`Аренда №${data.rentId} оформлена. Менеджер свяжется с вами для подтверждения и оплаты.`);
       } else {
         alert(data.error || 'Ошибка при создании аренды');
       }

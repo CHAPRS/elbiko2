@@ -22,7 +22,7 @@ export function useHomeLogic() {
   useEffect(() => {
     async function loadBikes() {
       try {
-        const res = await fetch('/api/admin/bikes');
+        const res = await fetch('/api/bikes');
         if (res.ok) {
           const data = await res.json();
           setBikes(data);

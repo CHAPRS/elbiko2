@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '@/lib/prisma';
 
 // PATCH - Обновление аренды (завершение, продление, изменение статуса)
 export async function PATCH(
@@ -33,9 +31,10 @@ export async function PATCH(
 
       // При завершении аренды - освобождаем велосипед
       if (status === 'COMPLETED' || status === 'CANCELLED') {
+        updateData.isActive = false;
         await prisma.bike.update({
           where: { id: rent.bikeId },
-          data: { status: 'AVAILABLE' },
+          data: { status: 'FREE' },
         });
       }
 
@@ -117,7 +116,7 @@ export async function DELETE(
       // Освобождаем велосипед
       await prisma.bike.update({
         where: { id: rent.bikeId },
-        data: { status: 'AVAILABLE' },
+        data: { status: 'FREE' },
       });
     }
 

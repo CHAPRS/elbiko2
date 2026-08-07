@@ -1,3 +1,19 @@
 node_modules
-.next/
 node_modules/
+.next/
+tsconfig.tsbuildinfo
+
+# Локальные секреты и переменные окружения
+.env
+.env.*
+!.env.example
+!.env.contentful.example
+
+# Служебные файлы Windows
+desktop.ini
+Thumbs.db
+
+# Дистрибутивы и установщики не место в репозитории
+*.msi
+*.exe
+*.7z

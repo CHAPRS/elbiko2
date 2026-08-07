@@ -1,10 +1,15 @@
+require('dotenv').config();
 const { Telegraf } = require('telegraf');
 
-// Рабочий токен авторизации вашего бота
-const finalToken = '8653805854:AAHoAngkcdhErgGCmoHn7ja-lsx1VYN_wIQ';
+const finalToken = process.env.TELEGRAM_TOKEN || process.env.TELEGRAM_BOT_TOKEN;
+const ADMIN_CHAT_ID = Number(
+  process.env.TELEGRAM_ADMIN_CHAT_ID || process.env.TELEGRAM_CHAT_ID
+);
 
-// Вставьте сюда ID вашей административной группы менеджеров (Обязательно со знаком минус)
-const ADMIN_CHAT_ID = -1002381920381; // <-- ЗАМЕНИТЕ ЭТО ЧИСЛО НА ВАШ ID ГРУППЫ
+if (!finalToken) {
+  console.error('Не задан TELEGRAM_TOKEN в telegram-bot/.env');
+  process.exit(1);
+}
 
 console.log('Попытка авторизации бота...');
 const bot = new Telegraf(finalToken);
@@ -16,7 +21,7 @@ function sendLeadToManagers(ctx, name, phone, bike) {
     'Наш менеджер уже проверяет данные и свяжется с вами в течение 10 минут!'
   );
 
-  const targetChat = (ADMIN_CHAT_ID && ADMIN_CHAT_ID !== -1002381920381) ? ADMIN_CHAT_ID : ctx.chat.id;
+  const targetChat = Number.isFinite(ADMIN_CHAT_ID) && ADMIN_CHAT_ID !== 0 ? ADMIN_CHAT_ID : ctx.chat.id;
 
   bot.telegram.sendMessage(
     targetChat,

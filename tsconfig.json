@@ -22,5 +22,15 @@
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules",
+    "sanity.config.ts",
+    "sanity.cli.ts",
+    "sanity/**",
+    "src/sanity/**",
+    "src/lib/sanity.ts",
+    "src/lib/sanityQueries.ts",
+    "src/components/HeroSanity.tsx",
+    "src/components/TariffsSanity.tsx"
+  ]
 }

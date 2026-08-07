@@ -1,6 +1,7 @@
 'use client';
 import React from 'react';
 import { useRentStore } from '@/store/useRentStore';
+import { Bike } from '@/types';
 
 export default function Calculator() {
   const { rentDays: days, setRentDays: setDays, toggleBookingModal, selectBike } = useRentStore();
@@ -17,9 +18,25 @@ export default function Calculator() {
   const buyingCost = 80000; 
   const economy = buyingCost - totalPrice > 0 ? buyingCost - totalPrice : 0;
 
-  const handleBooking = () => {
-    selectBike({ id: '1', name: 'Minako V8 Pro', range: 'до 60 км', speed: 'до 45 км/ч', power: '500W', pricePerDay: 500 });
-    toggleBookingModal(true);
+  const handleBooking = async () => {
+    try {
+      const res = await fetch('/api/bikes');
+      const data = await res.json();
+      const available: Bike | undefined = Array.isArray(data)
+        ? data.find((bike: Bike) => bike.status === 'FREE')
+        : undefined;
+
+      if (!available) {
+        alert('Сейчас все велосипеды заняты — оставьте заявку, и мы свяжемся с вами.');
+        return;
+      }
+
+      selectBike(available);
+      toggleBookingModal(true);
+    } catch (err) {
+      console.error('Ошибка загрузки автопарка:', err);
+      alert('Не удалось связаться с сервером');
+    }
   };
 
   return (

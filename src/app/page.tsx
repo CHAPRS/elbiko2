@@ -3,21 +3,32 @@ import React, { useEffect, useState } from 'react';
 import BikeCard from './(landing)/BikeCard';
 import OrderModal from './(landing)/OrderModal';
 import Hero from '@/components/Hero';
+import HeroSanity from '@/components/HeroSanity';
 import HowItWorks from '@/components/HowItWorks';
 import Features from '@/components/Features';
 import Tariffs from '@/components/Tariffs';
+import TariffsSanity from '@/components/TariffsSanity';
 import Reviews from '@/components/Reviews';
+import ReviewsSanity from '@/components/ReviewsSanity';
 import Business from '@/components/Business';
 import Repair from '@/components/Repair';
 import Header from '@/components/Header';
+import FAQSanity from '@/components/FAQSanity';
 import { ContactModal } from '@/components/ContactModal';
 import { useRentStore } from '@/store/useRentStore';
+import { getHero, getTariffs, getReviews, getFAQ } from '@/lib/sanityQueries';
 
 export default function HomePage() {
   const [bikes, setBikes] = useState<any[]>([]);
   const [selectedBike, setSelectedBike] = useState<any | null>(null);
   const [faqOpen, setFaqOpen] = useState<number | null>(null);
   const { toggleContactModal, toggleAuthModal, toggleBookingModal } = useRentStore();
+  
+  // Sanity data states
+  const [heroData, setHeroData] = useState<any>(null);
+  const [tariffsData, setTariffsData] = useState<any[]>([]);
+  const [reviewsData, setReviewsData] = useState<any[]>([]);
+  const [faqData, setFaqData] = useState<any[]>([]);
 
   // Сброс всех модальных окон при загрузке страницы
   useEffect(() => {
@@ -35,6 +46,27 @@ export default function HomePage() {
         }
       })
       .catch(err => console.error(err));
+  }, []);
+
+  // Fetch Sanity data
+  useEffect(() => {
+    const fetchSanityData = async () => {
+      try {
+        const [hero, tariffs, reviews, faq] = await Promise.all([
+          getHero(),
+          getTariffs(),
+          getReviews(),
+          getFAQ()
+        ]);
+        setHeroData(hero);
+        setTariffsData(tariffs);
+        setReviewsData(reviews);
+        setFaqData(faq);
+      } catch (error) {
+        console.error('Error fetching Sanity data:', error);
+      }
+    };
+    fetchSanityData();
   }, []);
 
   // =========================================================
@@ -97,7 +129,7 @@ export default function HomePage() {
       <Header />
 
       {/* Главный баннер (Hero) */}
-      <Hero />
+      {heroData ? <HeroSanity data={heroData} /> : <Hero />}
 
       {/* Как это работает */}
       <HowItWorks />
@@ -106,7 +138,7 @@ export default function HomePage() {
       <Features />
 
       {/* Тарифы */}
-      <Tariffs />
+      {tariffsData.length > 0 ? <TariffsSanity tariffs={tariffsData} /> : <Tariffs />}
 
       {/* Каталог велосипедов */}
       <main className="max-w-7xl mx-auto px-6 py-20">
@@ -122,7 +154,7 @@ export default function HomePage() {
       </main>
 
       {/* Отзывы */}
-      <Reviews />
+      {reviewsData.length > 0 ? <ReviewsSanity reviews={reviewsData} /> : <Reviews />}
 
       {/* Для бизнеса */}
       <Business />
@@ -131,14 +163,16 @@ export default function HomePage() {
       <Repair />
 
       {/* FAQ секция */}
-      <section id="faq" className="max-w-3xl mx-auto px-6 py-20 space-y-8 scroll-mt-24">
-        <div className="text-center">
-          <h2 className="text-2xl sm:text-3xl font-black text-white">Часто задаваемые вопросы</h2>
-        </div>
-        <div className="space-y-3">
-          {faqRenderList}
-        </div>
-      </section>
+      {faqData.length > 0 ? <FAQSanity faqs={faqData} /> : (
+        <section id="faq" className="max-w-3xl mx-auto px-6 py-20 space-y-8 scroll-mt-24">
+          <div className="text-center">
+            <h2 className="text-2xl sm:text-3xl font-black text-white">Часто задаваемые вопросы</h2>
+          </div>
+          <div className="space-y-3">
+            {faqRenderList}
+          </div>
+        </section>
+      )}
 
       {/* Контакты и карта */}
       <section id="contacts" className="max-w-7xl mx-auto px-6 py-20 grid grid-cols-1 md:grid-cols-3 gap-8 scroll-mt-24 border-t border-slate-900">

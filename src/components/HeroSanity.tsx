@@ -36,7 +36,7 @@ export default function HeroSanity({ data }: HeroSanityProps) {
       <div className="absolute inset-0 z-0">
         <Image
           src={bgImage}
-          alt="ELBIKO - аренда электровелосипедов"
+          alt="ЭльБайко - аренда электровелосипедов"
           fill
           className="object-cover"
           priority

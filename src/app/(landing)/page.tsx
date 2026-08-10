@@ -135,10 +135,10 @@ export default function HomePage() {
         <div className="space-y-4">
           <h2 className="text-2xl font-black text-white">Пункт выдачи ELBIKO</h2>
           <p className="text-sm text-slate-400 leading-relaxed">
-            Главный офис и сервисный центр. Ждем вас ежедневно.
+            Главный офис и сервисный центр. Ждем вас по будням с 10 до 19 ч.
           </p>
           <div className="space-y-2 text-sm font-mono text-slate-300">
-            <p><span className="text-slate-500">Адрес:</span> ул. Ястынская 6а, Красноярск</p>
+            <p><span className="text-slate-500">Адрес:</span> ул. Салмышская, д. 30, Оренбург</p>
             <p><span className="text-slate-500">Часы:</span> 09:00 — 21:00 ежедневно</p>
             <p><span className="text-slate-500">Телефон:</span> +7 (987) 847-92-89</p>
           </div>

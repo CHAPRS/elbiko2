@@ -15,7 +15,7 @@ const steps = [
   {
     number: '03',
     title: 'Приедь к нам',
-    description: 'Красноярск, ул. Ястынская 6а. Подписываем договор за 15 минут. Нужен только паспорт.'
+    description: 'Оренбург, ул. Салмышская, д. 30. Подписываем договор за 15 минут. Нужен только паспорт.'
   },
   {
     number: '04',
@@ -30,7 +30,7 @@ export default function HowItWorks() {
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-16">
           <h2 className="text-3xl sm:text-4xl font-black text-slate-100 mb-4">
-            Как арендовать электровелосипед для курьера
+            Как арендовать электровелосипед
           </h2>
           <p className="text-slate-400 text-sm sm:text-base">
             Выход на смену в день обращения за 15 минут

@@ -6,7 +6,7 @@ export default function Header() {
 
   const navLinks = [
     { href: '#tariffs', label: 'Тарифы' },
-    { href: '#how-it-works', label: 'Как работает' },
+    { href: '#how-it-works', label: 'Как взять в аренду' },
     { href: '#catalog', label: 'Каталог' },
     { href: '#advantages', label: 'Преимущества' },
     { href: '#business', label: 'Бизнесу' },
@@ -17,9 +17,9 @@ export default function Header() {
     <header className="border-b border-slate-900 bg-slate-950/80 backdrop-blur-md sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-6 h-20 flex justify-between items-center">
         <div className="flex items-center gap-2">
-          <span className="text-2xl font-black text-white tracking-tighter font-mono">ELBIKO.</span>
+          <span className="text-2xl font-black text-white tracking-tighter font-mono">ЭльБайко</span>
           <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 uppercase tracking-widest font-black border border-emerald-500/30">
-            ECO
+            Оренбург
           </span>
         </div>
         

@@ -26,7 +26,7 @@ export default function ReviewsSanity({ reviews }: ReviewsSanityProps) {
           Отзывы курьеров
         </h2>
         <p className="text-slate-400 max-w-2xl mx-auto">
-          Что говорят те, кто уже работает с ELBIKO
+          Что говорят те, кто уже работает с ЭльБайко
         </p>
       </div>
 

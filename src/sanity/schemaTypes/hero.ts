@@ -1,79 +1,33 @@
-export default {
+import { defineType, defineField } from 'sanity'
+
+export const heroSchema = defineType({
   name: 'hero',
   title: 'Hero секция',
   type: 'document',
   fields: [
-    {
+    defineField({
       name: 'title',
-      title: 'Заголовок',
+      title: 'Главный заголовок',
       type: 'string',
-      validation: (Rule: any) => Rule.required(),
-    },
-    {
+      validation: (Rule) => Rule.required(),
+    }),
+    defineField({
       name: 'subtitle',
-      title: 'Подзаголовок',
+      title: 'Подзаголовок (описание)',
       type: 'text',
-      rows: 2,
-    },
-    {
-      name: 'badge',
-      title: 'Бейдж',
+      rows: 3,
+    }),
+    defineField({
+      name: 'ctaText',
+      title: 'Текст на кнопке',
       type: 'string',
-    },
-    {
-      name: 'stat1_label',
-      title: 'Статистика 1 - подпись',
-      type: 'string',
-    },
-    {
-      name: 'stat1_value',
-      title: 'Статистика 1 - значение',
-      type: 'string',
-    },
-    {
-      name: 'stat2_label',
-      title: 'Статистика 2 - подпись',
-      type: 'string',
-    },
-    {
-      name: 'stat2_value',
-      title: 'Статистика 2 - значение',
-      type: 'string',
-    },
-    {
-      name: 'stat3_label',
-      title: 'Статистика 3 - подпись',
-      type: 'string',
-    },
-    {
-      name: 'stat3_value',
-      title: 'Статистика 3 - значение',
-      type: 'string',
-    },
-    {
-      name: 'cta_text',
-      title: 'Текст основной кнопки',
-      type: 'string',
-    },
-    {
-      name: 'cta_link',
-      title: 'Ссылка основной кнопки',
-      type: 'string',
-    },
-    {
-      name: 'secondary_cta_text',
-      title: 'Текст вторичной кнопки',
-      type: 'string',
-    },
-    {
-      name: 'secondary_cta_link',
-      title: 'Ссылка вторичной кнопки',
-      type: 'string',
-    },
+      description: 'Например: "Арендовать за 790₽/сут"',
+    }),
+    defineField({
+      name: 'backgroundImage',
+      title: 'Фоновое изображение',
+      type: 'image',
+      options: { hotspot: true },
+    }),
   ],
-  preview: {
-    select: {
-      title: 'title',
-    },
-  },
-}
+})

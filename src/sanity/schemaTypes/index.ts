@@ -1,7 +1,10 @@
-import hero from './hero'
-import tariff from './tariff'
-import review from './review'
-import faq from './faq'
-import bike from './bike'
+import { type SchemaTypeDefinition } from 'sanity'
+import { tariffSchema } from './tariff'
+import { heroSchema } from './hero'
+import { reviewSchema } from './review'
+import { faqSchema } from './faq'
+import { bikeSchema } from './bike'
 
-export const schema = [hero, tariff, review, faq, bike]
+export const schema: { types: SchemaTypeDefinition[] } = {
+  types: [tariffSchema, heroSchema, reviewSchema, faqSchema, bikeSchema],
+}

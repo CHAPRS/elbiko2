@@ -1,18 +1,19 @@
 export const apiVersion = '2026-08-05';
 
-// Пытаемся прочитать сначала переменные Next.js, затем Sanity Studio
-const env = (typeof process !== 'undefined' ? process.env : {}) as Record<string, string | undefined>;
-
+// Явное чтение переменных для корректной работы статического анализа сборщиков
 export const dataset = 
-  env.NEXT_PUBLIC_SANITY_DATASET || 
-  env.SANITY_STUDIO_DATASET || 
+  process.env.NEXT_PUBLIC_SANITY_DATASET || 
+  (typeof process !== 'undefined' ? process.env.SANITY_STUDIO_DATASET : undefined) || 
   'production';
 
 export const projectId = 
-  env.NEXT_PUBLIC_SANITY_PROJECT_ID || 
-  env.SANITY_STUDIO_PROJECT_ID;
+  process.env.NEXT_PUBLIC_SANITY_PROJECT_ID || 
+  (typeof process !== 'undefined' ? process.env.SANITY_STUDIO_PROJECT_ID : undefined);
 
-// Финальная проверка, чтобы не падать жестко в браузере
+// Жесткая проверка: без projectId студия всё равно упадет, лучше сразу выкинуть понятную ошибку
 if (!projectId) {
-  console.warn("⚠️ Предупреждение Sanity: Project ID не найден в переменных окружения. Убедитесь, что .env файл настроен.");
+  throw new Error(
+    "❌ Ошибка Sanity: Переменная NEXT_PUBLIC_SANITY_PROJECT_ID не найдена. " +
+    "Проверьте, что файл .env создан в корне проекта и вы перезапустили сервер."
+  );
 }

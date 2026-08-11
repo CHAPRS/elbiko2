@@ -66,19 +66,24 @@ model RentalSession {
   @@index([bikeId])
 }
 
-// Модель Заявки (Lead)
 model Lead {
   id           Int       @id @default(autoincrement())
   name         String
   phone        String
   bikeName     String?
-  status       String    @default("NEW") // Статусы: "NEW", "IN_PROGRESS", "CONFIRMED", "REJECTED"
-  message      String?   @db.Text // Дополнительное сообщение от клиента
-  comment      String?   @db.Text // Внутренний комментарий администратора
-  rejectReason String?   @db.Text // Причина отклонения заявки
+  status       String    @default("NEW") // "NEW", "IN_PROGRESS", "CONFIRMED", "REJECTED"
+  message      String?   @db.Text
+  comment      String?   @db.Text
+  rejectReason String?   @db.Text
+  createdAt    DateTime  @default(now())   // 🔥 Добавлено: дата поступления заявки
   processedAt  DateTime? // Момент последнего изменения статуса
-  rentId       Int? // Аренда, созданная из заявки
-  bikeId       Int? // Связь с велосипедом (если выбран конкретный)
+  rentId       Int?
+  bikeId       Int?
+
+  // 🔥 Индексы для мгновенной работы админки
+  @@index([status])    // Ускоряет фильтрацию по вкладкам (Новые / В работе / Отказ)
+  @@index([createdAt]) // Ускоряет сортировку от свежих к старым
+}
 
   // Отношения
   bike Bike? @relation(fields: [bikeId], references: [id], onDelete: SetNull)

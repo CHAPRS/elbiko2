@@ -107,9 +107,8 @@ ALTER TABLE `Rent` ADD CONSTRAINT `Rent_bikeId_fkey` FOREIGN KEY (`bikeId`) REFE
 -- AddForeignKey
 ALTER TABLE `Payment` ADD CONSTRAINT `Payment_rentId_fkey` FOREIGN KEY (`rentId`) REFERENCES `Rent`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
--- RenameIndex
-ALTER TABLE `Rent` RENAME INDEX `Rent_bikeId_fkey` TO `Rent_bikeId_idx`;
-
--- RenameIndex
-ALTER TABLE `Rent` RENAME INDEX `Rent_userId_fkey` TO `Rent_userId_idx`;
-
+-- 🔥 Безопасное пересоздание индексов с временным отключением проверок ключей MariaDB
+SET FOREIGN_KEY_CHECKS=0;
+DROP INDEX IF EXISTS `Rent_bikeId_fkey` ON `Rent`;
+CREATE INDEX `Rent_bikeId_idx` ON `Rent`(`bikeId`);
+SET FOREIGN_KEY_CHECKS=1;

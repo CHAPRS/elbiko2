@@ -1,6 +1,7 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { sendTelegramNotification } from '@/lib/telegram';
+import { limiter } from '@/lib/rate-limit'; // Импортируем лимитер из шага 2
 
 function escapeHtml(value: string): string {
   return value
@@ -9,7 +10,24 @@ function escapeHtml(value: string): string {
     .replace(/>/g, '&gt;');
 }
 
-export async function POST(request: Request) {
+// Заменяем Request на NextRequest для работы с IP
+export async function POST(request: NextRequest) {
+  // 1. Получаем IP-адрес пользователя для проверки лимитов
+  const ip = request.ip || request.headers.get('x-forwarded-for') || '127.0.0.1';
+
+  try {
+    // 2. Ограничиваем частоту: максимум 3 заявки в минуту с одного IP
+    await limiter.check(3, ip);
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Слишком много попыток. Пожалуйста, подождите 1 минуту перед отправкой новой заявки.' },
+      { 
+        status: 429,
+        headers: { 'Retry-After': '60' }
+      }
+    );
+  }
+
   try {
     const body = await request.json();
     const { name, phone, bikeName, bikeId, message } = body;
@@ -18,6 +36,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Заполните обязательные поля' }, { status: 400 });
     }
 
+    // 3. Создаем запись в MySQL через Prisma
     const lead = await prisma.lead.create({
       data: {
         name: String(name),
@@ -42,10 +61,14 @@ export async function POST(request: Request) {
       .filter(Boolean)
       .join('\n');
 
-    // Заявка уже сохранена, поэтому сбой Telegram не должен ломать ответ клиенту
-    const notified = await sendTelegramNotification(notificationText);
+    // 4. Оптимизация Telegram: убираем await, чтобы ответ клиенту улетал мгновенно.
+    // Запускаем отправку в фоновом режиме. Ошибки логируем, но юзер о них не знает.
+    sendTelegramNotification(notificationText).catch((tgError) => {
+      console.error('Фоновая ошибка отправки в Telegram:', tgError);
+    });
 
-    return NextResponse.json({ success: true, leadId: lead.id, notified }, { status: 201 });
+    // Мгновенно возвращаем успешный ответ курьеру на фронтенд
+    return NextResponse.json({ success: true, leadId: lead.id }, { status: 201 });
   } catch (error) {
     console.error('Ошибка при создании заявки:', error);
     return NextResponse.json({ error: 'Внутренняя ошибка сервера' }, { status: 500 });

@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "seed": "tsx prisma/seed.ts"
+    "seed": "tsx prisma/seed.ts",
+    "seed-content": "tsx prisma/seed-content.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

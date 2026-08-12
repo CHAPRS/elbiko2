@@ -1,34 +1,31 @@
 import React from 'react'
-import { urlFor } from '@/sanity/lib/image'
 import Image from 'next/image'
 
 interface HeroData {
-  backgroundImage?: any
   title: string
   subtitle?: string
   badge?: string
-  stat1_label?: string
-  stat1_value?: string
-  stat2_label?: string
-  stat2_value?: string
-  stat3_label?: string
-  stat3_value?: string
-  cta_text?: string
-  cta_link?: string
-  secondary_cta_text?: string
-  secondary_cta_link?: string
+  backgroundImageUrl?: string
+  stat1Label?: string
+  stat1Value?: string
+  stat2Label?: string
+  stat2Value?: string
+  stat3Label?: string
+  stat3Value?: string
+  ctaText?: string
+  ctaLink?: string
+  secondaryCtaText?: string
+  secondaryCtaLink?: string
 }
 
-interface HeroSanityProps {
+interface HeroDBProps {
   data: HeroData
 }
 
-export default function HeroSanity({ data }: HeroSanityProps) {
+export default function HeroDB({ data }: HeroDBProps) {
   if (!data) return null
 
-  const bgImage = data.backgroundImage 
-    ? urlFor(data.backgroundImage).url() 
-    : '/images/delivery.jpg'
+  const bgImage = data.backgroundImageUrl || '/images/delivery.jpg'
 
   return (
     <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden">
@@ -65,48 +62,48 @@ export default function HeroSanity({ data }: HeroSanityProps) {
 
         {/* Статистика */}
         <div className="flex flex-wrap justify-center gap-8 mb-10">
-          {data.stat1_label && data.stat1_value && (
+          {data.stat1Label && data.stat1Value && (
             <div className="text-center">
               <div className="text-3xl sm:text-4xl font-black text-emerald-400">
-                {data.stat1_label}
+                {data.stat1Label}
               </div>
-              <div className="text-sm text-slate-400 mt-1">{data.stat1_value}</div>
+              <div className="text-sm text-slate-400 mt-1">{data.stat1Value}</div>
             </div>
           )}
-          {data.stat2_label && data.stat2_value && (
+          {data.stat2Label && data.stat2Value && (
             <div className="text-center">
               <div className="text-3xl sm:text-4xl font-black text-cyan-400">
-                {data.stat2_label}
+                {data.stat2Label}
               </div>
-              <div className="text-sm text-slate-400 mt-1">{data.stat2_value}</div>
+              <div className="text-sm text-slate-400 mt-1">{data.stat2Value}</div>
             </div>
           )}
-          {data.stat3_label && data.stat3_value && (
+          {data.stat3Label && data.stat3Value && (
             <div className="text-center">
               <div className="text-3xl sm:text-4xl font-black text-emerald-400">
-                {data.stat3_label}
+                {data.stat3Label}
               </div>
-              <div className="text-sm text-slate-400 mt-1">{data.stat3_value}</div>
+              <div className="text-sm text-slate-400 mt-1">{data.stat3Value}</div>
             </div>
           )}
         </div>
 
         {/* Кнопки */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          {data.cta_text && data.cta_link && (
+          {data.ctaText && data.ctaLink && (
             <a
-              href={data.cta_link}
+              href={data.ctaLink}
               className="px-8 py-4 bg-gradient-to-r from-emerald-500 to-cyan-500 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-emerald-500/25 transition-all duration-300"
             >
-              {data.cta_text}
+              {data.ctaText}
             </a>
           )}
-          {data.secondary_cta_text && data.secondary_cta_link && (
+          {data.secondaryCtaText && data.secondaryCtaLink && (
             <a
-              href={data.secondary_cta_link}
+              href={data.secondaryCtaLink}
               className="px-8 py-4 bg-slate-800/50 border border-slate-700 text-white font-bold rounded-xl hover:bg-slate-800 transition-all duration-300 backdrop-blur-sm"
             >
-              {data.secondary_cta_text}
+              {data.secondaryCtaText}
             </a>
           )}
         </div>

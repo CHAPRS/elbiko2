@@ -129,3 +129,103 @@ model Payment {
 
   @@index([status])
 }
+
+// Модель Hero секции главной страницы
+model Hero {
+  id                  Int     @id @default(autoincrement())
+  title               String
+  subtitle            String?
+  badge               String?
+  backgroundImageUrl  String?
+  stat1Label          String?
+  stat1Value          String?
+  stat2Label          String?
+  stat2Value          String?
+  stat3Label          String?
+  stat3Value          String?
+  ctaText             String?
+  ctaLink             String?
+  secondaryCtaText    String?
+  secondaryCtaLink    String?
+  isActive            Boolean @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+// Модель Преимущества
+model Feature {
+  id          Int     @id @default(autoincrement())
+  icon        String?
+  imageUrl    String?
+  title       String
+  description String
+  order       Int     @default(0)
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([order])
+}
+
+// Модель Шага (Как это работает)
+model Step {
+  id          Int     @id @default(autoincrement())
+  number      String
+  imageUrl    String?
+  title       String
+  description String
+  order       Int     @default(0)
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([order])
+}
+
+// Модель Тарифа
+model Tariff {
+  id          Int      @id @default(autoincrement())
+  name        String
+  subtitle    String?
+  price       Decimal  @db.Decimal(10, 2)
+  period      String
+  features    String   @db.Text // JSON массив строк
+  popular     Boolean  @default(false)
+  imageUrl    String?
+  order       Int      @default(0)
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([order])
+}
+
+// Модель Отзыва
+model Review {
+  id          Int     @id @default(autoincrement())
+  author      String
+  avatarUrl   String?
+  platform    String?
+  duration    String?
+  rating      Int
+  text        String  @db.Text
+  order       Int     @default(0)
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([order])
+}
+
+// Модель FAQ
+model FAQ {
+  id        Int     @id @default(autoincrement())
+  question  String
+  answer    String  @db.Text
+  order     Int     @default(0)
+  isActive  Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([order])
+}

@@ -1,23 +1,23 @@
 import React from 'react'
-import { urlFor } from '@/sanity/lib/image'
 import Image from 'next/image'
 
 interface TariffData {
+  id: number
   name: string
   subtitle?: string
   price: number
   period: string
-  features?: string[]
+  features: string[]
   popular?: boolean
+  imageUrl?: string
   order?: number
-  image?: any
 }
 
-interface TariffsSanityProps {
+interface TariffsDBProps {
   tariffs: TariffData[]
 }
 
-export default function TariffsSanity({ tariffs }: TariffsSanityProps) {
+export default function TariffsDB({ tariffs }: TariffsDBProps) {
   if (!tariffs || tariffs.length === 0) return null
 
   return (
@@ -43,7 +43,7 @@ export default function TariffsSanity({ tariffs }: TariffsSanityProps) {
 
           return (
             <div
-              key={tariff.order || tariff.name}
+              key={tariff.id}
               className={`relative rounded-3xl p-8 border transition-all duration-300 ${popularClass}`}
             >
               {tariff.popular && (
@@ -52,10 +52,10 @@ export default function TariffsSanity({ tariffs }: TariffsSanityProps) {
                 </div>
               )}
 
-              {tariff.image && (
+              {tariff.imageUrl && (
                 <div className="relative h-48 mb-6 rounded-2xl overflow-hidden">
                   <Image
-                    src={urlFor(tariff.image).url()}
+                    src={tariff.imageUrl}
                     alt={tariff.name}
                     fill
                     className="object-cover"

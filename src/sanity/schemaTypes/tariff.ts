@@ -43,6 +43,14 @@ export const tariffSchema = {
       title: 'Порядок отображения',
       type: 'number',
     },
+    {
+      name: 'image',
+      title: 'Изображение тарифа',
+      type: 'image',
+      options: {
+        hotspot: true,
+      },
+    },
   ],
   preview: {
     select: {

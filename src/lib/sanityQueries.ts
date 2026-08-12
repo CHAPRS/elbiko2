@@ -28,7 +28,8 @@ export async function getTariffs() {
     period,
     features,
     popular,
-    order
+    order,
+    image
   }`
   return await client.fetch(query)
 }
@@ -65,6 +66,28 @@ export async function getBikes() {
     power,
     image,
     available,
+    order
+  }`
+  return await client.fetch(query)
+}
+
+export async function getFeatures() {
+  const query = `*[_type == "feature"] | order(order asc){
+    icon,
+    image,
+    title,
+    description,
+    order
+  }`
+  return await client.fetch(query)
+}
+
+export async function getSteps() {
+  const query = `*[_type == "step"] | order(order asc){
+    number,
+    image,
+    title,
+    description,
     order
   }`
   return await client.fetch(query)

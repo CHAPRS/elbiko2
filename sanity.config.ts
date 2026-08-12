@@ -7,6 +7,8 @@
 import { visionTool } from '@sanity/vision'
 import { defineConfig } from 'sanity'
 import { structureTool } from 'sanity/structure'
+import { SchemaTypeDefinition } from 'sanity';
+
 
 // Импортируем версию API и схемы
 import { apiVersion } from './src/sanity/env'
@@ -20,9 +22,13 @@ export default defineConfig({
   projectId: '9qjrff3g', 
   dataset: 'production', 
 
-  schema: {
-    types: schema,
-  },
+schema: {
+  types: (Array.isArray(schema) ? schema : (schema as any).types || []) as any,
+},
+
+
+
+
   plugins: [
     structureTool({ structure }),
     visionTool({ defaultApiVersion: apiVersion }),

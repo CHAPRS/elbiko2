@@ -59,5 +59,8 @@ export function middleware(request: NextRequest) {
 
 // Конфигурируем перехватчик для всех путей
 export const config = {
-  matcher: ["/api/admin/:path*", "/((?!api|_next/static|_next/image|favicon.ico).*)"],
+  // Защита будет срабатывать ТОЛЬКО на папки /admin и /dashboard
+  // Главная страница сайта (/) теперь полностью открыта для всех курьеров!
+  matcher: ['/admin/:path*', '/dashboard/:path*'],
 };
+

@@ -66,33 +66,26 @@ model RentalSession {
   @@index([bikeId])
 }
 
+// Оптимизированная модель Заявки (Lead)
 model Lead {
   id           Int       @id @default(autoincrement())
   name         String
   phone        String
   bikeName     String?
-  status       String    @default("NEW") // "NEW", "IN_PROGRESS", "CONFIRMED", "REJECTED"
+  status       String    @default("NEW")
   message      String?   @db.Text
   comment      String?   @db.Text
   rejectReason String?   @db.Text
-  createdAt    DateTime  @default(now())   // 🔥 Добавлено: дата поступления заявки
-  processedAt  DateTime? // Момент последнего изменения статуса
+  processedAt  DateTime?
   rentId       Int?
   bikeId       Int?
-
-  // 🔥 Индексы для мгновенной работы админки
-  @@index([status])    // Ускоряет фильтрацию по вкладкам (Новые / В работе / Отказ)
-  @@index([createdAt]) // Ускоряет сортировку от свежих к старым
-}
-
-  // Отношения
-  bike Bike? @relation(fields: [bikeId], references: [id], onDelete: SetNull)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  bike         Bike?     @relation(fields: [bikeId], references: [id], onDelete: SetNull)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   @@index([status])
   @@index([phone])
+  @@index([createdAt])
 }
 
 // Модель Аренды (Rent)

@@ -6,6 +6,10 @@ interface HeroData {
   subtitle?: string
   badge?: string
   backgroundImageUrl?: string
+  bikeImageUrl?: string
+  phone?: string
+  telegramUrl?: string
+  maksUrl?: string
   stat1Label?: string
   stat1Value?: string
   stat2Label?: string
@@ -26,30 +30,30 @@ export default function HeroDB({ data }: HeroDBProps) {
   if (!data) return null
 
   const bgImage = data.backgroundImageUrl || '/images/delivery.jpg'
+  const bikeImage = data.bikeImageUrl || '/images/wenbox-u6.jpg'
+  const phone = data.phone || '+7 (987) 847-92-89'
+  const telegramUrl = data.telegramUrl || 'https://t.me/your_telegram'
+  const maksUrl = data.maksUrl || 'https://maks.com/your_profile'
 
   return (
-    <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden">
+    <section className="relative flex flex-col items-center justify-center px-4 py-20 lg:py-32 min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
       {/* Фоновое изображение */}
       <div className="absolute inset-0 z-0">
         <Image
           src={bgImage}
           alt="ЭльБайко - аренда электровелосипедов"
           fill
-          className="object-cover"
+          className="object-cover opacity-20"
           priority
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-slate-950/80 via-slate-950/60 to-slate-950" />
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-950/90 via-slate-900/80 to-slate-950" />
       </div>
 
-      {/* Контент */}
-      <div className="relative z-10 max-w-7xl mx-auto px-6 py-20 text-center">
-        {data.badge && (
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm font-semibold mb-6 backdrop-blur-sm">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            {data.badge}
-          </div>
-        )}
-
+      <div className="absolute top-4 left-4 bg-emerald-500/20 text-emerald-400 font-black px-3 py-1 rounded-full text-xs uppercase tracking-wider border border-emerald-500/30 z-10">
+        {data.badge}
+      </div>
+      
+      <div className="relative z-10 max-w-4xl mx-auto w-full space-y-8 text-center">
         <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white mb-6 leading-tight">
           {data.title}
         </h1>
@@ -59,36 +63,30 @@ export default function HeroDB({ data }: HeroDBProps) {
             {data.subtitle}
           </p>
         )}
-
+        
         {/* Статистика */}
-        <div className="flex flex-wrap justify-center gap-8 mb-10">
+        <div className="grid grid-cols-3 gap-4 sm:gap-6 max-w-lg mx-auto pt-4">
           {data.stat1Label && data.stat1Value && (
-            <div className="text-center">
-              <div className="text-3xl sm:text-4xl font-black text-emerald-400">
-                {data.stat1Label}
-              </div>
-              <div className="text-sm text-slate-400 mt-1">{data.stat1Value}</div>
+            <div className="p-4 rounded-2xl bg-slate-900/50 border border-slate-800 backdrop-blur-sm">
+              <div className="text-2xl sm:text-3xl font-black text-emerald-400">{data.stat1Label}</div>
+              <div className="text-xs sm:text-sm text-slate-500 mt-1">{data.stat1Value}</div>
             </div>
           )}
           {data.stat2Label && data.stat2Value && (
-            <div className="text-center">
-              <div className="text-3xl sm:text-4xl font-black text-cyan-400">
-                {data.stat2Label}
-              </div>
-              <div className="text-sm text-slate-400 mt-1">{data.stat2Value}</div>
+            <div className="p-4 rounded-2xl bg-slate-900/50 border border-slate-800 backdrop-blur-sm">
+              <div className="text-2xl sm:text-3xl font-black text-cyan-400">{data.stat2Label}</div>
+              <div className="text-xs sm:text-sm text-slate-500 mt-1">{data.stat2Value}</div>
             </div>
           )}
           {data.stat3Label && data.stat3Value && (
-            <div className="text-center">
-              <div className="text-3xl sm:text-4xl font-black text-emerald-400">
-                {data.stat3Label}
-              </div>
-              <div className="text-sm text-slate-400 mt-1">{data.stat3Value}</div>
+            <div className="p-4 rounded-2xl bg-slate-900/50 border border-slate-800 backdrop-blur-sm">
+              <div className="text-2xl sm:text-3xl font-black text-emerald-400">{data.stat3Label}</div>
+              <div className="text-xs sm:text-sm text-slate-500 mt-1">{data.stat3Value}</div>
             </div>
           )}
         </div>
 
-        {/* Кнопки */}
+        {/* Основные кнопки */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           {data.ctaText && data.ctaLink && (
             <a
@@ -106,6 +104,59 @@ export default function HeroDB({ data }: HeroDBProps) {
               {data.secondaryCtaText}
             </a>
           )}
+        </div>
+
+        {/* Контакты */}
+        <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
+          <a
+            href={`tel:${phone}`}
+            className="flex items-center justify-center gap-2 px-6 py-3 bg-slate-800/50 border border-slate-700 text-slate-200 font-semibold rounded-xl transition-all hover:bg-slate-800 hover:border-emerald-500/50"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+            </svg>
+            Позвонить
+          </a>
+          <a
+            href={telegramUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 px-6 py-3 bg-blue-500/20 border border-blue-500/30 text-blue-400 font-semibold rounded-xl transition-all hover:bg-blue-500/30 hover:border-blue-500/50"
+          >
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.18-.357.295-.6.295-.002 0-.003 0-.005 0l.213-3.054 5.56-5.022c.24-.213-.054-.334-.373-.121l-6.869 4.326-2.96-.924c-.64-.203-.658-.64.135-.954l11.566-4.458c.538-.196 1.006.128.832.941z"/>
+            </svg>
+            Telegram
+          </a>
+          <a
+            href={maksUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 px-6 py-3 bg-purple-500/20 border border-purple-500/30 text-purple-400 font-semibold rounded-xl transition-all hover:bg-purple-500/30 hover:border-purple-500/50"
+          >
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+            </svg>
+            Maks
+          </a>
+        </div>
+      </div>
+
+      {/* Фото велосипеда */}
+      <div className="relative max-w-2xl mx-auto w-full h-64 sm:h-80 lg:h-96 rounded-3xl overflow-hidden shadow-2xl shadow-emerald-500/10 mt-8">
+        <Image
+          src={bikeImage}
+          alt="Электровелосипед для курьеров"
+          fill
+          className="object-cover"
+          priority
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/50 to-transparent" />
+        <div className="absolute bottom-4 left-4 right-4">
+          <div className="bg-slate-950/80 backdrop-blur-sm rounded-xl p-4 border border-slate-800">
+            <p className="text-emerald-400 font-bold text-lg">Wenbox U6</p>
+            <p className="text-slate-300 text-sm">Идеален для курьерской доставки</p>
+          </div>
         </div>
       </div>
     </section>

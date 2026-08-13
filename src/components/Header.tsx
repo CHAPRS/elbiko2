@@ -37,12 +37,12 @@ export default function Header() {
         </nav>
         
         <div className="flex items-center gap-4">
-          <a 
-            href="/login" 
-            className="hidden sm:block px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 text-sm font-bold transition-all shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 active:scale-95"
-          >
-            Личный кабинет
-          </a>
+            <a 
+              href="/login" 
+              className="hidden sm:block px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 text-sm font-bold transition-all shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 active:scale-95"
+            >
+              Личный кабинет
+            </a>
           <a 
             href="/admin" 
             className="text-xs bg-slate-900 border border-slate-800 text-slate-300 hover:border-emerald-500/50 px-4 py-2 rounded-xl transition-all"

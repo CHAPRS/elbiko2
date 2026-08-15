@@ -3,32 +3,21 @@ import React, { useEffect, useState } from 'react';
 import BikeCard from './(landing)/BikeCard';
 import OrderModal from './(landing)/OrderModal';
 import Hero from '@/components/Hero';
-import HeroDB from '@/components/HeroDB';
 import HowItWorks from '@/components/HowItWorks';
-import HowItWorksDB from '@/components/HowItWorksDB';
 import Features from '@/components/Features';
-import FeaturesDB from '@/components/FeaturesDB';
 import Tariffs from '@/components/Tariffs';
-import TariffsDB from '@/components/TariffsDB';
 import Reviews from '@/components/Reviews';
 import Business from '@/components/Business';
 import Repair from '@/components/Repair';
 import Header from '@/components/Header';
 import { ContactModal } from '@/components/ContactModal';
 import { useRentStore } from '@/store/useRentStore';
-import { getHeroFromDB, getTariffsFromDB, getFeaturesFromDB, getStepsFromDB } from '@/lib/contentQueries';
 
 export default function HomePage() {
   const [bikes, setBikes] = useState<any[]>([]);
   const [selectedBike, setSelectedBike] = useState<any | null>(null);
   const [faqOpen, setFaqOpen] = useState<number | null>(null);
   const { toggleContactModal, toggleAuthModal, toggleBookingModal } = useRentStore();
-  
-  // DB data states
-  const [heroData, setHeroData] = useState<any>(null);
-  const [tariffsData, setTariffsData] = useState<any[]>([]);
-  const [featuresData, setFeaturesData] = useState<any[]>([]);
-  const [stepsData, setStepsData] = useState<any[]>([]);
 
   // Сброс всех модальных окон при загрузке страницы
   useEffect(() => {
@@ -46,27 +35,6 @@ export default function HomePage() {
         }
       })
       .catch(err => console.error(err));
-  }, []);
-
-  // Fetch DB data
-  useEffect(() => {
-    const fetchDBData = async () => {
-      try {
-        const [hero, tariffs, features, steps] = await Promise.all([
-          getHeroFromDB(),
-          getTariffsFromDB(),
-          getFeaturesFromDB(),
-          getStepsFromDB()
-        ]);
-        setHeroData(hero);
-        setTariffsData(tariffs);
-        setFeaturesData(features);
-        setStepsData(steps);
-      } catch (error) {
-        console.error('Error fetching DB data:', error);
-      }
-    };
-    fetchDBData();
   }, []);
 
   // =========================================================
@@ -129,16 +97,16 @@ export default function HomePage() {
       <Header />
 
       {/* Главный баннер (Hero) */}
-      {heroData ? <HeroDB data={heroData} /> : <Hero />}
+      <Hero />
 
       {/* Как это работает */}
-      {stepsData.length > 0 ? <HowItWorksDB steps={stepsData} /> : <HowItWorks />}
+      <HowItWorks />
 
       {/* Преимущества */}
-      {featuresData.length > 0 ? <FeaturesDB features={featuresData} /> : <Features />}
+      <Features />
 
       {/* Тарифы */}
-      {tariffsData.length > 0 ? <TariffsDB tariffs={tariffsData} /> : <Tariffs />}
+      <Tariffs />
 
       {/* Каталог велосипедов */}
       <main className="max-w-7xl mx-auto px-6 py-20">

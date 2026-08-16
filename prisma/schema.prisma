@@ -138,9 +138,11 @@ model Hero {
   badge               String?
   backgroundImageUrl  String?
   bikeImageUrl        String?  // Фото электровелосипеда
+  courierImageUrl     String?  // Фото курьера
   phone               String?  // Телефон для звонка
   telegramUrl         String?  // Ссылка на Telegram
   maksUrl             String?  // Ссылка на Maks
+  price               String?  // Цена (например: "от 3000 ₽/неделя")
   stat1Label          String?
   stat1Value          String?
   stat2Label          String?

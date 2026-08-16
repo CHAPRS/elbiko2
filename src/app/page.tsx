@@ -132,7 +132,9 @@ export default function HomePage() {
       {heroData ? <HeroDB data={heroData} /> : <Hero />}
 
       {/* Как это работает */}
-      {stepsData.length > 0 ? <HowItWorksDB steps={stepsData} /> : <HowItWorks />}
+      <section id="how-it-works" className="scroll-mt-24">
+        {stepsData.length > 0 ? <HowItWorksDB steps={stepsData} /> : <HowItWorks />}
+      </section>
 
       {/* Преимущества */}
       {featuresData.length > 0 ? <FeaturesDB features={featuresData} /> : <Features />}

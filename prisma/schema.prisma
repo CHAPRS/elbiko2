@@ -181,6 +181,8 @@ model Step {
   title       String
   description String
   order       Int     @default(0)
+  badges      String?  // JSON массив строк для badges
+  icon        String?  // Иконка emoji
   isActive    Boolean @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

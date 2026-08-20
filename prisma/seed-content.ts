@@ -35,50 +35,49 @@ async function main() {
   })
   console.log('Hero создан:', hero.title)
 
-  // Преимущества
+  // Преимущества (Bento Grid)
   const features = [
     {
-      icon: '⚡',
-      title: 'Мощные АКБ',
-      description: '2 аккумулятора от 30 до 45 Ah — меняй и не останавливай смену. Зарядные станции в комплекте.',
-      imageUrl: '/images/feature-battery.jpg',
+      icon: '🚴',
+      title: 'Готов к работе',
+      description: 'Получите электровелосипед и начинайте зарабатывать больше без необходимости покупать и обслуживать собственный транспорт.',
+      imageUrl: '/images/hero-bike-main.png',
       order: 1,
+      isMain: true,
+      badges: JSON.stringify(['Для работы курьером', 'В аренду', 'Готовый транспорт'])
     },
     {
-      icon: '🔧',
-      title: 'Надёжная техника',
-      description: 'Все велосипеды проходят техосмотр перед выдачей. Работает в любую погоду — доставки не останавливаются.',
-      imageUrl: '/images/feature-reliable.jpg',
+      icon: '⚡',
+      title: 'Экономично',
+      description: 'Арендуйте велосипед когда нужно для работы, вместо покупки собственного транспорта.',
       order: 2,
+      isMain: false,
+      badges: null
     },
     {
-      icon: '📝',
-      title: 'Гибкий договор',
-      description: 'Аренда от одной недели. Продли или верни велосипед в любое время — без штрафов и лишних вопросов.',
-      imageUrl: '/images/feature-contract.jpg',
+      icon: '�',
+      title: 'Сервис',
+      description: 'Возникла техническая проблема — обратитесь к нам, и мы поможем решить вопрос.',
       order: 3,
+      isMain: false,
+      badges: null
     },
     {
-      icon: '💬',
-      title: 'Поддержка по связи',
-      description: 'Вопросы по аренде и технике — отвечаем в мессенджерах и по телефону в рабочее время.',
-      imageUrl: '/images/feature-support.jpg',
+      icon: '�',
+      title: 'Запас энергии на всю смену',
+      description: 'Меньше отвлечений на транспорт — больше времени для работы.',
       order: 4,
+      isMain: false,
+      badges: null
     },
     {
-      icon: '🚀',
-      title: 'Премиум для долгих смен',
-      description: 'Эргономичное седло, отличный свет и все необходимы световые индикаторы, амортизаторы и бортовой дисплей.',
-      imageUrl: '/images/feature-premium.jpg',
+      icon: '�',
+      title: 'Мы рядом',
+      description: 'Поможем разобраться с арендой, велосипедом и эксплуатацией.',
       order: 5,
-    },
-    {
-      icon: '📍',
-      title: 'Одна точка в Оренбурге',
-      description: 'Выдача, возврат и технические вопросы — всё по одному адресу: г. Оренбург, ул. Салмышская, д30. Удобно и без лишних поездок.',
-      imageUrl: '/images/feature-location.jpg',
-      order: 6,
-    },
+      isMain: false,
+      badges: null
+    }
   ]
 
   for (const feature of features) {
@@ -116,7 +115,7 @@ async function main() {
       description: 'Получите проверенный, заряженный и готовый к работе велосипед.',
       imageUrl: '/images/Иллюстрация 3 Получите велосипед.jpg',
       icon: '🚴',
-      badges: JSON.stringify(['Проверен', 'Заряжен', 'Готов к работе']),
+      badges: null,
       order: 3,
     },
     {

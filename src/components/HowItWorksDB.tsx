@@ -55,9 +55,9 @@ export default function HowItWorksDB({ steps }: HowItWorksDBProps) {
             <div className="grid grid-cols-4 gap-8 relative">
               {sortedSteps.map((step, index) => (
                 <div key={step.order || index} className="relative">
-                  {/* Номер этапа */}
-                  <div className="w-16 h-16 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 font-mono font-black flex items-center justify-center text-xl mb-4 mx-auto">
-                    {step.number}
+                  {/* Название этапа вместо цифры */}
+                  <div className="w-full h-16 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 font-bold flex items-center justify-center text-center text-sm mb-4 px-2">
+                    {step.title}
                   </div>
 
                   {/* Все этапы - с изображениями */}
@@ -89,9 +89,6 @@ export default function HowItWorksDB({ steps }: HowItWorksDBProps) {
                       </div>
                     )}
 
-                    <h3 className="text-lg font-bold text-slate-100 mb-2">
-                      {step.title}
-                    </h3>
                     <p className="text-sm text-slate-400 leading-relaxed">
                       {step.description}
                     </p>
@@ -118,9 +115,9 @@ export default function HowItWorksDB({ steps }: HowItWorksDBProps) {
 
             {sortedSteps.map((step, index) => (
               <div key={step.order || index} className="relative pl-20">
-                {/* Номер этапа */}
-                <div className="absolute left-0 w-16 h-16 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 font-mono font-black flex items-center justify-center text-xl">
-                  {step.number}
+                {/* Название этапа вместо цифры */}
+                <div className="absolute left-0 w-16 h-16 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 font-bold flex items-center justify-center text-center text-xs px-2">
+                  {step.title}
                 </div>
 
                 {/* Все этапы - с изображениями */}
@@ -152,9 +149,6 @@ export default function HowItWorksDB({ steps }: HowItWorksDBProps) {
                     </div>
                   )}
 
-                  <h3 className="text-lg font-bold text-slate-100 mb-2">
-                    {step.title}
-                  </h3>
                   <p className="text-sm text-slate-400 leading-relaxed">
                     {step.description}
                   </p>

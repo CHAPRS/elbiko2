@@ -140,7 +140,8 @@ model Hero {
   bikeImageUrl        String?  // Фото электровелосипеда
   courierImageUrl     String?  // Фото курьера
   phone               String?  // Телефон для звонка
-  telegramUrl         String?  // Ссылка на Telegram
+  telegramUrl         String?  // Ссылка на Telegram бот
+  telegramManagerUrl  String?  // Ссылка на Telegram менеджера
   maksUrl             String?  // Ссылка на Maks
   price               String?  // Цена (например: "от 3000 ₽/неделя")
   stat1Label          String?

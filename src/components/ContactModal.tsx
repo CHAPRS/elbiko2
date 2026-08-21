@@ -1,16 +1,10 @@
 'use client';
 import React, { useEffect } from 'react';
 import { useRentStore } from '@/store/useRentStore';
+import { CONTACTS } from '@/app/constants';
 
 export function ContactModal() {
   const { isContactModalOpen, toggleContactModal, contactModalType } = useRentStore();
-
-  // Контактные данные
-  const contactData = {
-    telegram: 'https://t.me/my_own_elbiko_bot',
-    max: null, // Канал в Макс пока не создан - заглушка
-    phone: '+79878479289'
-  };
 
   // Заголовки в зависимости от типа модалки
   const titles = {
@@ -42,16 +36,24 @@ export function ContactModal() {
 
   if (!isContactModalOpen) return null;
 
-  const handleContact = (type: 'telegram' | 'max' | 'phone') => {
+  const handleContact = (type: 'telegram' | 'telegramManager' | 'max' | 'phone') => {
     switch (type) {
       case 'telegram':
-        window.open(contactData.telegram, '_blank');
+        window.open(CONTACTS.telegramBot, '_blank');
+        break;
+      case 'telegramManager':
+        window.open(CONTACTS.telegramManager, '_blank');
         break;
       case 'max':
-        alert('Канал в Макс мессенджере пока не создан. Свяжитесь с нами через Telegram или по телефону.');
-        return; // Не закрываем модалку
+        if (CONTACTS.maxUrl) {
+          window.open(CONTACTS.maxUrl, '_blank');
+        } else {
+          alert('Свяжитесь с нами через Telegram или по телефону. MAX: ' + CONTACTS.maxPhoneDisplay);
+          return; // Не закрываем модалку
+        }
+        break;
       case 'phone':
-        window.location.href = `tel:${contactData.phone}`;
+        window.location.href = `tel:${CONTACTS.phone}`;
         break;
     }
     toggleContactModal(false);
@@ -86,9 +88,26 @@ export function ContactModal() {
 
         {/* Варианты связи */}
         <div className="mt-8 space-y-4">
-          {/* Telegram */}
+          {/* Telegram Bot - Заказать звонок */}
           <button
             onClick={() => handleContact('telegram')}
+            className="w-full p-4 bg-slate-950/50 border border-slate-800 rounded-2xl flex items-center gap-4 hover:border-emerald-500/50 hover:bg-slate-950/80 transition-all group"
+          >
+            <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-2xl group-hover:bg-emerald-500/20 transition-colors">
+              🤖
+            </div>
+            <div className="text-left flex-1">
+              <div className="font-bold text-white">Заказать звонок</div>
+              <div className="text-xs text-slate-400">Telegram бот</div>
+            </div>
+            <div className="text-slate-500 group-hover:text-emerald-400 transition-colors">
+              →
+            </div>
+          </button>
+
+          {/* Telegram Manager */}
+          <button
+            onClick={() => handleContact('telegramManager')}
             className="w-full p-4 bg-slate-950/50 border border-slate-800 rounded-2xl flex items-center gap-4 hover:border-emerald-500/50 hover:bg-slate-950/80 transition-all group"
           >
             <div className="w-12 h-12 rounded-xl bg-[#0088cc]/10 border border-[#0088cc]/30 flex items-center justify-center text-2xl group-hover:bg-[#0088cc]/20 transition-colors">
@@ -96,28 +115,10 @@ export function ContactModal() {
             </div>
             <div className="text-left flex-1">
               <div className="font-bold text-white">Telegram</div>
-              <div className="text-xs text-slate-400">Написать в Telegram</div>
+              <div className="text-xs text-slate-400">Написать менеджеру</div>
             </div>
             <div className="text-slate-500 group-hover:text-emerald-400 transition-colors">
               →
-            </div>
-          </button>
-
-          {/* Макс */}
-          <button
-            onClick={() => handleContact('max')}
-            className="w-full p-4 bg-slate-950/30 border border-slate-800/50 rounded-2xl flex items-center gap-4 opacity-60 cursor-not-allowed group"
-            disabled
-          >
-            <div className="w-12 h-12 rounded-xl bg-slate-800/50 border border-slate-700/50 flex items-center justify-center text-2xl">
-              💬
-            </div>
-            <div className="text-left flex-1">
-              <div className="font-bold text-slate-400">Макс</div>
-              <div className="text-xs text-slate-500">Канал в разработке</div>
-            </div>
-            <div className="text-slate-600">
-              🔒
             </div>
           </button>
 
@@ -131,12 +132,44 @@ export function ContactModal() {
             </div>
             <div className="text-left flex-1">
               <div className="font-bold text-white">Позвонить</div>
-              <div className="text-xs text-slate-400">{contactData.phone}</div>
+              <div className="text-xs text-slate-400">{CONTACTS.phoneDisplay}</div>
             </div>
             <div className="text-slate-500 group-hover:text-emerald-400 transition-colors">
               →
             </div>
           </button>
+
+          {/* MAX */}
+          {CONTACTS.maxUrl ? (
+            <button
+              onClick={() => handleContact('max')}
+              className="w-full p-4 bg-slate-950/50 border border-slate-800 rounded-2xl flex items-center gap-4 hover:border-emerald-500/50 hover:bg-slate-950/80 transition-all group"
+            >
+              <div className="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-2xl group-hover:bg-purple-500/20 transition-colors">
+                💬
+              </div>
+              <div className="text-left flex-1">
+                <div className="font-bold text-white">MAX</div>
+                <div className="text-xs text-slate-400">Написать в MAX</div>
+              </div>
+              <div className="text-slate-500 group-hover:text-emerald-400 transition-colors">
+                →
+              </div>
+            </button>
+          ) : (
+            <div className="w-full p-4 bg-slate-950/30 border border-slate-800/50 rounded-2xl flex items-center gap-4 opacity-60">
+              <div className="w-12 h-12 rounded-xl bg-slate-800/50 border border-slate-700/50 flex items-center justify-center text-2xl">
+                💬
+              </div>
+              <div className="text-left flex-1">
+                <div className="font-bold text-slate-400">MAX</div>
+                <div className="text-xs text-slate-500">{CONTACTS.maxPhoneDisplay}</div>
+              </div>
+              <div className="text-slate-600">
+                ℹ️
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Информация */}

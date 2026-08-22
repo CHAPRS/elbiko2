@@ -203,6 +203,7 @@ model Tariff {
   features    String   @db.Text // JSON массив строк
   popular     Boolean  @default(false)
   imageUrl    String?
+  icon        String?  // Emoji иконка тарифа
   order       Int      @default(0)
   isActive    Boolean @default(true)
   createdAt   DateTime @default(now())

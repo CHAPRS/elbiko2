@@ -174,7 +174,7 @@ export default function Hero() {
           </div>
 
           {/* Правая часть - изображение велосипеда */}
-          <div className="relative h-[60vh] lg:h-[80vh] order-1 lg:order-2 flex items-start justify-center pt-8">
+          <div className="relative h-[60vh] lg:h-[80vh] order-1 lg:order-2 flex items-start justify-center pt-12">
             {/* Динамические линии скорости */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
               {/* Линия 1 */}

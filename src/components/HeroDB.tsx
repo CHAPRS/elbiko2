@@ -197,7 +197,7 @@ export default function HeroDB({ data }: HeroDBProps) {
           </div>
 
           {/* Правая часть - изображение велосипеда */}
-          <div className="relative h-[60vh] lg:h-[80vh] order-1 lg:order-2 flex items-start justify-center pt-8">
+          <div className="relative h-[60vh] lg:h-[80vh] order-1 lg:order-2 flex items-start justify-center pt-12">
             {/* Динамические линии скорости */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
               {/* Линия 1 */}
@@ -227,7 +227,7 @@ export default function HeroDB({ data }: HeroDBProps) {
                 </div>
 
                 {/* Основное изображение велосипеда */}
-                <div className="absolute inset-0 flex items-start justify-center pt-8">
+                <div className="absolute inset-0 flex items-start justify-center pt-12">
                   <div className="relative w-full h-full max-w-3xl mx-auto">
                     <div className="absolute inset-0 transform translate-x-4 lg:translate-x-8">
                       <Image

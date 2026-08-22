@@ -174,7 +174,7 @@ export default function Hero() {
           </div>
 
           {/* Правая часть - изображение велосипеда */}
-          <div className="relative h-[60vh] lg:h-[80vh] order-1 lg:order-2 flex items-center justify-center">
+          <div className="relative h-[60vh] lg:h-[80vh] order-1 lg:order-2 flex items-start justify-center pt-8">
             {/* Динамические линии скорости */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
               {/* Линия 1 */}
@@ -190,7 +190,7 @@ export default function Hero() {
             </div>
 
             {/* Основное изображение велосипеда крупнее и четче */}
-            <div className="relative w-full h-full max-w-3xl mx-auto flex items-center justify-center">
+            <div className="relative w-full h-full max-w-3xl mx-auto flex items-start justify-center">
               <div className="relative w-full h-full">
                 <Image
                   src={heroData.bikeImageUrl}

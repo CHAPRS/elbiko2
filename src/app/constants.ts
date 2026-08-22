@@ -1,7 +1,26 @@
 import React from 'react';
 
 // ==========================================
-// 1. ИНТЕРФЕЙСЫ И ТИПЫ ДАННЫХ
+// 1. КОНТАКТЫ ELBIKO - ЕДИНАЯ КОНФИГУРАЦИЯ
+// ==========================================
+
+export const CONTACTS = {
+  // Телефон
+  phone: '+79867753030',
+  phoneDisplay: '+7 986 775-30-30',
+  
+  // Telegram
+  telegramBot: 'https://t.me/my_own_elbiko_bot',
+  telegramManager: 'https://t.me/ElBaiko',
+  
+  // MAX (публичная ссылка профиля)
+  maxPhone: '+79867753030',
+  maxPhoneDisplay: '+7 986 775-30-30',
+  maxUrl: 'https://max.ru/u/f9LHodD0cOIvfR5D3T5DSR5uA6Wb95xybkbzJy-30CpguEZ-UXZ2s1S9Vds',
+};
+
+// ==========================================
+// 2. ИНТЕРФЕЙСЫ И ТИПЫ ДАННЫХ
 // ==========================================
 
 export interface Bike {

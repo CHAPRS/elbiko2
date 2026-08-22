@@ -1,147 +1,116 @@
-'use client';
-import React, { useEffect, useState } from 'react';
-import { getHero } from '@/lib/sanityQueries';
+import React from 'react'
+import { urlFor } from '@/sanity/lib/image'
+import Image from 'next/image'
 
 interface HeroData {
-  title: string;
-  subtitle: string;
-  badge: string;
-  stat1_label: string;
-  stat1_value: string;
-  stat2_label: string;
-  stat2_value: string;
-  stat3_label: string;
-  stat3_value: string;
-  cta_text: string;
-  cta_link: string;
-  secondary_cta_text: string;
-  secondary_cta_link: string;
+  backgroundImage?: any
+  title: string
+  subtitle?: string
+  badge?: string
+  stat1_label?: string
+  stat1_value?: string
+  stat2_label?: string
+  stat2_value?: string
+  stat3_label?: string
+  stat3_value?: string
+  cta_text?: string
+  cta_link?: string
+  secondary_cta_text?: string
+  secondary_cta_link?: string
 }
 
-export default function HeroSanity() {
-  const [heroData, setHeroData] = useState<HeroData | null>(null);
-  const [loading, setLoading] = useState(true);
+interface HeroSanityProps {
+  data: HeroData
+}
 
-  useEffect(() => {
-    async function loadHero() {
-      try {
-        const data = await getHero();
-        if (data) {
-          setHeroData(data);
-        }
-      } catch (error) {
-        console.error('Failed to load hero data:', error);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadHero();
-  }, []);
+export default function HeroSanity({ data }: HeroSanityProps) {
+  if (!data) return null
 
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">Загрузка...</div>;
-  }
-
-  if (!heroData) {
-    // Fallback to static data if Sanity data not available
-    return (
-      <section className="relative flex flex-col justify-center items-center px-4 py-20 lg:py-32 min-h-screen text-center bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
-        <div className="absolute top-4 left-4 bg-emerald-500/20 text-emerald-400 font-black px-3 py-1 rounded-full text-xs uppercase tracking-wider border border-emerald-500/30">
-          Для Курьеров
-        </div>
-        
-        <div className="max-w-4xl mx-auto space-y-8">
-          <h1 className="text-4xl sm:text-5xl lg:text-7xl font-extrabold tracking-tight text-slate-100 leading-tight">
-            Аренда электровелосипедов для курьеров{' '}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400">
-              в Красноярске
-            </span>
-          </h1>
-          <p className="text-lg sm:text-xl text-slate-400 max-w-2xl mx-auto">
-            Доставляй быстрее. Зарабатывай больше. Современные электровелосипеды с обслуживанием под ключ.
-          </p>
-          
-          <div className="grid grid-cols-3 gap-4 sm:gap-8 max-w-2xl mx-auto pt-8">
-            <div className="p-4 rounded-2xl bg-slate-900/50 border border-slate-800 backdrop-blur-sm">
-              <div className="text-2xl sm:text-3xl font-black text-emerald-400">50+</div>
-              <div className="text-xs sm:text-sm text-slate-500 mt-1">км без подзарядки</div>
-            </div>
-            <div className="p-4 rounded-2xl bg-slate-900/50 border border-slate-800 backdrop-blur-sm">
-              <div className="text-2xl sm:text-3xl font-black text-emerald-400">2×</div>
-              <div className="text-xs sm:text-sm text-slate-500 mt-1">больше заказов</div>
-            </div>
-            <div className="p-4 rounded-2xl bg-slate-900/50 border border-slate-800 backdrop-blur-sm">
-              <div className="text-2xl sm:text-3xl font-black text-emerald-400">3</div>
-              <div className="text-xs sm:text-sm text-slate-500 mt-1">тарифа аренды</div>
-            </div>
-          </div>
-          
-          <div className="flex flex-col sm:flex-row gap-4 justify-center pt-8">
-            <a
-              href="#tariffs"
-              className="px-8 py-4 bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 font-bold rounded-xl text-lg transition-all shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 active:scale-95"
-            >
-              Выбрать тариф
-            </a>
-            <a
-              href="#catalog"
-              className="px-8 py-4 bg-slate-800 text-slate-200 font-bold rounded-xl text-lg transition-all border border-slate-700 hover:bg-slate-700 active:scale-95"
-            >
-              Смотреть каталог
-            </a>
-          </div>
-        </div>
-      </section>
-    );
-  }
-
-  const stats = [
-    { value: heroData.stat1_value, label: heroData.stat1_label },
-    { value: heroData.stat2_value, label: heroData.stat2_label },
-    { value: heroData.stat3_value, label: heroData.stat3_label }
-  ];
+  const bgImage = data.backgroundImage 
+    ? urlFor(data.backgroundImage).url() 
+    : '/images/delivery.jpg'
 
   return (
-    <section className="relative flex flex-col justify-center items-center px-4 py-20 lg:py-32 min-h-screen text-center bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
-      <div className="absolute top-4 left-4 bg-emerald-500/20 text-emerald-400 font-black px-3 py-1 rounded-full text-xs uppercase tracking-wider border border-emerald-500/30">
-        {heroData.badge}
+    <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden">
+      {/* Фоновое изображение */}
+      <div className="absolute inset-0 z-0">
+        <Image
+          src={bgImage}
+          alt="ЭльБайко - аренда электровелосипедов"
+          fill
+          className="object-cover"
+          priority
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-950/80 via-slate-950/60 to-slate-950" />
       </div>
-      
-      <div className="max-w-4xl mx-auto space-y-8">
-        <h1 className="text-4xl sm:text-5xl lg:text-7xl font-extrabold tracking-tight text-slate-100 leading-tight">
-          {heroData.title}{' '}
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400">
-            в Красноярске
-          </span>
+
+      {/* Контент */}
+      <div className="relative z-10 max-w-7xl mx-auto px-6 py-20 text-center">
+        {data.badge && (
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm font-semibold mb-6 backdrop-blur-sm">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            {data.badge}
+          </div>
+        )}
+
+        <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white mb-6 leading-tight">
+          {data.title}
         </h1>
-        <p className="text-lg sm:text-xl text-slate-400 max-w-2xl mx-auto">
-          {heroData.subtitle}
-        </p>
-        
-        <div className="grid grid-cols-3 gap-4 sm:gap-8 max-w-2xl mx-auto pt-8">
-          {stats.map((stat, index) => (
-            <div key={index} className="p-4 rounded-2xl bg-slate-900/50 border border-slate-800 backdrop-blur-sm">
-              <div className="text-2xl sm:text-3xl font-black text-emerald-400">{stat.value}</div>
-              <div className="text-xs sm:text-sm text-slate-500 mt-1">{stat.label}</div>
+
+        {data.subtitle && (
+          <p className="text-lg sm:text-xl text-slate-300 mb-8 max-w-2xl mx-auto">
+            {data.subtitle}
+          </p>
+        )}
+
+        {/* Статистика */}
+        <div className="flex flex-wrap justify-center gap-8 mb-10">
+          {data.stat1_label && data.stat1_value && (
+            <div className="text-center">
+              <div className="text-3xl sm:text-4xl font-black text-emerald-400">
+                {data.stat1_label}
+              </div>
+              <div className="text-sm text-slate-400 mt-1">{data.stat1_value}</div>
             </div>
-          ))}
+          )}
+          {data.stat2_label && data.stat2_value && (
+            <div className="text-center">
+              <div className="text-3xl sm:text-4xl font-black text-cyan-400">
+                {data.stat2_label}
+              </div>
+              <div className="text-sm text-slate-400 mt-1">{data.stat2_value}</div>
+            </div>
+          )}
+          {data.stat3_label && data.stat3_value && (
+            <div className="text-center">
+              <div className="text-3xl sm:text-4xl font-black text-emerald-400">
+                {data.stat3_label}
+              </div>
+              <div className="text-sm text-slate-400 mt-1">{data.stat3_value}</div>
+            </div>
+          )}
         </div>
-        
-        <div className="flex flex-col sm:flex-row gap-4 justify-center pt-8">
-          <a
-            href={heroData.cta_link}
-            className="px-8 py-4 bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 font-bold rounded-xl text-lg transition-all shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 active:scale-95"
-          >
-            {heroData.cta_text}
-          </a>
-          <a
-            href={heroData.secondary_cta_link}
-            className="px-8 py-4 bg-slate-800 text-slate-200 font-bold rounded-xl text-lg transition-all border border-slate-700 hover:bg-slate-700 active:scale-95"
-          >
-            {heroData.secondary_cta_text}
-          </a>
+
+        {/* Кнопки */}
+        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          {data.cta_text && data.cta_link && (
+            <a
+              href={data.cta_link}
+              className="px-8 py-4 bg-gradient-to-r from-emerald-500 to-cyan-500 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-emerald-500/25 transition-all duration-300"
+            >
+              {data.cta_text}
+            </a>
+          )}
+          {data.secondary_cta_text && data.secondary_cta_link && (
+            <a
+              href={data.secondary_cta_link}
+              className="px-8 py-4 bg-slate-800/50 border border-slate-700 text-white font-bold rounded-xl hover:bg-slate-800 transition-all duration-300 backdrop-blur-sm"
+            >
+              {data.secondary_cta_text}
+            </a>
+          )}
         </div>
       </div>
     </section>
-  );
+  )
 }

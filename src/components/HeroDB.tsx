@@ -1,47 +1,65 @@
-'use client';
-import React from 'react';
-import Image from 'next/image';
-import { CONTACTS } from '@/app/constants';
+import React from 'react'
+import Image from 'next/image'
+import { CONTACTS } from '@/app/constants'
 
-export default function Hero() {
-  const heroData = {
-    badge: 'Для Курьеров',
-    title: 'Электровелосипед',
-    titleHighlight: 'для работы курьером',
-    subtitle: 'Надёжные электровелосипеды в аренду для курьеров. Быстрое оформление, готовый к работе велосипед и сервис на весь срок аренды.',
-    price: 'от 3000 ₽/неделя',
-    phone: CONTACTS.phoneDisplay,
-    telegramUrl: CONTACTS.telegramBot,
-    telegramManagerUrl: CONTACTS.telegramManager,
-    maxUrl: CONTACTS.maxUrl,
-    benefits: [
-      {
-        icon: '⚡',
-        title: 'Выгодно',
-        description: 'от 3000 ₽/неделя'
-      },
-      {
-        icon: '📄',
-        title: 'Быстро',
-        description: 'Оформление за 5 минут'
-      },
-      {
-        icon: '🔧',
-        title: 'Сервис',
-        description: 'Поможем с ремонтом'
-      }
-    ],
-    cta: {
-      text: 'Выбрать велосипед',
-      link: '#catalog'
+interface HeroData {
+  title: string
+  subtitle?: string
+  badge?: string
+  backgroundImageUrl?: string
+  bikeImageUrl?: string
+  courierImageUrl?: string
+  phone?: string
+  telegramUrl?: string
+  telegramManagerUrl?: string
+  maxUrl?: string
+  price?: string
+  stat1Label?: string
+  stat1Value?: string
+  stat2Label?: string
+  stat2Value?: string
+  stat3Label?: string
+  stat3Value?: string
+  ctaText?: string
+  ctaLink?: string
+  secondaryCtaText?: string
+  secondaryCtaLink?: string
+}
+
+interface HeroDBProps {
+  data: HeroData
+}
+
+export default function HeroDB({ data }: HeroDBProps) {
+  if (!data) return null
+
+  const bgImage = data.backgroundImageUrl || '/images/delivery.jpg'
+  const bikeImage = data.bikeImageUrl || '/images/hero-bike-main.png'
+  const courierImage = data.courierImageUrl || null
+  const phone = data.phone || CONTACTS.phoneDisplay
+  const telegramUrl = data.telegramUrl || CONTACTS.telegramBot
+  const telegramManagerUrl = data.telegramManagerUrl || CONTACTS.telegramManager
+  const maxUrl = data.maxUrl || CONTACTS.maxUrl
+  const price = data.price || 'от 3000 ₽/неделя'
+
+  // Преобразуем старые статы в новый формат преимуществ
+  const benefits = [
+    {
+      icon: '⚡',
+      title: 'Выгодно',
+      description: data.stat1Value || 'от 3000 ₽/неделя'
     },
-    secondaryCta: {
-      text: 'Как это работает',
-      link: '#how-it-works'
+    {
+      icon: '📄',
+      title: 'Быстро',
+      description: data.stat2Value || 'Оформление за 5 минут'
     },
-    bikeImageUrl: '/images/hero-bike-main.png',
-    courierImageUrl: null
-  };
+    {
+      icon: '🔧',
+      title: 'Сервис',
+      description: data.stat3Value || 'Поможем с ремонтом'
+    }
+  ]
 
   return (
     <section className="relative min-h-[85vh] lg:min-h-[90vh] bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 overflow-hidden">
@@ -57,49 +75,54 @@ export default function Hero() {
           {/* Левая часть - контент */}
           <div className="space-y-8 z-10 order-2 lg:order-1">
             {/* Badge */}
-            <div className="inline-flex items-center bg-emerald-500/20 text-emerald-400 font-black px-4 py-2 rounded-full text-xs uppercase tracking-wider border border-emerald-500/30">
-              {heroData.badge}
-            </div>
+            {data.badge && (
+              <div className="inline-flex items-center bg-emerald-500/20 text-emerald-400 font-black px-4 py-2 rounded-full text-xs uppercase tracking-wider border border-emerald-500/30">
+                {data.badge}
+              </div>
+            )}
 
             {/* Заголовок */}
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-slate-100 leading-tight">
-              {heroData.title}{' '}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400">
-                {heroData.titleHighlight}
-              </span>
+              {data.title}
             </h1>
 
             {/* Подзаголовок */}
-            <p className="text-lg sm:text-xl text-slate-400 max-w-xl leading-relaxed">
-              {heroData.subtitle}
-            </p>
+            {data.subtitle && (
+              <p className="text-lg sm:text-xl text-slate-400 max-w-xl leading-relaxed">
+                {data.subtitle}
+              </p>
+            )}
 
             {/* Цена */}
             <div className="flex items-baseline gap-2">
               <span className="text-3xl sm:text-4xl font-bold text-emerald-400">
-                {heroData.price}
+                {price}
               </span>
             </div>
 
             {/* CTA кнопки */}
             <div className="flex flex-col sm:flex-row gap-4">
-              <a
-                href={heroData.cta.link}
-                className="px-8 py-4 bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 font-bold rounded-xl text-lg transition-all shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 hover:scale-105 active:scale-95 text-center"
-              >
-                {heroData.cta.text}
-              </a>
-              <a
-                href={heroData.secondaryCta.link}
-                className="px-8 py-4 bg-slate-800/50 text-slate-200 font-bold rounded-xl text-lg transition-all border border-slate-700 hover:bg-slate-800 hover:scale-105 active:scale-95 text-center"
-              >
-                {heroData.secondaryCta.text}
-              </a>
+              {data.ctaText && data.ctaLink && (
+                <a
+                  href={data.ctaLink}
+                  className="px-8 py-4 bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 font-bold rounded-xl text-lg transition-all shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 hover:scale-105 active:scale-95 text-center"
+                >
+                  {data.ctaText}
+                </a>
+              )}
+              {data.secondaryCtaText && data.secondaryCtaLink && (
+                <a
+                  href={data.secondaryCtaLink}
+                  className="px-8 py-4 bg-slate-800/50 text-slate-200 font-bold rounded-xl text-lg transition-all border border-slate-700 hover:bg-slate-800 hover:scale-105 active:scale-95 text-center"
+                >
+                  {data.secondaryCtaText}
+                </a>
+              )}
             </div>
 
             {/* Преимущества */}
             <div className="grid grid-cols-3 gap-4 pt-4">
-              {heroData.benefits.map((benefit, index) => (
+              {benefits.map((benefit, index) => (
                 <div 
                   key={index} 
                   className="p-4 rounded-2xl bg-slate-900/50 border border-slate-800 backdrop-blur-sm hover:bg-slate-900/70 transition-colors"
@@ -114,7 +137,7 @@ export default function Hero() {
             {/* Контакты */}
             <div className="flex flex-col sm:flex-row gap-4 pt-4">
               <a
-                href={heroData.telegramUrl}
+                href={telegramUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 font-semibold rounded-xl transition-all hover:bg-emerald-500/30 hover:border-emerald-500/50"
@@ -134,7 +157,7 @@ export default function Hero() {
                 Позвонить
               </a>
               <a
-                href={heroData.telegramManagerUrl}
+                href={telegramManagerUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center justify-center gap-2 px-6 py-3 bg-blue-500/20 border border-blue-500/30 text-blue-400 font-semibold rounded-xl transition-all hover:bg-blue-500/30 hover:border-blue-500/50"
@@ -150,7 +173,7 @@ export default function Hero() {
             <div className="flex items-center gap-4 pt-2 text-sm text-slate-500">
               <span>Или напишите менеджеру:</span>
               <a
-                href={heroData.telegramManagerUrl}
+                href={telegramManagerUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-blue-400 hover:text-blue-300 transition-colors"
@@ -189,22 +212,56 @@ export default function Hero() {
               <div className="absolute top-3/4 left-0 w-36 h-0.5 bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent" style={{ animation: 'dash 2.8s infinite linear', animationDelay: '1.2s' }} />
             </div>
 
-            {/* Основное изображение велосипеда крупнее и четче */}
-            <div className="relative w-full h-full max-w-3xl mx-auto flex items-start justify-center">
-              <div className="relative w-full h-full">
-                <Image
-                  src={heroData.bikeImageUrl}
-                  alt="Электровелосипед для аренды курьерам"
-                  fill
-                  className="object-contain"
-                  priority
-                  style={{
-                    filter: 'drop-shadow(0 30px 60px rgba(16, 185, 129, 0.2))',
-                    transform: 'scale(1.5)'
-                  }}
-                />
+            {courierImage ? (
+              <>
+                {/* Фоновое изображение курьера (если есть) */}
+                <div className="absolute inset-0 opacity-30">
+                  <Image
+                    src={courierImage}
+                    alt="Курьер на электровелосипеде"
+                    fill
+                    className="object-cover"
+                    priority
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent" />
+                </div>
+
+                {/* Основное изображение велосипеда */}
+                <div className="absolute inset-0 flex items-start justify-center pt-8">
+                  <div className="relative w-full h-full max-w-3xl mx-auto">
+                    <div className="absolute inset-0 transform translate-x-4 lg:translate-x-8">
+                      <Image
+                        src={bikeImage}
+                        alt="Электровелосипед для аренды курьерам"
+                        fill
+                        className="object-contain drop-shadow-2xl"
+                        priority
+                        style={{
+                          filter: 'drop-shadow(0 30px 60px rgba(16, 185, 129, 0.2))',
+                          transform: 'scale(1.5)'
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="relative w-full h-full max-w-3xl mx-auto flex items-start justify-center">
+                <div className="relative w-full h-full">
+                  <Image
+                    src={bikeImage}
+                    alt="Электровелосипед для аренды курьерам"
+                    fill
+                    className="object-contain"
+                    priority
+                    style={{
+                      filter: 'drop-shadow(0 30px 60px rgba(16, 185, 129, 0.2))',
+                      transform: 'scale(1.5)'
+                    }}
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Декоративные элементы */}
             <div className="absolute top-10 right-10 w-32 h-32 border-2 border-emerald-500/20 rounded-full animate-pulse" />
@@ -227,5 +284,5 @@ export default function Hero() {
         }
       `}</style>
     </section>
-  );
+  )
 }

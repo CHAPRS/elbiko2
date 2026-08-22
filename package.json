@@ -8,12 +8,14 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "seed": "tsx prisma/seed.ts"
+    "seed": "tsx prisma/seed.ts",
+    "seed-content": "tsx prisma/seed-content.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
     "@sanity/client": "^6.0.0",
     "@sanity/image-url": "^1.0.0",
+    "lru-cache": "^11.5.2",
     "next": "^14.2.0",
     "next-sanity": "^9.0.0",
     "nodemailer": "^9.0.3",

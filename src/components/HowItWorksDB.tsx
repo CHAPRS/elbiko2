@@ -1,52 +1,29 @@
-'use client';
-import React from 'react';
-import Image from 'next/image';
+import React from 'react'
+import Image from 'next/image'
 
-interface Step {
-  number: string;
-  title: string;
-  description: string;
-  icon: string;
-  badges: string[] | null;
-  imageUrl?: string;
+interface StepData {
+  number: string
+  imageUrl?: string
+  title: string
+  description: string
+  order?: number
+  badges?: string[]
+  icon?: string
 }
 
-const steps: Step[] = [
-  {
-    number: '01',
-    title: 'Оставьте заявку',
-    description: 'Заполните короткую форму на сайте и укажите удобный способ связи.',
-    icon: '📱',
-    badges: null,
-    imageUrl: '/images/Иллюстрация 1 Выберите велосипед.jpg'
-  },
-  {
-    number: '02',
-    title: 'Мы свяжемся с вами',
-    description: 'Уточним детали аренды, ответим на вопросы и поможем выбрать подходящий вариант.',
-    icon: '📞',
-    badges: null,
-    imageUrl: '/images/Иллюстрация 2 Оформите аренду.jpg'
-  },
-  {
-    number: '03',
-    title: 'Заберите готовый электровелосипед',
-    description: 'Получите проверенный, заряженный и готовый к работе велосипед.',
-    icon: '🚴',
-    badges: null,
-    imageUrl: '/images/Иллюстрация 3 Получите велосипед.jpg'
-  },
-  {
-    number: '04',
-    title: 'Выходите на линию',
-    description: 'Получите электровелосипед и можете начинать работать.',
-    icon: '🚀',
-    badges: null,
-    imageUrl: '/images/Иллюстрация 4.jpg'
-  }
-];
+interface HowItWorksDBProps {
+  steps: StepData[]
+}
 
-export default function HowItWorks() {
+export default function HowItWorksDB({ steps }: HowItWorksDBProps) {
+  if (!steps || steps.length === 0) return null
+
+  // Сортируем шаги по полю order
+  const sortedSteps = [...steps].sort((a, b) => (a.order || 0) - (b.order || 0))
+
+  // Иконки по умолчанию, если не указаны в БД
+  const defaultIcons = ['📱', '📞', '🚴', '🚀']
+
   return (
     <section id="how-it-works" className="py-20 px-4 bg-slate-950">
       <div className="max-w-7xl mx-auto">
@@ -76,8 +53,8 @@ export default function HowItWorks() {
 
             {/* Этапы */}
             <div className="grid grid-cols-4 gap-8 relative">
-              {steps.map((step, index) => (
-                <div key={index} className="relative">
+              {sortedSteps.map((step, index) => (
+                <div key={step.order || index} className="relative">
                   {/* Название этапа вместо цифры */}
                   <div className="w-full h-16 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 font-bold flex items-center justify-center text-center text-sm mb-4 px-2">
                     {step.title}
@@ -97,7 +74,7 @@ export default function HowItWorks() {
                       </div>
                     ) : (
                       <div className="text-4xl mb-4 text-center">
-                        {step.icon}
+                        {step.icon || defaultIcons[index]}
                       </div>
                     )}
                     
@@ -136,8 +113,8 @@ export default function HowItWorks() {
               ))}
             </div>
 
-            {steps.map((step, index) => (
-              <div key={index} className="relative pl-20">
+            {sortedSteps.map((step, index) => (
+              <div key={step.order || index} className="relative pl-20">
                 {/* Название этапа вместо цифры */}
                 <div className="absolute left-0 w-16 h-16 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 font-bold flex items-center justify-center text-center text-xs px-2">
                   {step.title}
@@ -157,7 +134,7 @@ export default function HowItWorks() {
                     </div>
                   ) : (
                     <div className="text-4xl mb-4">
-                      {step.icon}
+                      {step.icon || defaultIcons[index]}
                     </div>
                   )}
                   
@@ -201,5 +178,5 @@ export default function HowItWorks() {
         </div>
       </div>
     </section>
-  );
+  )
 }

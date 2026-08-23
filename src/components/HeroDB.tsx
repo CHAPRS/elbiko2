@@ -238,7 +238,7 @@ export default function HeroDB({ data }: HeroDBProps) {
                         priority
                         style={{
                           filter: 'drop-shadow(0 30px 60px rgba(16, 185, 129, 0.2))',
-                          transform: 'scale(1.5)'
+                          transform: 'scale(2.25)'
                         }}
                       />
                     </div>
@@ -256,7 +256,7 @@ export default function HeroDB({ data }: HeroDBProps) {
                     priority
                     style={{
                       filter: 'drop-shadow(0 30px 60px rgba(16, 185, 129, 0.2))',
-                      transform: 'scale(1.5)'
+                      transform: 'scale(2.25)'
                     }}
                   />
                 </div>

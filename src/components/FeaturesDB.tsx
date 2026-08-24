@@ -42,11 +42,11 @@ export default function FeaturesDB({ features }: FeaturesDBProps) {
         </div>
 
         {/* Desktop: Bento Grid */}
-        <div className="hidden lg:grid lg:grid-cols-3 lg:grid-rows-2 lg:gap-6">
-          {/* Компактная карточка "Готов к работе" - занимает 1 колонку и 1 ряд */}
-          <div className="lg:col-span-1 lg:row-span-1 relative bg-slate-900/50 border border-slate-800 rounded-3xl overflow-hidden group hover:border-emerald-500/30 transition-all duration-300">
+        <div className="hidden lg:grid lg:grid-cols-2 lg:grid-rows-2 lg:gap-6">
+          {/* Карточка "Готов к работе" - занимает 1 колонку и 2 ряда (слева, большая) */}
+          <div className="lg:col-span-1 lg:row-span-2 relative bg-slate-900/50 border border-slate-800 rounded-3xl overflow-hidden group hover:border-emerald-500/30 transition-all duration-300">
             {mainFeature.imageUrl && (
-              <div className="relative h-32">
+              <div className="relative h-48">
                 <Image
                   src={mainFeature.imageUrl}
                   alt={mainFeature.title}
@@ -56,20 +56,97 @@ export default function FeaturesDB({ features }: FeaturesDBProps) {
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-transparent" />
               </div>
             )}
-            <div className="p-4">
-              <div className="flex items-center gap-2 mb-2">
-                {mainFeature.icon && <span className="text-2xl">{mainFeature.icon}</span>}
-                <h3 className="text-lg font-bold text-slate-100">
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-3">
+                {mainFeature.icon && <span className="text-3xl">{mainFeature.icon}</span>}
+                <h3 className="text-2xl font-bold text-slate-100">
                   {mainFeature.title}
                 </h3>
               </div>
-              <p className="text-slate-300 text-xs leading-relaxed mb-2">
+              <p className="text-slate-300 text-sm leading-relaxed mb-3">
                 {mainFeature.description}
               </p>
               {mainFeature.badges && mainFeature.badges.length > 0 && (
-                <div className="flex flex-wrap gap-1">
+                <div className="flex flex-wrap gap-2">
                   {mainFeature.badges.map((badge, index) => (
-                    <span key={index} className="px-2 py-0.5 bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold rounded-full">
+                    <span key={index} className="px-3 py-1 bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-bold rounded-full">
+                      ✓ {badge}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Три карточки справа */}
+          <div className="space-y-4">
+            {secondaryFeatures.slice(0, 3).map((feature, index) => (
+              <div
+                key={feature.order || index}
+                className="bg-slate-900/50 border border-slate-800 rounded-3xl p-5 hover:border-emerald-500/30 transition-all duration-300 group"
+              >
+                {feature.icon && (
+                  <div className="text-3xl mb-3 group-hover:scale-110 transition-transform">
+                    {feature.icon}
+                  </div>
+                )}
+                <h3 className="text-lg font-bold text-emerald-400 mb-2">
+                  {feature.title}
+                </h3>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  {feature.description}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          {/* Последняя карточка слева внизу */}
+          <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-5 hover:border-emerald-500/30 transition-all duration-300 group">
+            {secondaryFeatures[3].icon && (
+              <div className="text-3xl mb-3 group-hover:scale-110 transition-transform">
+                {secondaryFeatures[3].icon}
+              </div>
+            )}
+            <h3 className="text-lg font-bold text-emerald-400 mb-2">
+              {secondaryFeatures[3].title}
+            </h3>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              {secondaryFeatures[3].description}
+            </p>
+          </div>
+
+
+        </div>
+
+        {/* Tablet: Главная карточка сверху + остальные */}
+        <div className="hidden md:grid lg:hidden md:grid-cols-2 md:gap-5">
+          {/* Главная карточка */}
+          <div className="md:col-span-2 relative bg-slate-900/50 border border-slate-800 rounded-3xl overflow-hidden group hover:border-emerald-500/30 transition-all duration-300">
+            {mainFeature.imageUrl && (
+              <div className="relative h-36">
+                <Image
+                  src={mainFeature.imageUrl}
+                  alt={mainFeature.title}
+                  fill
+                  className="object-cover group-hover:scale-105 transition-transform duration-500"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-transparent" />
+              </div>
+            )}
+            <div className="p-5">
+              <div className="flex items-center gap-3 mb-2">
+                {mainFeature.icon && <span className="text-3xl">{mainFeature.icon}</span>}
+                <h3 className="text-xl font-bold text-slate-100">
+                  {mainFeature.title}
+                </h3>
+              </div>
+              <p className="text-slate-300 text-sm leading-relaxed mb-2">
+                {mainFeature.description}
+              </p>
+              {mainFeature.badges && mainFeature.badges.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {mainFeature.badges.map((badge, index) => (
+                    <span key={index} className="px-3 py-1 bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-bold rounded-full">
                       ✓ {badge}
                     </span>
                   ))}
@@ -97,52 +174,6 @@ export default function FeaturesDB({ features }: FeaturesDBProps) {
               </p>
             </div>
           ))}
-
-
-        </div>
-
-        {/* Tablet: Все карточки равные */}
-        <div className="hidden md:grid lg:hidden md:grid-cols-2 md:gap-5">
-          {sortedFeatures.map((feature, index) => (
-            <div
-              key={feature.order || index}
-              className={`relative bg-slate-900/50 border border-slate-800 rounded-3xl overflow-hidden group hover:border-emerald-500/30 transition-all duration-300 ${
-                index === 0 ? '' : 'p-5'
-              }`}
-            >
-              {index === 0 && feature.imageUrl && (
-                <div className="relative h-28">
-                  <Image
-                    src={feature.imageUrl}
-                    alt={feature.title}
-                    fill
-                    className="object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-transparent" />
-                </div>
-              )}
-              <div className={index === 0 ? 'p-4' : ''}>
-                <div className="flex items-center gap-2 mb-2">
-                  {feature.icon && <span className="text-2xl">{feature.icon}</span>}
-                  <h3 className={`font-bold ${index === 0 ? 'text-lg text-slate-100' : 'text-lg text-emerald-400'}`}>
-                    {feature.title}
-                  </h3>
-                </div>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  {feature.description}
-                </p>
-                {feature.badges && feature.badges.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {feature.badges.map((badge, badgeIndex) => (
-                      <span key={badgeIndex} className="px-2 py-0.5 bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold rounded-full">
-                        ✓ {badge}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
         </div>
 
         {/* Mobile: Вертикальная сетка */}
@@ -155,7 +186,7 @@ export default function FeaturesDB({ features }: FeaturesDBProps) {
               }`}
             >
               {index === 0 && feature.imageUrl && (
-                <div className="relative h-24">
+                <div className="relative h-28">
                   <Image
                     src={feature.imageUrl}
                     alt={feature.title}

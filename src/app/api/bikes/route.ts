@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   try {
     const bikes = await prisma.bike.findMany({
-      where: { status: { not: 'MAINTENANCE' } },
+      where: { status: 'FREE' },
       orderBy: { name: 'asc' },
     });
 

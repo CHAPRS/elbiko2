@@ -126,9 +126,9 @@ export default function LeadsPage() {
 
   const handleStatusChange = (id: number, status: LeadStatus, reason?: string) => {
     if (status === 'REJECTED' && !reason) {
-      setError('Укажите причину отказа в карточке заявки');
       const lead = leads.find((item) => item.id === id);
       if (lead) openLead(lead);
+      setError('Укажите причину отказа в карточке заявки');
       return;
     }
     patchLead(id, { status, ...(reason ? { rejectReason: reason } : {}) });

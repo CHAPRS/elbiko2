@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { createAdminSessionToken } from '@/lib/session';
 
 export async function POST(request: Request) {
   try {
@@ -19,9 +20,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Неверный логин или пароль' }, { status: 401 });
     }
 
+    const token = await createAdminSessionToken();
     const response = NextResponse.json({ success: true, role: 'admin' });
 
-    response.cookies.set('admin_session', 'true', {
+    response.cookies.set('admin_session', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { sendTelegramNotification } from '@/lib/telegram';
-import { limiter } from '@/lib/rate-limit'; // Импортируем лимитер из шага 2
+import { limiter } from '@/lib/rate-limit';
+import { createLeadSchema } from '@/lib/validation';
 
 function escapeHtml(value: string): string {
   return value
@@ -30,20 +31,20 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { name, phone, bikeName, bikeId, message } = body;
+    const parsed = createLeadSchema.safeParse(body);
 
-    if (!name || !phone) {
-      return NextResponse.json({ error: 'Заполните обязательные поля' }, { status: 400 });
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Некорректные данные', details: parsed.error.format() },
+        { status: 400 }
+      );
     }
 
     // 3. Создаем запись в MySQL через Prisma
     const lead = await prisma.lead.create({
       data: {
-        name: String(name),
-        phone: String(phone),
-        bikeName: bikeName ? String(bikeName) : null,
-        bikeId: bikeId ? Number(bikeId) : null,
-        message: message ? String(message) : null,
+        ...parsed.data,
+        bikeId: parsed.data.bikeId ?? null,
         status: 'NEW',
       },
     });

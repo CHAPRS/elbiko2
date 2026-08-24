@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { isLeadStatus } from '@/lib/leadStatus';
+import { leadStatus, createLeadSchema } from '@/lib/validation';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,7 +10,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
 
-    const where = status && isLeadStatus(status) ? { status } : {};
+    const where = status && leadStatus.safeParse(status).success ? { status } : {};
 
     const leads = await prisma.lead.findMany({
       where,
@@ -42,22 +42,19 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { name, phone, bikeName, bikeId, message } = body;
+    const parsed = createLeadSchema.safeParse(body);
 
-    if (!name || !phone) {
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: 'Имя и телефон обязательны' },
+        { error: 'Некорректные данные', details: parsed.error.format() },
         { status: 400 }
       );
     }
 
     const lead = await prisma.lead.create({
       data: {
-        name,
-        phone,
-        bikeName,
-        bikeId: bikeId ? Number(bikeId) : null,
-        message,
+        ...parsed.data,
+        bikeId: parsed.data.bikeId ?? null,
         status: 'NEW',
       },
       include: {

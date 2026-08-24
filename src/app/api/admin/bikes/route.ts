@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import { BIKE_STATUSES, isBikeStatus } from '@/lib/bikeStatus';
+import { createBikeSchema, updateBikeSchema } from '@/lib/validation';
 
 // ==========================================
 // GET: Получение списка всех велосипедов
@@ -34,40 +34,21 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { name, speed, range, motor, isWaterproof, pricePerDay, status, imageUrl } = body;
+    const parsed = createBikeSchema.safeParse(body);
 
-    if (!name || !speed || !range || !motor) {
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: 'Отсутствуют обязательные поля (name, speed, range, motor)' },
-        { status: 400 }
-      );
-    }
-
-    if (status !== undefined && !isBikeStatus(status)) {
-      return NextResponse.json(
-        { error: `Статус должен быть одним из: ${BIKE_STATUSES.join(', ')}` },
-        { status: 400 }
-      );
-    }
-
-    const price = pricePerDay === undefined ? 500 : Number(pricePerDay);
-    if (Number.isNaN(price) || price <= 0) {
-      return NextResponse.json(
-        { error: 'Цена аренды должна быть положительным числом' },
+        { error: 'Некорректные данные', details: parsed.error.format() },
         { status: 400 }
       );
     }
 
     const newBike = await prisma.bike.create({
       data: {
-        name: String(name),
-        speed: String(speed),
-        range: String(range),
-        motor: String(motor),
-        isWaterproof: Boolean(isWaterproof),
-        pricePerDay: price,
-        imageUrl: imageUrl ? String(imageUrl) : null,
-        status: status ?? 'FREE',
+        ...parsed.data,
+        status: parsed.data.status ?? 'FREE',
+        isWaterproof: parsed.data.isWaterproof ?? false,
+        pricePerDay: parsed.data.pricePerDay ?? 500,
       },
     });
 
@@ -87,29 +68,31 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const body = await request.json();
-    const { id, status, name, speed, range, motor, isWaterproof, pricePerDay, imageUrl } = body;
+    const parsed = updateBikeSchema.safeParse(body);
 
-    if (!id) {
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: 'Отсутствует обязательный параметр (id)' },
+        { error: 'Некорректные данные', details: parsed.error.format() },
         { status: 400 }
       );
     }
 
+    const { id, ...fields } = parsed.data;
     const updateData: Prisma.BikeUpdateInput = {};
 
-    if (status !== undefined) {
-      if (!isBikeStatus(status)) {
-        return NextResponse.json(
-          { error: `Статус должен быть одним из: ${BIKE_STATUSES.join(', ')}` },
-          { status: 400 }
-        );
-      }
+    if (fields.name !== undefined) updateData.name = fields.name;
+    if (fields.speed !== undefined) updateData.speed = fields.speed;
+    if (fields.range !== undefined) updateData.range = fields.range;
+    if (fields.motor !== undefined) updateData.motor = fields.motor;
+    if (fields.isWaterproof !== undefined) updateData.isWaterproof = fields.isWaterproof;
+    if (fields.imageUrl !== undefined) updateData.imageUrl = fields.imageUrl;
+    if (fields.pricePerDay !== undefined) updateData.pricePerDay = fields.pricePerDay;
 
+    if (fields.status !== undefined) {
       // Нельзя вручную освободить или отправить на сервис байк с активной арендой
-      if (status !== 'RENTED') {
+      if (fields.status !== 'RENTED') {
         const activeRents = await prisma.rent.count({
-          where: { bikeId: Number(id), isActive: true },
+          where: { bikeId: id, isActive: true },
         });
 
         if (activeRents > 0) {
@@ -120,29 +103,11 @@ export async function PATCH(request: Request) {
         }
       }
 
-      updateData.status = status;
-    }
-
-    if (name !== undefined) updateData.name = String(name);
-    if (speed !== undefined) updateData.speed = String(speed);
-    if (range !== undefined) updateData.range = String(range);
-    if (motor !== undefined) updateData.motor = String(motor);
-    if (isWaterproof !== undefined) updateData.isWaterproof = Boolean(isWaterproof);
-    if (imageUrl !== undefined) updateData.imageUrl = imageUrl ? String(imageUrl) : null;
-
-    if (pricePerDay !== undefined) {
-      const price = Number(pricePerDay);
-      if (Number.isNaN(price) || price <= 0) {
-        return NextResponse.json(
-          { error: 'Цена аренды должна быть положительным числом' },
-          { status: 400 }
-        );
-      }
-      updateData.pricePerDay = price;
+      updateData.status = fields.status;
     }
 
     const updatedBike = await prisma.bike.update({
-      where: { id: Number(id) },
+      where: { id },
       data: updateData,
     });
 

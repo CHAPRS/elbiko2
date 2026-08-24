@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { verifyAdminSessionToken } from "@/lib/session";
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Админские API закрыты той же сессией, что и страницы админки
+  // Админские API закрыты подписанной сессионной кукой
   if (pathname.startsWith("/api/admin")) {
-    if (!request.cookies.has("admin_session")) {
+    const adminSession = request.cookies.get("admin_session")?.value;
+    const isValid = await verifyAdminSessionToken(adminSession);
+    if (!isValid) {
       return NextResponse.json({ error: "Требуется авторизация администратора" }, { status: 401 });
     }
     return NextResponse.next();
@@ -24,15 +27,15 @@ export function middleware(request: NextRequest) {
 
   // Читаем сессионные куки
   const hasCourierSession = request.cookies.has("courier_session");
-  const hasAdminSession = request.cookies.has("admin_session");
+  const adminSession = request.cookies.get("admin_session")?.value;
 
   // 2. ЗАЩИТА ОТ ЦИКЛА: Если пользователь УЖЕ идет на страницу логина, не трогаем его
   if (pathname === "/login") {
-    // Если он уже авторизован, можно сразу перекинуть в ЛК
     if (hasCourierSession) {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
-    if (hasAdminSession) {
+    const isAdminValid = await verifyAdminSessionToken(adminSession);
+    if (isAdminValid) {
       return NextResponse.redirect(new URL("/admin", request.url));
     }
     return NextResponse.next();
@@ -40,7 +43,8 @@ export function middleware(request: NextRequest) {
 
   // 3. Защита панели администратора
   if (pathname.startsWith("/admin")) {
-    if (!hasAdminSession) {
+    const isAdminValid = await verifyAdminSessionToken(adminSession);
+    if (!isAdminValid) {
       return NextResponse.redirect(new URL("/login", request.url));
     }
     return NextResponse.next();
@@ -59,8 +63,6 @@ export function middleware(request: NextRequest) {
 
 // Конфигурируем перехватчик для всех путей
 export const config = {
-  // Защита будет срабатывать ТОЛЬКО на папки /admin и /dashboard
-  // Главная страница сайта (/) теперь полностью открыта для всех курьеров!
-  matcher: ['/admin/:path*', '/dashboard/:path*'],
+  // Защита срабатывает на /admin, /dashboard и админских API
+  matcher: ['/admin/:path*', '/dashboard/:path*', '/api/admin/:path*'],
 };
-

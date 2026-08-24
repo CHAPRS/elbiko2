@@ -1,5 +1,6 @@
 'use client';
 import React from 'react';
+import Image from 'next/image';
 
 interface BikeCardProps {
   bike: any;
@@ -19,8 +20,14 @@ export default function BikeCard({ bike, onBook }: BikeCardProps) {
       {/* Область фото — фиксированная высота для всех карточек */}
       <div className="w-full h-44 bg-slate-950/80 rounded-2xl flex items-center justify-center relative overflow-hidden mb-4 border border-slate-800/50 group-hover:border-slate-700/50 transition-colors">
         {bikeImage ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={bikeImage} alt={bikeName} className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-500" />
+          <Image
+            src={bikeImage}
+            alt={bikeName}
+            fill
+            className="object-contain p-2 group-hover:scale-105 transition-transform duration-500"
+            sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+            unoptimized={bikeImage.startsWith('http')}
+          />
         ) : (
           <span className="text-7xl group-hover:scale-105 group-hover:-rotate-3 transition-transform duration-500 select-none">🚲</span>
         )}

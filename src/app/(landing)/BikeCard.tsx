@@ -58,7 +58,7 @@ export default function BikeCard({ bike, onBook }: BikeCardProps) {
         <button
           type="button"
           onClick={() => onBook(bike)}
-          className="w-full mt-4 py-3.5 rounded-xl font-black text-sm transition-all active:scale-95 shadow-md bg-gradient-to-r from-emerald-500 to-emerald-400 text-slate-950 hover:shadow-lg hover:shadow-emerald-500/10 hover:from-emerald-400 hover:to-emerald-300 cursor-pointer"
+          className="w-full mt-4 py-3.5 min-h-11 rounded-xl font-black text-sm transition-all active:scale-95 shadow-md bg-gradient-to-r from-emerald-500 to-emerald-400 text-slate-950 hover:shadow-lg hover:shadow-emerald-500/10 hover:from-emerald-400 hover:to-emerald-300 cursor-pointer"
         >
           Арендовать
         </button>

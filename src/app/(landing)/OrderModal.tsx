@@ -1,5 +1,5 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface OrderModalProps {
   bike: any;
@@ -10,6 +10,15 @@ export default function OrderModal({ bike, onClose }: OrderModalProps) {
   const [phone, setPhone] = useState('');
   const [name, setName] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Блокируем скролл страницы при открытой модалке
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,7 +36,8 @@ export default function OrderModal({ bike, onClose }: OrderModalProps) {
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-md w-full relative shadow-2xl animate-in fade-in zoom-in-95 duration-200">
         <button 
           onClick={onClose}
-          className="absolute top-4 right-4 text-slate-500 hover:text-white transition-colors"
+          className="absolute top-4 right-4 w-11 h-11 flex items-center justify-center rounded-full text-slate-500 hover:text-white hover:bg-slate-800/50 transition-colors"
+          aria-label="Закрыть"
         >
           ✕
         </button>

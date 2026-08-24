@@ -21,16 +21,14 @@ export function ContactModal() {
 
   // Блокируем скролл основной страницы при открытой модалке
   useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
     if (isContactModalOpen) {
       document.body.style.overflow = 'hidden';
-      document.body.style.pointerEvents = 'none';
     } else {
-      document.body.style.overflow = 'unset';
-      document.body.style.pointerEvents = 'auto';
+      document.body.style.overflow = originalOverflow;
     }
     return () => {
-      document.body.style.overflow = 'unset';
-      document.body.style.pointerEvents = 'auto';
+      document.body.style.overflow = originalOverflow;
     };
   }, [isContactModalOpen]);
 
@@ -74,7 +72,8 @@ export function ContactModal() {
         {/* Кнопка закрытия */}
         <button 
           onClick={() => toggleContactModal(false)} 
-          className="absolute top-5 right-5 w-8 h-8 flex items-center justify-center rounded-full bg-slate-800/50 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+          className="absolute top-4 right-4 w-11 h-11 flex items-center justify-center rounded-full bg-slate-800/50 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+          aria-label="Закрыть"
         >
           ✕
         </button>

@@ -1,10 +1,22 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CONTACTS, SHOW_REPAIR_SECTION } from '@/app/constants';
 
 export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [contactMenuOpen, setContactMenuOpen] = useState(false);
+
+  // Блокируем скролл при открытом мобильном меню
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [mobileMenuOpen]);
 
   const navLinks = [
     { href: '#tariffs', label: 'Тарифы' },
@@ -31,7 +43,7 @@ export default function Header() {
             <a 
               key={link.href}
               href={link.href}
-              className="hover:text-emerald-400 transition-colors"
+              className="hover:text-emerald-400 transition-colors py-3 min-h-11 flex items-center"
             >
               {link.label}
             </a>
@@ -41,7 +53,7 @@ export default function Header() {
         <div className="flex items-center gap-4">
             <a 
               href="/login" 
-              className="hidden sm:block px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 text-sm font-bold transition-all shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 active:scale-95"
+              className="hidden sm:flex items-center justify-center min-h-11 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 text-sm font-bold transition-all shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 active:scale-95"
             >
               Личный кабинет
             </a>
@@ -50,7 +62,7 @@ export default function Header() {
           <div className="relative hidden md:block">
             <button
               onClick={() => setContactMenuOpen(!contactMenuOpen)}
-              className="text-xs bg-slate-900 border border-slate-800 text-slate-300 hover:border-emerald-500/50 px-4 py-2 rounded-xl transition-all flex items-center gap-2"
+              className="text-xs bg-slate-900 border border-slate-800 text-slate-300 hover:border-emerald-500/50 px-4 min-h-11 rounded-xl transition-all flex items-center gap-2"
             >
               Связаться
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -65,7 +77,7 @@ export default function Header() {
                     href={CONTACTS.telegramBot}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-3 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-emerald-400 transition-colors"
+                    className="flex items-center gap-3 px-4 py-3 text-sm text-slate-300 hover:bg-slate-800 hover:text-emerald-400 transition-colors"
                   >
                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.18-.357.295-.6.295-.002 0-.003 0-.005 0l.213-3.054 5.56-5.022c.24-.213-.054-.334-.373-.121l-6.869 4.326-2.96-.924c-.64-.203-.658-.64.135-.954l11.566-4.458c.538-.196 1.006.128.832.941z"/>
@@ -74,7 +86,7 @@ export default function Header() {
                   </a>
                   <a
                     href={`tel:${CONTACTS.phone}`}
-                    className="flex items-center gap-3 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-emerald-400 transition-colors"
+                    className="flex items-center gap-3 px-4 py-3 text-sm text-slate-300 hover:bg-slate-800 hover:text-emerald-400 transition-colors"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
@@ -85,7 +97,7 @@ export default function Header() {
                     href={CONTACTS.telegramManager}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-3 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-emerald-400 transition-colors"
+                    className="flex items-center gap-3 px-4 py-3 text-sm text-slate-300 hover:bg-slate-800 hover:text-emerald-400 transition-colors"
                   >
                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.18-.357.295-.6.295-.002 0-.003 0-.005 0l.213-3.054 5.56-5.022c.24-.213-.054-.334-.373-.121l-6.869 4.326-2.96-.924c-.64-.203-.658-.64.135-.954l11.566-4.458c.538-.196 1.006.128.832.941z"/>
@@ -97,7 +109,7 @@ export default function Header() {
                       href={CONTACTS.maxUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-3 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-emerald-400 transition-colors"
+                      className="flex items-center gap-3 px-4 py-3 text-sm text-slate-300 hover:bg-slate-800 hover:text-emerald-400 transition-colors"
                     >
                       <span className="w-4 h-4 flex items-center justify-center text-xs bg-purple-500/20 text-purple-400 rounded">MAX</span>
                       MAX
@@ -115,7 +127,7 @@ export default function Header() {
           
           <a 
             href="/admin" 
-            className="text-xs bg-slate-900 border border-slate-800 text-slate-300 hover:border-emerald-500/50 px-4 py-2 rounded-xl transition-all"
+            className="text-xs bg-slate-900 border border-slate-800 text-slate-300 hover:border-emerald-500/50 px-4 min-h-11 rounded-xl transition-all flex items-center"
           >
             Диспетчерская
           </a>
@@ -123,7 +135,8 @@ export default function Header() {
           {/* Mobile menu button */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden p-2 text-slate-400 hover:text-white"
+            className="md:hidden p-3 min-w-11 min-h-11 flex items-center justify-center text-slate-400 hover:text-white"
+            aria-label={mobileMenuOpen ? 'Закрыть меню' : 'Открыть меню'}
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               {mobileMenuOpen ? (
@@ -144,7 +157,7 @@ export default function Header() {
               <a
                 key={link.href}
                 href={link.href}
-                className="block text-sm font-medium text-slate-400 hover:text-emerald-400 transition-colors"
+                className="block text-sm font-medium text-slate-400 hover:text-emerald-400 transition-colors min-h-11 py-3"
                 onClick={() => setMobileMenuOpen(false)}
               >
                 {link.label}
@@ -152,7 +165,7 @@ export default function Header() {
             ))}
             <a
               href="/login"
-              className="block text-center px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 text-sm font-bold transition-all"
+              className="block text-center px-4 py-3 min-h-11 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 text-sm font-bold transition-all"
               onClick={() => setMobileMenuOpen(false)}
             >
               Личный кабинет

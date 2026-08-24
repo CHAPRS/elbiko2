@@ -162,8 +162,8 @@ export default function HomePage() {
             Главный офис и сервисный центр. Ждем вас ежедневно.
           </p>
           <div className="space-y-2 text-sm font-mono text-slate-300">
-            <p><span className="text-slate-500">Адрес:</span> Салмышская улица, 44, Оренбург</p>
-            <p><span className="text-slate-500">Часы:</span> 09:00 — 21:00 ежедневно</p>
+            <p><span className="text-slate-500">Адрес:</span> {CONTACTS.addressDisplay}</p>
+            <p><span className="text-slate-500">Часы:</span> {CONTACTS.workHours}</p>
             <p><span className="text-slate-500">Телефон:</span> {CONTACTS.phoneDisplay}</p>
           </div>
           
@@ -245,8 +245,8 @@ export default function HomePage() {
                 Надёжные электровелосипеды в аренду для курьеров в Оренбурге. Готовый транспорт, выгодные тарифы и сервис на весь срок аренды.
               </p>
               <div className="mt-4 text-sm text-slate-400">
-                <p>📍 Салмышская улица, 44</p>
-                <p>🕐 09:00 — 21:00 ежедневно</p>
+                <p>📍 {CONTACTS.addressDisplay}</p>
+                <p>🕐 {CONTACTS.workHours}</p>
               </div>
             </div>
             

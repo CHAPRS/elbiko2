@@ -7,15 +7,23 @@ import React from 'react';
 export const CONTACTS = {
   // Телефон
   phone: '+79867753030',
-  phoneDisplay: '+7 986 775-30-30',
-  
+  phoneDisplay: '+7 (986) 775-30-30',
+
+  // Адрес — единый источник правды
+  city: 'Оренбург',
+  address: 'Салмышская улица, 44',
+  addressDisplay: 'Салмышская улица, 44, Оренбург',
+
+  // Часы работы
+  workHours: '09:00 — 21:00 ежедневно',
+
   // Telegram
   telegramBot: 'https://t.me/my_own_elbiko_bot',
   telegramManager: 'https://t.me/ElBaiko',
-  
+
   // MAX (публичная ссылка профиля)
   maxPhone: '+79867753030',
-  maxPhoneDisplay: '+7 986 775-30-30',
+  maxPhoneDisplay: '+7 (986) 775-30-30',
   maxUrl: 'https://max.ru/u/f9LHodD0cOIvfR5D3T5DSR5uA6Wb95xybkbzJy-30CpguEZ-UXZ2s1S9Vds',
 };
 

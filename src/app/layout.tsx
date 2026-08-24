@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "@/app/globals.css";
+import { CONTACTS } from "@/app/constants";
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -10,7 +11,7 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: "ЭльБайко — аренда электровелосипедов для курьеров в Оренбурге",
   description:
-    "Аренда электровелосипедов для курьеров в Оренбурге от 450 ₽/сутки. Свободные модели, быстрое оформление, без залога. Звоните +7 (986) 775-30-30.",
+    `Аренда электровелосипедов для курьеров в ${CONTACTS.city} от 450 ₽/сутки. Свободные модели, быстрое оформление, без залога. Звоните ${CONTACTS.phoneDisplay}.`,
   keywords: [
     "аренда электровелосипеда Оренбург",
     "электровелосипед для курьера",
@@ -57,17 +58,17 @@ const localBusinessJsonLd = {
   "@context": "https://schema.org",
   "@type": "LocalBusiness",
   name: "ЭльБайко",
-  description: "Аренда электровелосипедов для курьеров в Оренбурге",
+  description: `Аренда электровелосипедов для курьеров в ${CONTACTS.city}`,
   url: "https://elbiko.ru",
-  telephone: "+79867753030",
+  telephone: CONTACTS.phone,
   address: {
     "@type": "PostalAddress",
-    streetAddress: "Салмышская улица, 44",
-    addressLocality: "Оренбург",
+    streetAddress: CONTACTS.address,
+    addressLocality: CONTACTS.city,
     addressCountry: "RU",
   },
   openingHours: ["Mo-Su 09:00-21:00"],
-  areaServed: "Оренбург",
+  areaServed: CONTACTS.city,
 };
 
 export default function RootLayout({

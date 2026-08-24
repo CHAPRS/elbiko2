@@ -8,7 +8,7 @@ interface CompactCatalogProps {
 }
 
 export default function CompactCatalog({ bikes, onBook }: CompactCatalogProps) {
-  // Показать только первые 3 велосипеда для компактности
+  // Показать только первые 3 велосипеда для главной страницы
   const displayBikes = bikes.slice(0, 3);
 
   const bikesRenderList = displayBikes.map((bike) => (
@@ -22,16 +22,14 @@ export default function CompactCatalog({ bikes, onBook }: CompactCatalogProps) {
   );
 
   return (
-    <section id="catalog" className="py-12 px-4 bg-slate-950">
+    <section id="catalog" className="py-10 px-4 bg-slate-950">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-8">
           <h2 className="text-2xl sm:text-3xl font-black text-white">Доступные модели в вашем городе</h2>
           <p className="text-sm text-slate-500 mt-2">Выберите электровелосипед для работы курьером</p>
         </div>
-        <div className="flex justify-center">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full max-w-5xl">
-            {displayBikes.length === 0 ? catalogLoadingText : bikesRenderList}
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 justify-items-center max-w-6xl mx-auto">
+          {displayBikes.length === 0 ? catalogLoadingText : bikesRenderList}
         </div>
       </div>
     </section>

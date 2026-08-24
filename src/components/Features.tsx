@@ -14,7 +14,7 @@ interface Benefit {
 const benefits: Benefit[] = [
   {
     title: 'Готов к работе',
-    description: 'Получите электровелосипед и начинайте зарабатывать больше без необходимости покупать и обслуживать собственный транспорт.',
+    description: 'Получите готовый электровелосипед и выходите на линию без покупки собственного транспорта.',
     icon: '🚴',
     imageUrl: '/images/вид три четверти спереди.jpg',
     isMain: true,
@@ -22,75 +22,76 @@ const benefits: Benefit[] = [
   },
   {
     title: 'Экономично',
-    description: 'Арендуйте велосипед когда нужно для работы, вместо покупки собственного транспорта.',
+    description: 'Аренда вместо покупки собственного транспорта.',
     icon: '⚡',
     isMain: false
   },
   {
     title: 'Сервис',
-    description: 'Возникла техническая проблема — обратитесь к нам, и мы поможем решить вопрос.',
+    description: 'Техническая поддержка и обслуживание.',
     icon: '🔧',
     isMain: false
   },
   {
-    title: 'Запас энергии на всю смену',
-    description: 'Меньше отвлечений на транспорт — больше времени для работы.',
+    title: 'Запас энергии',
+    description: 'Аккумуляторы на весь рабочий день.',
     icon: '🔋',
     isMain: false
   },
   {
-    title: 'Мы рядом',
-    description: 'Поможем разобраться с арендой, велосипедом и эксплуатацией.',
+    title: 'Поддержка',
+    description: 'Поможем с арендой и эксплуатацией.',
     icon: '📞',
     isMain: false
   }
 ];
 
 export default function Features() {
+  const mainBenefit = benefits[0];
+  const secondaryBenefits = benefits.slice(1);
+
   return (
-    <section id="advantages" className="py-12 px-4 bg-slate-950">
+    <section id="advantages" className="py-8 px-4 bg-slate-950">
       <div className="max-w-7xl mx-auto">
-        <div className="text-center mb-8">
-          <div className="inline-block px-4 py-2 bg-emerald-500/20 text-emerald-400 font-black text-xs uppercase tracking-wider rounded-full border border-emerald-500/30 mb-4">
-            ПОЧЕМУ ELBIKO
+        <div className="text-center mb-6">
+          <div className="inline-block px-3 py-1.5 bg-emerald-500/20 text-emerald-400 font-black text-xs uppercase tracking-wider rounded-full border border-emerald-500/30 mb-3">
+            ПОЧЕМУ ЭльБайко
           </div>
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-100 mb-4">
-            Всё для работы курьером — в одной аренде
+          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-100 mb-2">
+            Всё для работы курьером
           </h2>
-          <p className="text-slate-400 text-sm sm:text-base max-w-2xl mx-auto">
-            Получаете готовый электровелосипед, понятные условия аренды и поддержку на всём сроке использования.
+          <p className="text-slate-400 text-sm max-w-2xl mx-auto">
+            Всё необходимое для комфортной работы — в одной аренде.
           </p>
         </div>
 
         {/* Desktop: Bento Grid */}
-        <div className="hidden lg:grid lg:grid-cols-2 lg:grid-rows-2 lg:gap-6">
-          {/* Карточка "Готов к работе" - занимает 1 колонку и 2 ряда (слева, большая) */}
-          <div className="lg:col-span-1 lg:row-span-2 relative bg-slate-900/50 border border-slate-800 rounded-3xl overflow-hidden group hover:border-emerald-500/30 transition-all duration-300">
-            {benefits[0].imageUrl && (
-              <div className="relative h-48">
-                <Image
-                  src={benefits[0].imageUrl}
-                  alt={benefits[0].title}
-                  fill
-                  className="object-cover group-hover:scale-105 transition-transform duration-500"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-transparent" />
-              </div>
+        <div className="hidden lg:grid lg:grid-cols-5 lg:gap-4">
+          {/* Главная карточка — 3 из 5 колонок, примерно 60% */}
+          <div className="lg:col-span-3 relative h-[320px] bg-slate-900/50 border border-slate-800 rounded-3xl overflow-hidden group hover:border-emerald-500/30 transition-all duration-300">
+            {mainBenefit.imageUrl && (
+              <Image
+                src={mainBenefit.imageUrl}
+                alt={mainBenefit.title}
+                fill
+                className="object-cover group-hover:scale-[1.02] transition-transform duration-500"
+              />
             )}
-            <div className="p-6">
-              <div className="flex items-center gap-3 mb-3">
-                <span className="text-3xl">{benefits[0].icon}</span>
-                <h3 className="text-2xl font-bold text-slate-100">
-                  {benefits[0].title}
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-950/40 to-transparent" />
+            <div className="absolute inset-0 flex flex-col justify-end p-6">
+              <div className="flex items-center gap-3 mb-2">
+                <span className="text-3xl">{mainBenefit.icon}</span>
+                <h3 className="text-2xl font-black text-slate-100">
+                  {mainBenefit.title}
                 </h3>
               </div>
-              <p className="text-slate-300 text-sm leading-relaxed mb-3">
-                {benefits[0].description}
+              <p className="text-slate-300 text-sm max-w-md mb-3">
+                {mainBenefit.description}
               </p>
-              {benefits[0].badges && (
+              {mainBenefit.badges && (
                 <div className="flex flex-wrap gap-2">
-                  {benefits[0].badges.map((badge, index) => (
-                    <span key={index} className="px-3 py-1 bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-bold rounded-full">
+                  {mainBenefit.badges.map((badge, index) => (
+                    <span key={index} className="px-3 py-1 bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-black rounded-full">
                       ✓ {badge}
                     </span>
                   ))}
@@ -99,71 +100,53 @@ export default function Features() {
             </div>
           </div>
 
-          {/* Три карточки справа */}
-          <div className="space-y-4">
-            {benefits.slice(1, 4).map((benefit, index) => (
+          {/* 4 карточки справа — 2×2 сетка */}
+          <div className="lg:col-span-2 grid grid-cols-2 grid-rows-2 gap-4">
+            {secondaryBenefits.map((benefit, index) => (
               <div
                 key={index}
-                className="bg-slate-900/50 border border-slate-800 rounded-3xl p-5 hover:border-emerald-500/30 transition-all duration-300 group"
+                className="bg-slate-900/50 border border-slate-800 rounded-2xl p-4 hover:border-emerald-500/30 transition-all duration-300 group"
               >
-                <div className="text-3xl mb-3 group-hover:scale-110 transition-transform">
+                <div className="text-2xl mb-2 group-hover:scale-110 transition-transform">
                   {benefit.icon}
                 </div>
-                <h3 className="text-lg font-bold text-emerald-400 mb-2">
+                <h3 className="text-base font-bold text-emerald-400 mb-1">
                   {benefit.title}
                 </h3>
-                <p className="text-xs text-slate-400 leading-relaxed">
+                <p className="text-[11px] text-slate-400 leading-relaxed">
                   {benefit.description}
                 </p>
               </div>
             ))}
           </div>
-
-          {/* Последняя карточка слева внизу */}
-          <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-5 hover:border-emerald-500/30 transition-all duration-300 group">
-            <div className="text-3xl mb-3 group-hover:scale-110 transition-transform">
-              {benefits[4].icon}
-            </div>
-            <h3 className="text-lg font-bold text-emerald-400 mb-2">
-              {benefits[4].title}
-            </h3>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              {benefits[4].description}
-            </p>
-          </div>
-
-
         </div>
 
-        {/* Tablet: Главная карточка сверху + остальные */}
-        <div className="hidden md:grid lg:hidden md:grid-cols-2 md:gap-5">
-          {/* Главная карточка */}
-          <div className="md:col-span-2 relative bg-slate-900/50 border border-slate-800 rounded-3xl overflow-hidden group hover:border-emerald-500/30 transition-all duration-300">
-            {benefits[0].imageUrl && (
-              <div className="relative h-36">
-                <Image
-                  src={benefits[0].imageUrl}
-                  alt={benefits[0].title}
-                  fill
-                  className="object-cover group-hover:scale-105 transition-transform duration-500"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-transparent" />
-              </div>
+        {/* Tablet: Главная карточка сверху + 4 маленькие 2×2 */}
+        <div className="hidden md:grid lg:hidden md:grid-cols-2 md:gap-4">
+          <div className="md:col-span-2 relative h-64 bg-slate-900/50 border border-slate-800 rounded-3xl overflow-hidden group hover:border-emerald-500/30 transition-all duration-300">
+            {mainBenefit.imageUrl && (
+              <Image
+                src={mainBenefit.imageUrl}
+                alt={mainBenefit.title}
+                fill
+                className="object-cover group-hover:scale-[1.02] transition-transform duration-500"
+              />
             )}
-            <div className="p-5">
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-950/40 to-transparent" />
+            <div className="absolute inset-0 flex flex-col justify-end p-5">
               <div className="flex items-center gap-3 mb-2">
-                <span className="text-3xl">{benefits[0].icon}</span>
-                <h3 className="text-xl font-bold text-slate-100">
-                  {benefits[0].title}
+                <span className="text-2xl">{mainBenefit.icon}</span>
+                <h3 className="text-xl font-black text-slate-100">
+                  {mainBenefit.title}
                 </h3>
               </div>
-              <p className="text-slate-300 text-sm leading-relaxed mb-2">
-                {benefits[0].description}
+              <p className="text-slate-300 text-sm max-w-lg mb-2">
+                {mainBenefit.description}
               </p>
-              {benefits[0].badges && (
+              {mainBenefit.badges && (
                 <div className="flex flex-wrap gap-2">
-                  {benefits[0].badges.map((badge, index) => (
-                    <span key={index} className="px-3 py-1 bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-bold rounded-full">
+                  {mainBenefit.badges.map((badge, index) => (
+                    <span key={index} className="px-2.5 py-0.5 bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-black rounded-full">
                       ✓ {badge}
                     </span>
                   ))}
@@ -172,16 +155,15 @@ export default function Features() {
             </div>
           </div>
 
-          {/* Остальные карточки */}
-          {benefits.slice(1).map((benefit, index) => (
+          {secondaryBenefits.map((benefit, index) => (
             <div
               key={index}
-              className="bg-slate-900/50 border border-slate-800 rounded-3xl p-5 hover:border-emerald-500/30 transition-all duration-300 group"
+              className="bg-slate-900/50 border border-slate-800 rounded-2xl p-4 hover:border-emerald-500/30 transition-all duration-300 group"
             >
-              <div className="text-3xl mb-3 group-hover:scale-110 transition-transform">
+              <div className="text-2xl mb-2 group-hover:scale-110 transition-transform">
                 {benefit.icon}
               </div>
-              <h3 className="text-lg font-bold text-emerald-400 mb-2">
+              <h3 className="text-base font-bold text-emerald-400 mb-1">
                 {benefit.title}
               </h3>
               <p className="text-xs text-slate-400 leading-relaxed">
@@ -193,46 +175,58 @@ export default function Features() {
 
         {/* Mobile: Вертикальная сетка */}
         <div className="md:hidden space-y-3">
-          {benefits.map((benefit, index) => (
-            <div
-              key={index}
-              className={`relative bg-slate-900/50 border border-slate-800 rounded-3xl overflow-hidden group hover:border-emerald-500/30 transition-all duration-300 ${
-                index === 0 ? '' : 'p-4'
-              }`}
-            >
-              {index === 0 && benefit.imageUrl && (
-                <div className="relative h-28">
-                  <Image
-                    src={benefit.imageUrl}
-                    alt={benefit.title}
-                    fill
-                    className="object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-transparent" />
+          {/* Главная карточка */}
+          <div className="relative h-56 bg-slate-900/50 border border-slate-800 rounded-3xl overflow-hidden group hover:border-emerald-500/30 transition-all duration-300">
+            {mainBenefit.imageUrl && (
+              <Image
+                src={mainBenefit.imageUrl}
+                alt={mainBenefit.title}
+                fill
+                className="object-cover group-hover:scale-[1.02] transition-transform duration-500"
+              />
+            )}
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-950/40 to-transparent" />
+            <div className="absolute inset-0 flex flex-col justify-end p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-2xl">{mainBenefit.icon}</span>
+                <h3 className="text-lg font-black text-slate-100">
+                  {mainBenefit.title}
+                </h3>
+              </div>
+              <p className="text-slate-300 text-xs max-w-md mb-2">
+                {mainBenefit.description}
+              </p>
+              {mainBenefit.badges && (
+                <div className="flex flex-wrap gap-1">
+                  {mainBenefit.badges.map((badge, index) => (
+                    <span key={index} className="px-2 py-0.5 bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-[10px] font-black rounded-full">
+                      ✓ {badge}
+                    </span>
+                  ))}
                 </div>
               )}
-              <div className={index === 0 ? 'p-4' : ''}>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-xl">{benefit.icon}</span>
-                  <h3 className={`font-bold ${index === 0 ? 'text-base text-slate-100' : 'text-base text-emerald-400'}`}>
-                    {benefit.title}
-                  </h3>
+            </div>
+          </div>
+
+          {/* 4 маленькие карточки */}
+          <div className="grid grid-cols-2 gap-3">
+            {secondaryBenefits.map((benefit, index) => (
+              <div
+                key={index}
+                className="bg-slate-900/50 border border-slate-800 rounded-2xl p-3 hover:border-emerald-500/30 transition-all duration-300 group"
+              >
+                <div className="text-xl mb-1.5 group-hover:scale-110 transition-transform">
+                  {benefit.icon}
                 </div>
-                <p className="text-[11px] text-slate-400 leading-relaxed">
+                <h3 className="text-sm font-bold text-emerald-400 mb-0.5">
+                  {benefit.title}
+                </h3>
+                <p className="text-[10px] text-slate-400 leading-relaxed">
                   {benefit.description}
                 </p>
-                {benefit.badges && (
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {benefit.badges.map((badge, badgeIndex) => (
-                      <span key={badgeIndex} className="px-2 py-0.5 bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold rounded-full">
-                        ✓ {badge}
-                      </span>
-                    ))}
-                  </div>
-                )}
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
     </section>

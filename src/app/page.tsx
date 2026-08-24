@@ -18,7 +18,7 @@ import { ContactModal } from '@/components/ContactModal';
 import CompactCatalog from '@/components/CompactCatalog';
 import { useRentStore } from '@/store/useRentStore';
 import { getHeroFromDB, getTariffsFromDB, getFeaturesFromDB, getStepsFromDB } from '@/lib/contentQueries';
-import { CONTACTS } from '@/app/constants';
+import { CONTACTS, SHOW_REPAIR_SECTION } from '@/app/constants';
 
 export default function HomePage() {
   const [bikes, setBikes] = useState<any[]>([]);
@@ -141,8 +141,8 @@ export default function HomePage() {
       {/* Для бизнеса */}
       <Business />
 
-      {/* Ремонт */}
-      <Repair />
+      {/* Ремонт — временно скрыт через SHOW_REPAIR_SECTION */}
+      {SHOW_REPAIR_SECTION && <Repair />}
 
       {/* FAQ секция */}
       <section id="faq" className="max-w-3xl mx-auto px-6 py-20 space-y-8 scroll-mt-24">
@@ -157,7 +157,7 @@ export default function HomePage() {
       {/* Контакты и карта */}
       <section id="contacts" className="max-w-7xl mx-auto px-6 py-20 grid grid-cols-1 md:grid-cols-3 gap-8 scroll-mt-24 border-t border-slate-900">
         <div className="space-y-4">
-          <h2 className="text-2xl font-black text-white">Пункт выдачи ELBIKO</h2>
+          <h2 className="text-2xl font-black text-white">Пункт выдачи ЭльБайко</h2>
           <p className="text-sm text-slate-400 leading-relaxed">
             Главный офис и сервисный центр. Ждем вас ежедневно.
           </p>
@@ -229,7 +229,7 @@ export default function HomePage() {
             frameBorder="0" 
             style={{ border: 0 }}
             allowFullScreen
-            title="Карта офиса ELBIKO"
+            title="Карта офиса ЭльБайко"
           />
         </div>
       </section>
@@ -240,7 +240,7 @@ export default function HomePage() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
             {/* О компании */}
             <div>
-              <h3 className="text-white font-bold mb-4">ELBIKO</h3>
+              <h3 className="text-white font-bold mb-4">ЭльБайко</h3>
               <p className="text-sm text-slate-400 leading-relaxed">
                 Надёжные электровелосипеды в аренду для курьеров в Оренбурге. Готовый транспорт, выгодные тарифы и сервис на весь срок аренды.
               </p>
@@ -336,7 +336,7 @@ export default function HomePage() {
           
           <div className="border-t border-slate-900 pt-8 text-center">
             <div className="text-sm text-slate-500">
-              © 2024 ELBIKO. Все права защищены.
+              © 2024 ЭльБайко. Все права защищены.
             </div>
           </div>
         </div>

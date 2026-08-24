@@ -10,6 +10,7 @@ import Reviews from '@/components/Reviews';
 import Business from '@/components/Business';
 import Repair from '@/components/Repair';
 import Header from '@/components/Header';
+import { SHOW_REPAIR_SECTION } from '@/app/constants';
 
 export default function HomePage() {
   const [bikes, setBikes] = useState<any[]>([]);
@@ -117,8 +118,8 @@ export default function HomePage() {
       {/* Для бизнеса */}
       <Business />
 
-      {/* Ремонт */}
-      <Repair />
+      {/* Ремонт — временно скрыт через SHOW_REPAIR_SECTION */}
+      {SHOW_REPAIR_SECTION && <Repair />}
 
       {/* FAQ секция */}
       <section id="faq" className="max-w-3xl mx-auto px-6 py-20 space-y-8 scroll-mt-24">
@@ -133,7 +134,7 @@ export default function HomePage() {
       {/* Контакты и карта */}
       <section id="contacts" className="max-w-7xl mx-auto px-6 py-20 grid grid-cols-1 md:grid-cols-3 gap-8 scroll-mt-24 border-t border-slate-900">
         <div className="space-y-4">
-          <h2 className="text-2xl font-black text-white">Пункт выдачи ELBIKO</h2>
+          <h2 className="text-2xl font-black text-white">Пункт выдачи ЭльБайко</h2>
           <p className="text-sm text-slate-400 leading-relaxed">
             Главный офис и сервисный центр. Ждем вас по будням с 10 до 19 ч.
           </p>
@@ -147,7 +148,7 @@ export default function HomePage() {
         <div className="md:col-span-2 h-72 bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden relative shadow-inner">
           <div className="absolute inset-0 bg-slate-950/20 z-10 pointer-events-none" />
           <div className="w-full h-full flex items-center justify-center text-sm font-mono text-slate-500">
-            Интерактивная карта офиса ELBIKO загружена...
+            Интерактивная карта офиса ЭльБайко загружена...
           </div>
         </div>
       </section>
@@ -157,7 +158,7 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-6 text-center">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="text-sm text-slate-500">
-              © 2024 ELBIKO. Все права защищены.
+              © 2024 ЭльБайко. Все права защищены.
             </div>
             <div className="flex gap-6 text-sm text-slate-500">
               <a href="#" className="hover:text-emerald-400 transition-colors">Политика конфиденциальности</a>

@@ -1,6 +1,6 @@
 'use client';
 import React, { useState } from 'react';
-import { CONTACTS } from '@/app/constants';
+import { CONTACTS, SHOW_REPAIR_SECTION } from '@/app/constants';
 
 export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -12,7 +12,7 @@ export default function Header() {
     { href: '#catalog', label: 'Каталог' },
     { href: '#advantages', label: 'Преимущества' },
     { href: '#business', label: 'Бизнесу' },
-    { href: '#repair', label: 'Ремонт' },
+    ...(SHOW_REPAIR_SECTION ? [{ href: '#repair', label: 'Ремонт' }] : []),
   ];
 
   return (

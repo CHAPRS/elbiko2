@@ -15,6 +15,7 @@ import Business from '@/components/Business';
 import Repair from '@/components/Repair';
 import Header from '@/components/Header';
 import { ContactModal } from '@/components/ContactModal';
+import CompactCatalog from '@/components/CompactCatalog';
 import { useRentStore } from '@/store/useRentStore';
 import { getHeroFromDB, getTariffsFromDB, getFeaturesFromDB, getStepsFromDB } from '@/lib/contentQueries';
 import { CONTACTS } from '@/app/constants';
@@ -74,19 +75,7 @@ export default function HomePage() {
   // ПРЕДВАРИТЕЛЬНАЯ СБОРКА КОНТЕНТА (Чистый JavaScript)
   // =========================================================
 
-  // 1. Сборка списка велосипедов (СКОБКИ ИСПРАВЛЕНЫ)
-  const bikesRenderList = bikes.map((bike) => (
-    <BikeCard key={bike.id} bike={bike} onBook={(b) => setSelectedBike(b)} />
-  ));
-
-  // Заглушка для каталога
-  const catalogLoadingText = (
-    <div className="col-span-full p-12 bg-slate-900 border border-slate-800 rounded-3xl text-center text-slate-500 font-mono text-sm">
-      Загрузка актуального автопарка Elbiko...
-    </div>
-  );
-
-  // 2. Сборка FAQ-аккордеона
+  // 1. Сборка FAQ-аккордеона
   const faqItems = [
     { q: "Что нужно для оформления договора?", a: "Только паспорт гражданина РФ или СНГ и минимальный возраст от 18 лет. Никаких скрытых залогов." },
     { q: "Как происходит замена аккумулятора?", a: "Если аккумулятор вышел из строя мы заменим его на заряженный без дополнительных плат" },
@@ -140,21 +129,11 @@ export default function HomePage() {
       {/* Преимущества */}
       {featuresData.length > 0 ? <FeaturesDB features={featuresData} /> : <Features />}
 
+      {/* Компактный каталог после преимуществ */}
+      <CompactCatalog bikes={bikes} onBook={(b) => setSelectedBike(b)} />
+
       {/* Тарифы */}
       {tariffsData.length > 0 ? <TariffsDB tariffs={tariffsData} /> : <Tariffs />}
-
-      {/* Каталог велосипедов */}
-      <main className="max-w-7xl mx-auto px-6 py-20">
-        <section id="catalog" className="space-y-8 scroll-mt-24">
-          <div className="text-center sm:text-left">
-            <h2 className="text-2xl sm:text-3xl font-black text-white">Доступные модели в вашем городе</h2>
-            <p className="text-sm text-slate-500 mt-1">Все байки проходят ежедневный технический осмотр</p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {totalBikesFound === 0 ? catalogLoadingText : bikesRenderList}
-          </div>
-        </section>
-      </main>
 
       {/* Отзывы */}
       <Reviews />

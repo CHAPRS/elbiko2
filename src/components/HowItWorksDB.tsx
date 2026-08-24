@@ -21,8 +21,14 @@ export default function HowItWorksDB({ steps }: HowItWorksDBProps) {
   // Сортируем шаги по полю order
   const sortedSteps = [...steps].sort((a, b) => (a.order || 0) - (b.order || 0))
 
-  // Иконки по умолчанию, если не указаны в БД
+  // Иконки и изображения по умолчанию, если не указаны в БД
   const defaultIcons = ['📱', '📞', '🚴', '🚀']
+  const defaultImageUrls = [
+    '/images/step-1.jpg',
+    '/images/step-2.jpg',
+    '/images/step-3.jpg',
+    '/images/step-4.jpg',
+  ]
 
   return (
     <section id="how-it-works" className="py-20 px-4 bg-slate-950">
@@ -62,10 +68,10 @@ export default function HowItWorksDB({ steps }: HowItWorksDBProps) {
 
                   {/* Все этапы - с изображениями */}
                   <div className="relative">
-                    {step.imageUrl ? (
+                    {step.imageUrl || defaultImageUrls[index] ? (
                       <div className="relative h-48 rounded-2xl overflow-hidden mb-4 bg-slate-900/50 border border-slate-800">
                         <Image
-                          src={step.imageUrl}
+                          src={step.imageUrl || defaultImageUrls[index]}
                           alt={step.title}
                           fill
                           className="object-cover"
@@ -122,10 +128,10 @@ export default function HowItWorksDB({ steps }: HowItWorksDBProps) {
 
                 {/* Все этапы - с изображениями */}
                 <div className="relative">
-                  {step.imageUrl ? (
+                  {step.imageUrl || defaultImageUrls[index] ? (
                     <div className="relative h-48 rounded-2xl overflow-hidden mb-4 bg-slate-900/50 border border-slate-800">
                       <Image
-                        src={step.imageUrl}
+                        src={step.imageUrl || defaultImageUrls[index]}
                         alt={step.title}
                         fill
                         className="object-cover"

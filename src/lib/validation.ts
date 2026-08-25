@@ -42,6 +42,12 @@ export const createLeadSchema = z.object({
   message: z.string().max(2000).optional().nullable(),
 });
 
+export const createOrderSchema = z.object({
+  name: z.string().min(1).max(120),
+  phone: z.string().min(5).max(30),
+  bikeName: z.string().min(1).max(120),
+});
+
 export const idParamSchema = z.object({
   id: z.string().regex(/^\d+$/).transform(Number),
 });

@@ -44,7 +44,7 @@ const tariffs = [
     price: '15 000',
     period: 'в месяц',
     icon: '⭐',
-    image: '/images/tariff-partner.jpg',
+    image: '/images/tariff-partner.webp',
     features: [
       'все из тарифа "Заработок"',
       '2 аккумулятора максимальной емкости',

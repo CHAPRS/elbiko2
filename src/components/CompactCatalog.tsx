@@ -28,7 +28,7 @@ export default function CompactCatalog({ bikes, onBook }: CompactCatalogProps) {
           <h2 className="text-2xl sm:text-3xl font-black text-white">Доступные модели в вашем городе</h2>
           <p className="text-sm text-slate-500 mt-2">Выберите электровелосипед для работы курьером</p>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 justify-items-center max-w-6xl mx-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
           {displayBikes.length === 0 ? catalogLoadingText : bikesRenderList}
         </div>
       </div>

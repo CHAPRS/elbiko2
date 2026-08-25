@@ -16,9 +16,9 @@ export default function BikeCard({ bike, onBook }: BikeCardProps) {
   const bikeImage = bike.imageUrl || null;
 
   return (
-    <div className="h-full bg-slate-900/40 backdrop-blur-md border border-slate-800/80 rounded-3xl p-4 flex flex-col hover:border-emerald-500/40 transition-all duration-300 group hover:shadow-xl hover:shadow-emerald-500/5">
-      {/* Область фото — фиксированная высота для всех карточек */}
-      <div className="w-full h-44 bg-slate-950/80 rounded-2xl flex items-center justify-center relative overflow-hidden mb-4 border border-slate-800/50 group-hover:border-slate-700/50 transition-colors">
+    <div className="h-full min-w-0 bg-slate-900/40 backdrop-blur-md border border-slate-800/80 rounded-3xl p-5 flex flex-col hover:border-emerald-500/40 transition-all duration-300 group hover:shadow-xl hover:shadow-emerald-500/5">
+      {/* Область фото — соотношение сторон 4:3 */}
+      <div className="w-full aspect-[4/3] bg-slate-950/80 rounded-2xl flex items-center justify-center relative overflow-hidden mb-4 border border-slate-800/50 group-hover:border-slate-700/50 transition-colors">
         {bikeImage ? (
           <Image
             src={bikeImage}

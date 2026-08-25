@@ -1,8 +1,19 @@
 import { NextResponse } from 'next/server';
 import { createAdminSessionToken } from '@/lib/session';
+import { authLimiter, getClientIp } from '@/lib/rate-limit';
 
 export async function POST(request: Request) {
   try {
+    const ip = getClientIp(request);
+    try {
+      await authLimiter.check(5, ip);
+    } catch {
+      return NextResponse.json(
+        { error: 'Слишком много попыток. Попробуйте позже.' },
+        { status: 429, headers: { 'Retry-After': '60' } }
+      );
+    }
+
     const { username, password } = await request.json();
 
     const adminUsername = process.env.ADMIN_USERNAME;

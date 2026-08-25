@@ -1,9 +1,20 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyPassword, hashPassword } from '@/lib/password';
+import { authLimiter, getClientIp } from '@/lib/rate-limit';
 
 export async function POST(request: Request) {
   try {
+    const ip = getClientIp(request);
+    try {
+      await authLimiter.check(5, ip);
+    } catch {
+      return NextResponse.json(
+        { error: 'Слишком много попыток. Попробуйте позже.' },
+        { status: 429, headers: { 'Retry-After': '60' } }
+      );
+    }
+
     const { phone, password } = await request.json();
 
     // 1. Ищем курьера в MySQL

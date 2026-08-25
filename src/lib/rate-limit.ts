@@ -41,3 +41,19 @@ export const limiter = rateLimit({
   uniqueTokenPerInterval: 500,
   interval: 60000, // Временное окно: 1 минута
 });
+
+// Лимитер для auth endpoints
+export const authLimiter = rateLimit({
+  uniqueTokenPerInterval: 500,
+  interval: 60000,
+});
+
+export function getClientIp(request: Request): string {
+  const forwarded = request.headers.get('x-forwarded-for');
+  const realIp = request.headers.get('x-real-ip');
+  if (forwarded) {
+    return forwarded.split(',')[0].trim();
+  }
+  if (realIp) return realIp;
+  return '127.0.0.1';
+}

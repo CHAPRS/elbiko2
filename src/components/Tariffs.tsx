@@ -1,5 +1,6 @@
 'use client';
 import React from 'react';
+import Image from 'next/image';
 import { useRentStore } from '@/store/useRentStore';
 
 // Временные данные - будут заменены на данные из Sanity
@@ -98,9 +99,14 @@ export default function Tariffs() {
               {/* Изображение велосипеда */}
               <div className="relative h-40 mb-6 rounded-2xl overflow-hidden bg-slate-950/50 border border-slate-800">
                 {tariff.image ? (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <div className="text-6xl opacity-50">🚲</div>
-                  </div>
+                  <Image
+                    src={tariff.image}
+                    alt={tariff.name}
+                    fill
+                    unoptimized
+                    sizes="(max-width: 768px) 100vw, 33vw"
+                    className="object-cover"
+                  />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
                     <div className="text-6xl opacity-50">🚲</div>

@@ -1,5 +1,6 @@
 import React from 'react'
 import Image from 'next/image'
+import { normalizeImageUrl, tariffFallbackImages } from '@/lib/image'
 
 interface TariffData {
   id: number
@@ -33,7 +34,7 @@ export default function TariffsDB({ tariffs }: TariffsDBProps) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {tariffs.map((tariff) => {
+        {tariffs.map((tariff, index) => {
           const popularClass = tariff.popular
             ? 'bg-gradient-to-b from-emerald-500/20 to-slate-900 border-emerald-500/50 shadow-xl shadow-emerald-500/20 transform hover:scale-105 hover:shadow-2xl'
             : 'bg-slate-900/50 border-slate-800 hover:border-emerald-500/30 hover:shadow-xl transform hover:scale-105'
@@ -58,16 +59,19 @@ export default function TariffsDB({ tariffs }: TariffsDBProps) {
                 <div className="text-5xl mb-2">{tariff.icon || '🚲'}</div>
               </div>
 
-              {tariff.imageUrl && (
-                <div className="relative h-40 mb-6 rounded-2xl overflow-hidden bg-slate-950/50 border border-slate-800">
-                  <Image
-                    src={tariff.imageUrl}
-                    alt={tariff.name}
-                    fill
-                    className="object-cover"
-                  />
-                </div>
-              )}
+              {(() => {
+                const imageUrl = normalizeImageUrl(tariff.imageUrl) || tariffFallbackImages[index % tariffFallbackImages.length]
+                return (
+                  <div className="relative h-40 mb-6 rounded-2xl overflow-hidden bg-slate-950/50 border border-slate-800">
+                    <Image
+                      src={imageUrl}
+                      alt={tariff.name}
+                      fill
+                      className="object-cover"
+                    />
+                  </div>
+                )
+              })()}
 
               <div className="text-center mb-6">
                 <h3 className="text-2xl font-black text-white mb-2">{tariff.name}</h3>

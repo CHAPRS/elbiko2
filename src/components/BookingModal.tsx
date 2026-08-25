@@ -95,7 +95,7 @@ export function BookingModal() {
         {/* Детали заказа */}
         <div className="mt-6 p-5 bg-slate-950/50 border border-slate-800/60 rounded-2xl space-y-3.5 text-sm text-slate-300">
           <div className="flex justify-between items-center">
-            <span className="text-slate-400">Модель байка</span>
+            <span className="text-slate-400">Модель электровелосипеда</span>
             <span className="font-bold text-white text-base">{selectedBike.name}</span>
           </div>
           <div className="flex justify-between items-center">
@@ -118,7 +118,7 @@ export function BookingModal() {
         {/* Предупреждение о подмене */}
         <div className="mt-4 flex items-center gap-3 p-3 bg-slate-800/40 rounded-xl border border-slate-800 text-xs text-slate-400">
           <span className="text-lg">🛠️</span>
-          <span>Бесплатное техническое обслуживание и подменный байк включены в стоимость.</span>
+          <span>Бесплатное техническое обслуживание и подменный электровелосипед включены в стоимость.</span>
         </div>
 
         {/* Главная кнопка действия */}

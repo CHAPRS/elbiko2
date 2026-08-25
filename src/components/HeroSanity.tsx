@@ -28,7 +28,7 @@ export default function HeroSanity({ data }: HeroSanityProps) {
 
   const bgImage = data.backgroundImage 
     ? urlFor(data.backgroundImage).url() 
-    : '/images/delivery.jpg'
+    : '/images/delivery.webp'
 
   return (
     <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden">

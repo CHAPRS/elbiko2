@@ -18,7 +18,7 @@ const steps: Step[] = [
     description: 'Заполните короткую форму на сайте и укажите удобный способ связи.',
     icon: '📱',
     badges: null,
-    imageUrl: '/images/step-1.jpg'
+    imageUrl: '/images/step-1.webp'
   },
   {
     number: '02',
@@ -26,7 +26,7 @@ const steps: Step[] = [
     description: 'Уточним детали аренды, ответим на вопросы и поможем выбрать подходящий вариант.',
     icon: '📞',
     badges: null,
-    imageUrl: '/images/step-2.jpg'
+    imageUrl: '/images/step-2.webp'
   },
   {
     number: '03',
@@ -34,7 +34,7 @@ const steps: Step[] = [
     description: 'Получите проверенный, заряженный и готовый к работе велосипед.',
     icon: '🚴',
     badges: null,
-    imageUrl: '/images/step-3.jpg'
+    imageUrl: '/images/step-3.webp'
   },
   {
     number: '04',
@@ -42,7 +42,7 @@ const steps: Step[] = [
     description: 'Получите электровелосипед и можете начинать работать.',
     icon: '🚀',
     badges: null,
-    imageUrl: '/images/step-4.jpg'
+    imageUrl: '/images/step-4.webp'
   }
 ];
 

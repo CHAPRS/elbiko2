@@ -33,8 +33,8 @@ interface HeroDBProps {
 export default function HeroDB({ data }: HeroDBProps) {
   if (!data) return null
 
-  const bgImage = data.backgroundImageUrl || '/images/delivery.jpg'
-  const bikeImage = data.bikeImageUrl || '/images/hero-bike-main.png'
+  const bgImage = data.backgroundImageUrl || '/images/delivery.webp'
+  const bikeImage = data.bikeImageUrl || '/images/hero-bike-main.webp'
   const courierImage = data.courierImageUrl || null
   const phone = data.phone || CONTACTS.phoneDisplay
   const telegramUrl = data.telegramUrl || CONTACTS.telegramBot

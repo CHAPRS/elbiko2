@@ -10,7 +10,7 @@ const tariffs = [
     price: '3 000',
     period: 'в неделю',
     icon: '🚲',
-    image: '/images/tariff-basic.jpg',
+    image: '/images/tariff-basic.webp',
     features: [
       '2 аккумулятора по 30 Ah',
       'Корзина и замок в комплекте',
@@ -26,7 +26,7 @@ const tariffs = [
     price: '3 500',
     period: 'в неделю',
     icon: '🚀',
-    image: '/images/tariff-earning.jpg',
+    image: '/images/tariff-earning.webp',
     features: [
       '2 аккумулятора увеличенной емкости',
       'Корзина, замок, крылья',

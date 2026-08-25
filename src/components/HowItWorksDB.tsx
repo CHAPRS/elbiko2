@@ -24,10 +24,10 @@ export default function HowItWorksDB({ steps }: HowItWorksDBProps) {
   // Иконки и изображения по умолчанию, если не указаны в БД
   const defaultIcons = ['📱', '📞', '🚴', '🚀']
   const defaultImageUrls = [
-    '/images/step-1.jpg',
-    '/images/step-2.jpg',
-    '/images/step-3.jpg',
-    '/images/step-4.jpg',
+    '/images/step-1.webp',
+    '/images/step-2.webp',
+    '/images/step-3.webp',
+    '/images/step-4.webp',
   ]
 
   return (

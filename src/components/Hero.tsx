@@ -39,7 +39,7 @@ export default function Hero() {
       text: 'Как это работает',
       link: '#how-it-works'
     },
-    bikeImageUrl: '/images/hero-bike-main.png',
+    bikeImageUrl: '/images/hero-bike-main.webp',
     courierImageUrl: null
   };
 

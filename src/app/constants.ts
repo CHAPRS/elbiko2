@@ -15,7 +15,7 @@ export const CONTACTS = {
   addressDisplay: 'Салмышская улица, 44, Оренбург',
 
   // Часы работы
-  workHours: '09:00 — 21:00 ежедневно',
+  workHours: '10:00 — 18:00 ежедневно',
 
   // Telegram
   telegramBot: 'https://t.me/my_own_elbiko_bot',

@@ -161,6 +161,7 @@ export default function DispatchPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [days, setDays] = useState(7);
   const [markingOverdue, setMarkingOverdue] = useState(false);
+  const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
   const fetchDashboard = useCallback(async (selectedDays: number, silent = false) => {
@@ -354,20 +355,34 @@ export default function DispatchPage() {
           <div className="relative flex-1">
             <input
               type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  setSearchQuery(searchInput.trim());
+                }
+              }}
               placeholder="Поиск по имени, телефону, модели..."
               className="w-full bg-slate-900 border border-slate-800 rounded-lg pl-4 pr-10 py-2.5 text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-amber-500"
             />
-            {searchQuery && (
+            {searchInput && (
               <button
-                onClick={() => setSearchQuery('')}
+                onClick={() => {
+                  setSearchInput('');
+                  setSearchQuery('');
+                }}
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 text-xs"
               >
                 Сбросить
               </button>
             )}
           </div>
+          <button
+            onClick={() => setSearchQuery(searchInput.trim())}
+            className="px-4 py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-sm font-medium transition-colors"
+          >
+            Найти
+          </button>
         </div>
 
         {error && (

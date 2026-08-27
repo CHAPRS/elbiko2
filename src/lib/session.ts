@@ -38,37 +38,60 @@ async function getKey(): Promise<CryptoKey> {
   );
 }
 
-export async function createAdminSessionToken(): Promise<string> {
+export const ADMIN_ROLES = ['OWNER', 'DISPATCHER'] as const;
+export type AdminRole = (typeof ADMIN_ROLES)[number];
+
+export async function createAdminSessionToken(role: AdminRole = 'OWNER'): Promise<string> {
   const key = await getKey();
-  const payload = new TextEncoder().encode('admin');
+  const payloadObj = { type: 'admin', role };
+  const payload = new TextEncoder().encode(JSON.stringify(payloadObj));
   const signature = await crypto.subtle.sign('HMAC', key, payload.buffer as ArrayBuffer);
   return `${base64UrlEncode(payload.buffer as ArrayBuffer)}.${base64UrlEncode(signature)}`;
 }
 
-export async function verifyAdminSessionToken(token: string | undefined): Promise<boolean> {
-  if (!token) return false;
+export interface AdminSessionResult {
+  valid: boolean;
+  role: AdminRole | null;
+}
+
+export async function verifyAdminSessionToken(token: string | undefined): Promise<AdminSessionResult> {
+  if (!token) return { valid: false, role: null };
 
   try {
     getSessionSecret();
   } catch {
-    return false;
+    return { valid: false, role: null };
   }
 
   const [payloadB64, signatureB64] = token.split('.');
-  if (!payloadB64 || !signatureB64) return false;
+  if (!payloadB64 || !signatureB64) return { valid: false, role: null };
 
   try {
     const payload = await base64UrlDecode(payloadB64);
-    const expectedPayload = new TextEncoder().encode('admin');
-    if (payload.length !== expectedPayload.length) return false;
-    for (let i = 0; i < payload.length; i++) {
-      if (payload[i] !== expectedPayload[i]) return false;
+    const key = await getKey();
+    const signature = await base64UrlDecode(signatureB64);
+    const valid = await crypto.subtle.verify(
+      'HMAC',
+      key,
+      signature.buffer as ArrayBuffer,
+      payload.buffer as ArrayBuffer
+    );
+    if (!valid) return { valid: false, role: null };
+
+    const text = new TextDecoder().decode(payload);
+    let role: AdminRole = 'OWNER';
+
+    if (text === 'admin') {
+      role = 'OWNER';
+    } else {
+      const parsed = JSON.parse(text);
+      if (ADMIN_ROLES.includes(parsed.role)) {
+        role = parsed.role as AdminRole;
+      }
     }
 
-    const signature = await base64UrlDecode(signatureB64);
-    const key = await getKey();
-    return await crypto.subtle.verify('HMAC', key, signature.buffer as ArrayBuffer, payload.buffer as ArrayBuffer);
+    return { valid: true, role };
   } catch {
-    return false;
+    return { valid: false, role: null };
   }
 }

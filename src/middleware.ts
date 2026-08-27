@@ -43,8 +43,8 @@ export async function middleware(request: NextRequest) {
     // Админские API закрыты подписанной сессионной кукой
     if (pathname.startsWith("/api/admin")) {
       const adminSession = request.cookies.get("admin_session")?.value;
-      const isValid = await verifyAdminSessionToken(adminSession);
-      if (!isValid) {
+      const { valid } = await verifyAdminSessionToken(adminSession);
+      if (!valid) {
         const response = NextResponse.json(
           { error: "Требуется авторизация администратора" },
           { status: 401 }
@@ -78,7 +78,7 @@ export async function middleware(request: NextRequest) {
     if (hasCourierSession) {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
-    const isAdminValid = await verifyAdminSessionToken(adminSession);
+    const { valid: isAdminValid } = await verifyAdminSessionToken(adminSession);
     if (isAdminValid) {
       return NextResponse.redirect(new URL("/admin", request.url));
     }
@@ -87,7 +87,7 @@ export async function middleware(request: NextRequest) {
 
   // 5. Защита панели администратора
   if (pathname.startsWith("/admin")) {
-    const isAdminValid = await verifyAdminSessionToken(adminSession);
+    const { valid: isAdminValid } = await verifyAdminSessionToken(adminSession);
     if (!isAdminValid) {
       return NextResponse.redirect(new URL("/login", request.url));
     }

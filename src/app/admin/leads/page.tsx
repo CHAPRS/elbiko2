@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import Link from 'next/link';
 import { LEAD_STATUSES, LEAD_STATUS_LABELS, LeadStatus } from '@/lib/leadStatus';
 
 interface Lead {
@@ -264,27 +263,6 @@ export default function LeadsPage() {
         <h1 className="text-3xl font-bold bg-gradient-to-r from-emerald-500 to-cyan-500 bg-clip-text text-transparent mb-8">
           Управление заявками
         </h1>
-
-        <div className="mb-8 flex gap-4 flex-wrap">
-          <Link
-            href="/admin"
-            className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg font-medium hover:bg-slate-700 transition-colors"
-          >
-            🚲 Велосипеды
-          </Link>
-          <Link
-            href="/admin/leads"
-            className="px-4 py-2 bg-emerald-500 text-slate-950 rounded-lg font-medium hover:bg-emerald-400 transition-colors"
-          >
-            📋 Заявки
-          </Link>
-          <Link
-            href="/admin/rents"
-            className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg font-medium hover:bg-slate-700 transition-colors"
-          >
-            📊 Аренды
-          </Link>
-        </div>
 
         <div className="mb-6 flex gap-3 flex-wrap">
           {FILTERS.map(({ value, label }) => (

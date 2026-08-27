@@ -31,8 +31,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Неверный логин или пароль' }, { status: 401 });
     }
 
-    const token = await createAdminSessionToken();
-    const response = NextResponse.json({ success: true, role: 'admin' });
+    const token = await createAdminSessionToken('OWNER');
+    const response = NextResponse.json({ success: true, role: 'OWNER' });
 
     response.cookies.set('admin_session', token, {
       httpOnly: true,

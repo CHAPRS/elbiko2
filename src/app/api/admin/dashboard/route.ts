@@ -5,38 +5,63 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    // 1. Загружаем весь автопарк
-    const bikes = await prisma.bike.findMany({
-      orderBy: { name: 'asc' } // Сортируем по полю name, которое есть в вашей схеме
-    });
+    const [bikes, totalUsers, newLeads, activeRents] = await Promise.all([
+      prisma.bike.findMany({
+        orderBy: { name: 'asc' },
+      }),
+      prisma.user.count(),
+      prisma.lead.findMany({
+        where: { status: 'NEW' },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+        include: {
+          bike: {
+            select: { id: true, name: true },
+          },
+        },
+      }),
+      prisma.rent.findMany({
+        where: { status: 'ACTIVE' },
+        include: {
+          user: {
+            select: { id: true, name: true, phone: true },
+          },
+          bike: {
+            select: { id: true, name: true, status: true },
+          },
+          payment: true,
+        },
+        orderBy: { endDate: 'asc' },
+      }),
+    ]);
 
-    // 2. Загружаем логи аренд с пользователями и байками
-    const rents = await prisma.rent.findMany({
-      include: {
-        user: true,
-        bike: true
-      },
-      orderBy: { createdAt: 'desc' }
-    });
+    const now = new Date();
+    const rentedBikes = bikes.filter((b) => b.status === 'RENTED').length;
+    const freeBikes = bikes.filter((b) => b.status === 'FREE');
+    const maintenanceBikes = bikes.filter((b) => b.status === 'MAINTENANCE');
+    const overdueRents = activeRents.filter((r) => new Date(r.endDate) < now);
 
-    // 3. Высчитываем KPI-метрики
-    const totalBikes = bikes.length;
-    const rentedBikes = bikes.filter((b: any) => String(b.status).toUpperCase() === 'RENTED').length;
-    const freeBikes = bikes.filter((b: any) => String(b.status).toUpperCase() === 'FREE').length;
-    
-    const totalUsers = await prisma.user.count();
-    
-    // Считаем пользователей с привязанным Telegram
-    const allUsers = await prisma.user.findMany();
-    const usersWithTg = allUsers.filter((u: any) => u.telegramChatId !== null && u.telegramChatId !== undefined).length;
+    const stats = {
+      totalBikes: bikes.length,
+      rentedBikes,
+      freeBikes: freeBikes.length,
+      maintenanceBikes: maintenanceBikes.length,
+      totalUsers,
+      newLeads: newLeads.length,
+      activeRents: activeRents.length,
+      overdueRents: overdueRents.length,
+    };
 
     return NextResponse.json({
-      stats: { totalBikes, rentedBikes, freeBikes, totalUsers, usersWithTg },
-      bikes,
-      rents
+      stats,
+      newLeads,
+      activeRents,
+      overdueRents,
+      freeBikes,
+      maintenanceBikes,
     });
   } catch (error) {
-    console.error('Ошибка API админки:', error);
+    console.error('Ошибка API диспетчерской:', error);
     return NextResponse.json({ error: 'Внутренняя ошибка сервера' }, { status: 500 });
   }
 }

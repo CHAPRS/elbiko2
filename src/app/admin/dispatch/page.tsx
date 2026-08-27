@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { LeadForm } from '@/components/admin/LeadForm';
 import { buildMaxLink } from '@/lib/messenger';
 
 interface Stats {
@@ -319,6 +320,11 @@ export default function DispatchPage() {
                 </div>
               ))}
         </div>
+
+        <section className="bg-slate-900/50 border border-slate-800 rounded-xl p-6 mb-8">
+          <h2 className="text-lg font-semibold text-slate-200 mb-4">Новая заявка</h2>
+          <LeadForm bikes={data?.freeBikes ?? []} onSuccess={() => fetchDashboard(days)} />
+        </section>
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
           <section className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">

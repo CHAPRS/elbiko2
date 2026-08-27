@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { leadStatus, createLeadSchema } from '@/lib/validation';
+import { leadStatus, createLeadManualSchema } from '@/lib/validation';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,11 +38,11 @@ export async function GET(request: Request) {
   }
 }
 
-// POST - Создание новой заявки
+// POST - Создание новой заявки вручную
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const parsed = createLeadSchema.safeParse(body);
+    const parsed = createLeadManualSchema.safeParse(body);
 
     if (!parsed.success) {
       return NextResponse.json(
@@ -54,8 +54,10 @@ export async function POST(request: Request) {
     const lead = await prisma.lead.create({
       data: {
         ...parsed.data,
-        bikeId: parsed.data.bikeId ?? null,
+        bikeName: parsed.data.bikeName ?? null,
+        bikeId: parsed.data.bikeId,
         status: 'NEW',
+        totalPrice: parsed.data.totalPrice,
       },
       include: {
         bike: true,

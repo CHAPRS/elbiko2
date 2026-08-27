@@ -78,6 +78,8 @@ model Lead {
   message      String?   @db.Text
   comment      String?   @db.Text
   rejectReason String?   @db.Text
+  rentDays     Int?
+  totalPrice   Decimal?  @db.Decimal(10, 2)
   processedAt  DateTime?
   rentId       Int?
   bikeId       Int?

@@ -10,7 +10,6 @@ export async function POST(
   try {
     const leadId = Number(params.id);
     const body = await request.json().catch(() => ({}));
-    const days = Number(body.days) > 0 ? Number(body.days) : 1;
     const bikeId = body.bikeId ? Number(body.bikeId) : null;
 
     const lead = await prisma.lead.findUnique({ where: { id: leadId } });
@@ -25,6 +24,18 @@ export async function POST(
         { status: 409 }
       );
     }
+
+    const days =
+      Number(body.days) > 0
+        ? Number(body.days)
+        : lead.rentDays && lead.rentDays > 0
+        ? Number(lead.rentDays)
+        : 1;
+
+    const totalPrice =
+      lead.totalPrice !== null && lead.totalPrice !== undefined
+        ? Number(lead.totalPrice)
+        : undefined;
 
     const targetBikeId = bikeId ?? lead.bikeId;
 
@@ -41,7 +52,7 @@ export async function POST(
       create: { phone: lead.phone, name: lead.name },
     });
 
-    const rent = await createRent({ userId: user.id, bikeId: targetBikeId, days });
+    const rent = await createRent({ userId: user.id, bikeId: targetBikeId, days, totalPrice });
 
     const updatedLead = await prisma.lead.update({
       where: { id: leadId },

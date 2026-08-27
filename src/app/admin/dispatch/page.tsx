@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 
 interface Stats {
@@ -12,6 +12,12 @@ interface Stats {
   newLeads: number;
   activeRents: number;
   overdueRents: number;
+  revenueToday: number;
+  revenuePeriod: number;
+  expectedRevenue: number;
+  overdueRevenue: number;
+  averageCheck: number;
+  failedRefundedRevenue: number;
 }
 
 interface Bike {
@@ -52,6 +58,16 @@ interface Rent {
   bike: RentBike;
 }
 
+interface RevenueDay {
+  date: string;
+  revenue: number;
+}
+
+interface TopBike {
+  name: string;
+  revenue: number;
+}
+
 interface DashboardData {
   stats: Stats;
   newLeads: Lead[];
@@ -59,13 +75,9 @@ interface DashboardData {
   overdueRents: Rent[];
   freeBikes: Bike[];
   maintenanceBikes: Bike[];
+  revenueByDay: RevenueDay[];
+  topBikes: TopBike[];
 }
-
-const STATUS_COLORS: Record<string, string> = {
-  FREE: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-  RENTED: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-  MAINTENANCE: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
-};
 
 function formatDate(date: string): string {
   return new Date(date).toLocaleDateString('ru-RU', {
@@ -85,15 +97,30 @@ function formatDateTime(date: string): string {
   });
 }
 
+function formatShortDay(date: string): string {
+  const [year, month, day] = date.split('-').map(Number);
+  const d = new Date(year, month - 1, day);
+  return d.toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'short',
+  });
+}
+
+function formatMoney(value: number): string {
+  return `${Math.round(value).toLocaleString('ru-RU')} ₽`;
+}
+
 export default function DispatchPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [days, setDays] = useState(7);
 
-  const fetchDashboard = async () => {
+  const fetchDashboard = useCallback(async (selectedDays: number) => {
+    setLoading(true);
     try {
-      const res = await fetch('/api/admin/dashboard');
+      const res = await fetch(`/api/admin/dashboard?days=${selectedDays}`);
       const json = await res.json();
       if (!res.ok) {
         setError(json.error || 'Не удалось загрузить дашборд');
@@ -106,11 +133,11 @@ export default function DispatchPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchDashboard();
-  }, []);
+    fetchDashboard(days);
+  }, [days, fetchDashboard]);
 
   const takeLead = async (id: number) => {
     try {
@@ -121,7 +148,7 @@ export default function DispatchPage() {
       });
       if (res.ok) {
         setNotice('Заявка взята в работу');
-        fetchDashboard();
+        fetchDashboard(days);
       } else {
         const json = await res.json();
         setError(json.error || 'Не удалось обновить заявку');
@@ -140,7 +167,7 @@ export default function DispatchPage() {
       });
       if (res.ok) {
         setNotice('Аренда завершена, байк освобожден');
-        fetchDashboard();
+        fetchDashboard(days);
       } else {
         const json = await res.json();
         setError(json.error || 'Не удалось завершить аренду');
@@ -159,7 +186,7 @@ export default function DispatchPage() {
       });
       if (res.ok) {
         setNotice('Аренда продлена на 1 день');
-        fetchDashboard();
+        fetchDashboard(days);
       } else {
         const json = await res.json();
         setError(json.error || 'Не удалось продлить аренду');
@@ -169,7 +196,7 @@ export default function DispatchPage() {
     }
   };
 
-  const stats: { label: string; value: number; color: string }[] = data
+  const operationalStats: { label: string; value: number; color: string }[] = data
     ? [
         { label: 'Новые заявки', value: data.stats.newLeads, color: 'text-emerald-400' },
         { label: 'Активные аренды', value: data.stats.activeRents, color: 'text-amber-400' },
@@ -177,6 +204,21 @@ export default function DispatchPage() {
         { label: 'Свободные байки', value: data.stats.freeBikes, color: 'text-cyan-400' },
       ]
     : [];
+
+  const financialStats: { label: string; value: number; color: string }[] = data
+    ? [
+        { label: 'Выручка сегодня', value: data.stats.revenueToday, color: 'text-emerald-400' },
+        { label: `Выручка за ${days} дн.`, value: data.stats.revenuePeriod, color: 'text-amber-400' },
+        { label: 'Ожидаемая выручка', value: data.stats.expectedRevenue, color: 'text-cyan-400' },
+        { label: 'Просроченная выручка', value: data.stats.overdueRevenue, color: 'text-rose-400' },
+        { label: 'Средний чек', value: data.stats.averageCheck, color: 'text-slate-200' },
+        { label: 'Неудачи / возвраты', value: data.stats.failedRefundedRevenue, color: 'text-slate-400' },
+      ]
+    : [];
+
+  const maxRevenue = data && data.revenueByDay.length > 0
+    ? Math.max(...data.revenueByDay.map((d) => d.revenue), 1)
+    : 1;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-6 font-sans">
@@ -204,7 +246,7 @@ export default function DispatchPage() {
                   className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 animate-pulse h-24"
                 />
               ))
-            : stats.map((item) => (
+            : operationalStats.map((item) => (
                 <div
                   key={item.label}
                   className="bg-slate-900/50 border border-slate-800 rounded-xl p-4"
@@ -218,9 +260,7 @@ export default function DispatchPage() {
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
           <section className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-slate-200">
-                Новые заявки
-              </h2>
+              <h2 className="text-lg font-semibold text-slate-200">Новые заявки</h2>
               <Link
                 href="/admin/leads"
                 className="text-xs text-amber-500 hover:text-amber-400 transition-colors"
@@ -271,9 +311,7 @@ export default function DispatchPage() {
 
           <section className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-slate-200">
-                Активные и просроченные аренды
-              </h2>
+              <h2 className="text-lg font-semibold text-slate-200">Активные и просроченные аренды</h2>
               <Link
                 href="/admin/rents"
                 className="text-xs text-amber-500 hover:text-amber-400 transition-colors"
@@ -333,11 +371,113 @@ export default function DispatchPage() {
           </section>
         </div>
 
+        <section className="bg-slate-900/50 border border-slate-800 rounded-xl p-6 mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+            <h2 className="text-lg font-semibold text-slate-200">Финансы</h2>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setDays(7)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  days === 7
+                    ? 'bg-amber-500 text-slate-950'
+                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                }`}
+              >
+                7 дней
+              </button>
+              <button
+                onClick={() => setDays(30)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  days === 30
+                    ? 'bg-amber-500 text-slate-950'
+                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                }`}
+              >
+                30 дней
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
+            {loading
+              ? Array.from({ length: 6 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="bg-slate-950/50 border border-slate-800 rounded-xl p-4 animate-pulse h-20"
+                  />
+                ))
+              : financialStats.map((item) => (
+                  <div
+                    key={item.label}
+                    className="bg-slate-950/50 border border-slate-800 rounded-xl p-4"
+                  >
+                    <div className={`text-xl font-bold ${item.color}`}>{formatMoney(item.value)}</div>
+                    <div className="text-xs text-slate-400 mt-1">{item.label}</div>
+                  </div>
+                ))}
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 bg-slate-950/50 border border-slate-800 rounded-xl p-4">
+              <h3 className="text-sm font-semibold text-slate-200 mb-4">
+                Выручка по дням
+              </h3>
+
+              {loading ? (
+                <p className="text-slate-400 text-sm">Загрузка...</p>
+              ) : data && data.revenueByDay.length === 0 ? (
+                <p className="text-slate-400 text-sm">Нет данных за период</p>
+              ) : (
+                <div className="space-y-2">
+                  {data?.revenueByDay.map((day) => (
+                    <div key={day.date} className="flex items-center gap-3 text-sm">
+                      <div className="w-14 shrink-0 text-xs text-slate-400">{formatShortDay(day.date)}</div>
+                      <div className="flex-1 h-3 bg-slate-800 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-amber-500 rounded-full"
+                          style={{ width: `${(day.revenue / maxRevenue) * 100}%` }}
+                        />
+                      </div>
+                      <div className="w-24 text-right text-xs text-slate-200 font-medium">
+                        {formatMoney(day.revenue)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="bg-slate-950/50 border border-slate-800 rounded-xl p-4">
+              <h3 className="text-sm font-semibold text-slate-200 mb-4">
+                Топ байков по доходу
+              </h3>
+
+              {loading ? (
+                <p className="text-slate-400 text-sm">Загрузка...</p>
+              ) : data && data.topBikes.length === 0 ? (
+                <p className="text-slate-400 text-sm">Нет завершённых аренд</p>
+              ) : (
+                <ul className="space-y-3">
+                  {data?.topBikes.map((bike, index) => (
+                    <li key={bike.name} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="w-5 h-5 rounded bg-slate-800 text-slate-400 text-xs flex items-center justify-center">
+                          {index + 1}
+                        </span>
+                        <span className="text-slate-200">{bike.name}</span>
+                      </div>
+                      <span className="font-medium text-amber-500">{formatMoney(bike.revenue)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </section>
+
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           <section className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
-            <h2 className="text-lg font-semibold text-slate-200 mb-4">
-              Свободный транспорт
-            </h2>
+            <h2 className="text-lg font-semibold text-slate-200 mb-4">Свободный транспорт</h2>
             {loading ? (
               <p className="text-slate-400 text-sm">Загрузка...</p>
             ) : data && data.freeBikes.length === 0 ? (
@@ -358,9 +498,7 @@ export default function DispatchPage() {
           </section>
 
           <section className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
-            <h2 className="text-lg font-semibold text-slate-200 mb-4">
-              На сервисе
-            </h2>
+            <h2 className="text-lg font-semibold text-slate-200 mb-4">На сервисе</h2>
             {loading ? (
               <p className="text-slate-400 text-sm">Загрузка...</p>
             ) : data && data.maintenanceBikes.length === 0 ? (

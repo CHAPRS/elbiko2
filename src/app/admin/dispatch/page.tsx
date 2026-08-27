@@ -10,6 +10,8 @@ interface Stats {
   rentedBikes: number;
   freeBikes: number;
   maintenanceBikes: number;
+  availableForRent: number;
+  occupancyRate: number;
   totalUsers: number;
   newLeads: number;
   activeRents: number;
@@ -75,6 +77,13 @@ interface TopBike {
   revenue: number;
 }
 
+interface TimelineDay {
+  date: string;
+  dayOfWeek: string;
+  freeCount: number;
+  returning: Rent[];
+}
+
 interface DashboardData {
   stats: Stats;
   newLeads: Lead[];
@@ -86,6 +95,7 @@ interface DashboardData {
   maintenanceBikes: Bike[];
   revenueByDay: RevenueDay[];
   topBikes: TopBike[];
+  timeline: TimelineDay[];
 }
 
 function formatDate(date: string): string {
@@ -249,7 +259,7 @@ export default function DispatchPage() {
     }
   };
 
-  const operationalStats: { label: string; value: number; color: string }[] = data
+  const operationalStats: { label: string; value: number; color: string; suffix?: string }[] = data
     ? [
         { label: 'Новые заявки', value: data.stats.newLeads, color: 'text-emerald-400' },
         { label: 'Активные аренды', value: data.stats.activeRents, color: 'text-amber-400' },
@@ -257,6 +267,8 @@ export default function DispatchPage() {
         { label: 'Свободные байки', value: data.stats.freeBikes, color: 'text-cyan-400' },
         { label: 'Возврат сегодня', value: data.stats.returningToday, color: 'text-blue-400' },
         { label: 'Возврат завтра', value: data.stats.returningTomorrow, color: 'text-violet-400' },
+        { label: 'Загруженность', value: data.stats.occupancyRate, color: 'text-amber-500', suffix: '%' },
+        { label: 'Доступно для аренды', value: data.stats.availableForRent, color: 'text-emerald-300' },
       ]
     : [];
 
@@ -315,7 +327,9 @@ export default function DispatchPage() {
                   key={item.label}
                   className="bg-slate-900/50 border border-slate-800 rounded-xl p-4"
                 >
-                  <div className={`text-2xl font-bold ${item.color}`}>{item.value}</div>
+                  <div className={`text-2xl font-bold ${item.color}`}>
+                    {item.suffix ? `${Number(item.value).toFixed(1)}${item.suffix}` : item.value}
+                  </div>
                   <div className="text-xs text-slate-400 mt-1">{item.label}</div>
                 </div>
               ))}
@@ -496,6 +510,52 @@ export default function DispatchPage() {
             )}
           </section>
         </div>
+
+        <section className="bg-slate-900/50 border border-slate-800 rounded-xl p-6 mb-8">
+          <h2 className="text-lg font-semibold text-slate-200 mb-4">Таймлайн загруженности на 14 дней</h2>
+          {loading ? (
+            <p className="text-slate-400 text-sm">Загрузка...</p>
+          ) : !data || data.timeline.length === 0 ? (
+            <p className="text-slate-400 text-sm">Нет данных</p>
+          ) : (
+            <div className="overflow-x-auto pb-2">
+              <div className="flex gap-3 min-w-max">
+                {data?.timeline.map((day) => (
+                  <div
+                    key={day.date}
+                    className="min-w-[12rem] max-w-[12rem] bg-slate-950/50 border border-slate-800 rounded-lg p-3 flex flex-col"
+                  >
+                    <div className="text-sm font-medium text-slate-200 mb-1">
+                      {day.dayOfWeek}, {formatShortDay(day.date)}
+                    </div>
+                    <div className="text-2xl font-bold text-emerald-400 mb-1">{day.freeCount}</div>
+                    <div className="text-xs text-slate-500 mb-3">свободных байков</div>
+                    {day.returning.length > 0 && (
+                      <div className="mt-auto">
+                        <div className="text-xs font-medium text-amber-400 mb-1">
+                          Возвратов: {day.returning.length}
+                        </div>
+                        <ul className="space-y-1 text-xs text-slate-400">
+                          {day.returning.slice(0, 3).map((rent) => (
+                            <li key={rent.id} className="truncate">
+                              {rent.bike.name} · {rent.user.name}
+                            </li>
+                          ))}
+                          {day.returning.length > 3 && (
+                            <li className="text-slate-500">+{day.returning.length - 3}</li>
+                          )}
+                        </ul>
+                      </div>
+                    )}
+                    {day.returning.length === 0 && (
+                      <div className="mt-auto text-xs text-slate-600">Без возвратов</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
 
         <section className="bg-slate-900/50 border border-slate-800 rounded-xl p-6 mb-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">

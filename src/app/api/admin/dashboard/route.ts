@@ -44,7 +44,7 @@ export async function GET(request: Request) {
       bikes,
       totalUsers,
       newLeads,
-      activeRents,
+      activeAndOverdueRents,
       returningToday,
       returningTomorrow,
       completedRentsForAvg,
@@ -68,7 +68,9 @@ export async function GET(request: Request) {
         },
       }),
       prisma.rent.findMany({
-        where: { status: 'ACTIVE' },
+        where: {
+          status: { in: ['ACTIVE', 'OVERDUE'] },
+        },
         include: {
           user: userSelect,
           bike: bikeSelect,
@@ -78,7 +80,7 @@ export async function GET(request: Request) {
       }),
       prisma.rent.findMany({
         where: {
-          status: 'ACTIVE',
+          status: { in: ['ACTIVE', 'OVERDUE'] },
           endDate: { gte: today, lt: tomorrow },
         },
         include: {
@@ -89,7 +91,7 @@ export async function GET(request: Request) {
       }),
       prisma.rent.findMany({
         where: {
-          status: 'ACTIVE',
+          status: { in: ['ACTIVE', 'OVERDUE'] },
           endDate: { gte: tomorrow, lt: dayAfterTomorrow },
         },
         include: {
@@ -133,10 +135,17 @@ export async function GET(request: Request) {
       }),
     ]);
 
+    const activeRents = activeAndOverdueRents;
     const rentedBikes = bikes.filter((b) => b.status === 'RENTED').length;
     const freeBikes = bikes.filter((b) => b.status === 'FREE');
     const maintenanceBikes = bikes.filter((b) => b.status === 'MAINTENANCE');
     const overdueRents = activeRents.filter((r) => new Date(r.endDate) < now);
+
+    const availableForRent = bikes.length - maintenanceBikes.length;
+    const occupancyRate =
+      availableForRent > 0
+        ? Math.round((rentedBikes / availableForRent) * 1000) / 10
+        : 0;
 
     const expectedRevenue = activeRents.reduce(
       (sum, r) => sum + Number(r.totalPrice),
@@ -179,11 +188,48 @@ export async function GET(request: Request) {
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 5);
 
+    const timelineDays = 14;
+    const timeline: {
+      date: string;
+      dayOfWeek: string;
+      freeCount: number;
+      returning: typeof activeRents;
+    }[] = [];
+
+    for (let i = 0; i < timelineDays; i++) {
+      const day = new Date(today);
+      day.setDate(day.getDate() + i);
+      const nextDay = new Date(day);
+      nextDay.setDate(nextDay.getDate() + 1);
+
+      const returning = activeRents.filter((r) => {
+        const end = startOfDay(new Date(r.endDate));
+        return end.getTime() === day.getTime();
+      });
+
+      const occupied = activeRents.filter((r) => {
+        const start = new Date(r.startDate).getTime();
+        const end = new Date(r.endDate).getTime();
+        return start <= day.getTime() && end > day.getTime();
+      }).length;
+
+      const freeCount = availableForRent - occupied;
+
+      timeline.push({
+        date: day.toISOString().split('T')[0],
+        dayOfWeek: day.toLocaleDateString('ru-RU', { weekday: 'short' }),
+        freeCount,
+        returning,
+      });
+    }
+
     const stats = {
       totalBikes: bikes.length,
       rentedBikes,
       freeBikes: freeBikes.length,
       maintenanceBikes: maintenanceBikes.length,
+      availableForRent,
+      occupancyRate,
       totalUsers,
       newLeads: newLeads.length,
       activeRents: activeRents.length,
@@ -209,6 +255,7 @@ export async function GET(request: Request) {
       maintenanceBikes,
       revenueByDay,
       topBikes,
+      timeline,
     });
   } catch (error) {
     console.error('Ошибка API диспетчерской:', error);

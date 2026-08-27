@@ -161,9 +161,10 @@ export default function DispatchPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [days, setDays] = useState(7);
   const [markingOverdue, setMarkingOverdue] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const fetchDashboard = useCallback(async (selectedDays: number) => {
-    setLoading(true);
+  const fetchDashboard = useCallback(async (selectedDays: number, silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const res = await fetch(`/api/admin/dashboard?days=${selectedDays}`);
       const json = await res.json();
@@ -176,12 +177,18 @@ export default function DispatchPage() {
     } catch (err) {
       setError('Нет связи с сервером');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
     fetchDashboard(days);
+
+    const interval = setInterval(() => {
+      fetchDashboard(days, true);
+    }, 30000);
+
+    return () => clearInterval(interval);
   }, [days, fetchDashboard]);
 
   const takeLead = async (id: number) => {
@@ -287,10 +294,50 @@ export default function DispatchPage() {
     ? Math.max(...data.revenueByDay.map((d) => d.revenue), 1)
     : 1;
 
+  const query = searchQuery.toLowerCase().trim();
+
+  const matchesSearch = (...values: (string | number | null | undefined)[]) => {
+    if (!query) return true;
+    return values.some((value) =>
+      String(value ?? '').toLowerCase().includes(query)
+    );
+  };
+
+  const filteredNewLeads = data?.newLeads.filter((lead) =>
+    matchesSearch(lead.name, lead.phone, lead.bike?.name, lead.bikeName)
+  ) ?? [];
+
+  const filteredActiveRents = data?.activeRents.filter((rent) =>
+    matchesSearch(rent.user.name, rent.user.phone, rent.bike.name)
+  ) ?? [];
+
+  const filteredReturningToday = data?.returningToday.filter((rent) =>
+    matchesSearch(rent.user.name, rent.user.phone, rent.bike.name)
+  ) ?? [];
+
+  const filteredReturningTomorrow = data?.returningTomorrow.filter((rent) =>
+    matchesSearch(rent.user.name, rent.user.phone, rent.bike.name)
+  ) ?? [];
+
+  const filteredFreeBikes = data?.freeBikes.filter((bike) =>
+    matchesSearch(bike.name)
+  ) ?? [];
+
+  const filteredMaintenanceBikes = data?.maintenanceBikes.filter((bike) =>
+    matchesSearch(bike.name)
+  ) ?? [];
+
+  const filteredTimeline = data?.timeline.filter((day) =>
+    matchesSearch(day.date) ||
+    day.returning.some((rent) =>
+      matchesSearch(rent.user.name, rent.user.phone, rent.bike.name)
+    )
+  ) ?? [];
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-6 font-sans">
       <div className="max-w-7xl mx-auto">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <h1 className="text-3xl font-bold bg-gradient-to-r from-amber-500 to-orange-500 bg-clip-text text-transparent">
             Диспетчерская
           </h1>
@@ -301,6 +348,26 @@ export default function DispatchPage() {
           >
             {markingOverdue ? 'Проверка...' : 'Пометить просрочки'}
           </button>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-3 mb-6">
+          <div className="relative flex-1">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Поиск по имени, телефону, модели..."
+              className="w-full bg-slate-900 border border-slate-800 rounded-lg pl-4 pr-10 py-2.5 text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-amber-500"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 text-xs"
+              >
+                Сбросить
+              </button>
+            )}
+          </div>
         </div>
 
         {error && (
@@ -354,11 +421,11 @@ export default function DispatchPage() {
 
             {loading ? (
               <p className="text-slate-400 text-sm">Загрузка...</p>
-            ) : data && data.newLeads.length === 0 ? (
+            ) : filteredNewLeads.length === 0 ? (
               <p className="text-slate-400 text-sm">Новых заявок нет</p>
             ) : (
               <ul className="space-y-3">
-                {data?.newLeads.map((lead) => (
+                {filteredNewLeads.map((lead) => (
                   <li
                     key={lead.id}
                     className="border border-slate-800 rounded-lg p-3 bg-slate-950/50"
@@ -405,11 +472,11 @@ export default function DispatchPage() {
 
             {loading ? (
               <p className="text-slate-400 text-sm">Загрузка...</p>
-            ) : data && data.activeRents.length === 0 ? (
+            ) : filteredActiveRents.length === 0 ? (
               <p className="text-slate-400 text-sm">Активных аренд нет</p>
             ) : (
               <ul className="space-y-3">
-                {data?.activeRents.map((rent) => {
+                {filteredActiveRents.map((rent) => {
                   const overdue = new Date(rent.endDate) < new Date();
                   return (
                     <li
@@ -460,11 +527,11 @@ export default function DispatchPage() {
             <h2 className="text-lg font-semibold text-slate-200 mb-4">Возвращаются сегодня</h2>
             {loading ? (
               <p className="text-slate-400 text-sm">Загрузка...</p>
-            ) : data && data.returningToday.length === 0 ? (
+            ) : filteredReturningToday.length === 0 ? (
               <p className="text-slate-400 text-sm">Сегодня никто не возвращается</p>
             ) : (
               <ul className="space-y-3">
-                {data?.returningToday.map((rent) => (
+                {filteredReturningToday.map((rent) => (
                   <li
                     key={rent.id}
                     className="border border-slate-800 rounded-lg p-3 bg-slate-950/50"
@@ -487,11 +554,11 @@ export default function DispatchPage() {
             <h2 className="text-lg font-semibold text-slate-200 mb-4">Возвращаются завтра</h2>
             {loading ? (
               <p className="text-slate-400 text-sm">Загрузка...</p>
-            ) : data && data.returningTomorrow.length === 0 ? (
+            ) : filteredReturningTomorrow.length === 0 ? (
               <p className="text-slate-400 text-sm">Завтра никто не возвращается</p>
             ) : (
               <ul className="space-y-3">
-                {data?.returningTomorrow.map((rent) => (
+                {filteredReturningTomorrow.map((rent) => (
                   <li
                     key={rent.id}
                     className="border border-slate-800 rounded-lg p-3 bg-slate-950/50"
@@ -515,12 +582,12 @@ export default function DispatchPage() {
           <h2 className="text-lg font-semibold text-slate-200 mb-4">Таймлайн загруженности на 14 дней</h2>
           {loading ? (
             <p className="text-slate-400 text-sm">Загрузка...</p>
-          ) : !data || data.timeline.length === 0 ? (
+          ) : filteredTimeline.length === 0 ? (
             <p className="text-slate-400 text-sm">Нет данных</p>
           ) : (
             <div className="overflow-x-auto pb-2">
               <div className="flex gap-3 min-w-max">
-                {data?.timeline.map((day) => (
+                {filteredTimeline.map((day) => (
                   <div
                     key={day.date}
                     className="min-w-[12rem] max-w-[12rem] bg-slate-950/50 border border-slate-800 rounded-lg p-3 flex flex-col"
@@ -662,11 +729,11 @@ export default function DispatchPage() {
             <h2 className="text-lg font-semibold text-slate-200 mb-4">Свободный транспорт</h2>
             {loading ? (
               <p className="text-slate-400 text-sm">Загрузка...</p>
-            ) : data && data.freeBikes.length === 0 ? (
+            ) : filteredFreeBikes.length === 0 ? (
               <p className="text-slate-400 text-sm">Нет свободных байков</p>
             ) : (
               <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {data?.freeBikes.map((bike) => (
+                {filteredFreeBikes.map((bike) => (
                   <li
                     key={bike.id}
                     className="border border-slate-800 rounded-lg p-3 bg-slate-950/50 text-sm"
@@ -683,11 +750,11 @@ export default function DispatchPage() {
             <h2 className="text-lg font-semibold text-slate-200 mb-4">На сервисе</h2>
             {loading ? (
               <p className="text-slate-400 text-sm">Загрузка...</p>
-            ) : data && data.maintenanceBikes.length === 0 ? (
+            ) : filteredMaintenanceBikes.length === 0 ? (
               <p className="text-slate-400 text-sm">Нет байков на сервисе</p>
             ) : (
               <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {data?.maintenanceBikes.map((bike) => (
+                {filteredMaintenanceBikes.map((bike) => (
                   <li
                     key={bike.id}
                     className="border border-slate-800 rounded-lg p-3 bg-slate-950/50 text-sm"

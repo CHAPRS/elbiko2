@@ -22,12 +22,31 @@ export async function GET(request: Request) {
     periodStart.setDate(periodStart.getDate() - (days - 1));
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
+    const dayAfterTomorrow = new Date(tomorrow);
+    dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 1);
+
+    const userSelect = {
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        telegramChatId: true,
+        maxChatId: true,
+        preferredMessenger: true,
+      },
+    };
+
+    const bikeSelect = {
+      select: { id: true, name: true, status: true },
+    };
 
     const [
       bikes,
       totalUsers,
       newLeads,
       activeRents,
+      returningToday,
+      returningTomorrow,
       completedRentsForAvg,
       revenueTodayAgg,
       revenuePeriodPayments,
@@ -51,13 +70,31 @@ export async function GET(request: Request) {
       prisma.rent.findMany({
         where: { status: 'ACTIVE' },
         include: {
-          user: {
-            select: { id: true, name: true, phone: true },
-          },
-          bike: {
-            select: { id: true, name: true, status: true },
-          },
+          user: userSelect,
+          bike: bikeSelect,
           payment: true,
+        },
+        orderBy: { endDate: 'asc' },
+      }),
+      prisma.rent.findMany({
+        where: {
+          status: 'ACTIVE',
+          endDate: { gte: today, lt: tomorrow },
+        },
+        include: {
+          user: userSelect,
+          bike: bikeSelect,
+        },
+        orderBy: { endDate: 'asc' },
+      }),
+      prisma.rent.findMany({
+        where: {
+          status: 'ACTIVE',
+          endDate: { gte: tomorrow, lt: dayAfterTomorrow },
+        },
+        include: {
+          user: userSelect,
+          bike: bikeSelect,
         },
         orderBy: { endDate: 'asc' },
       }),
@@ -151,6 +188,8 @@ export async function GET(request: Request) {
       newLeads: newLeads.length,
       activeRents: activeRents.length,
       overdueRents: overdueRents.length,
+      returningToday: returningToday.length,
+      returningTomorrow: returningTomorrow.length,
       revenueToday,
       revenuePeriod,
       expectedRevenue,
@@ -164,6 +203,8 @@ export async function GET(request: Request) {
       newLeads,
       activeRents,
       overdueRents,
+      returningToday,
+      returningTomorrow,
       freeBikes,
       maintenanceBikes,
       revenueByDay,

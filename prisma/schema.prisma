@@ -34,8 +34,10 @@ model User {
   password       String   @default("") // Временно добавили дефолт для прохождения миграции
   name           String   @default("Курьер") // Временно добавили дефолт для существующих строк
   balance        Decimal  @default(0.00) @db.Decimal(10, 2)
-  telegramChatId String? // Chat ID курьера для уведомлений бота
-  createdAt      DateTime @default(now())
+  telegramChatId     String? // Chat ID курьера для уведомлений бота
+  maxChatId          String? // Идентификатор/телефон курьера в MAX
+  preferredMessenger String   @default("MAX") // "MAX" | "TELEGRAM"
+  createdAt          DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   rentalSessions RentalSession[]

@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { buildMaxLink } from '@/lib/messenger';
 
 interface Stats {
   totalBikes: number;
@@ -12,6 +13,8 @@ interface Stats {
   newLeads: number;
   activeRents: number;
   overdueRents: number;
+  returningToday: number;
+  returningTomorrow: number;
   revenueToday: number;
   revenuePeriod: number;
   expectedRevenue: number;
@@ -40,6 +43,9 @@ interface RentUser {
   id: number;
   name: string;
   phone: string;
+  telegramChatId?: string | null;
+  maxChatId?: string | null;
+  preferredMessenger?: string | null;
 }
 
 interface RentBike {
@@ -73,6 +79,8 @@ interface DashboardData {
   newLeads: Lead[];
   activeRents: Rent[];
   overdueRents: Rent[];
+  returningToday: Rent[];
+  returningTomorrow: Rent[];
   freeBikes: Bike[];
   maintenanceBikes: Bike[];
   revenueByDay: RevenueDay[];
@@ -110,12 +118,38 @@ function formatMoney(value: number): string {
   return `${Math.round(value).toLocaleString('ru-RU')} ₽`;
 }
 
+function ContactLinks({ user }: { user: RentUser }) {
+  const maxLink = buildMaxLink(user);
+
+  return (
+    <div className="flex gap-2 shrink-0 flex-wrap">
+      <a
+        href={`tel:${user.phone}`}
+        className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs transition-colors"
+      >
+        Позвонить
+      </a>
+      {maxLink && (
+        <a
+          href={maxLink}
+          target="_blank"
+          rel="noreferrer"
+          className="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded text-xs transition-colors"
+        >
+          MAX
+        </a>
+      )}
+    </div>
+  );
+}
+
 export default function DispatchPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [days, setDays] = useState(7);
+  const [markingOverdue, setMarkingOverdue] = useState(false);
 
   const fetchDashboard = useCallback(async (selectedDays: number) => {
     setLoading(true);
@@ -196,12 +230,32 @@ export default function DispatchPage() {
     }
   };
 
+  const markOverdue = async () => {
+    setMarkingOverdue(true);
+    try {
+      const res = await fetch('/api/admin/overdue', { method: 'POST' });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error || 'Не удалось пометить просрочки');
+        return;
+      }
+      setNotice(`Просрочено аренд: ${json.count}`);
+      fetchDashboard(days);
+    } catch {
+      setError('Нет связи с сервером');
+    } finally {
+      setMarkingOverdue(false);
+    }
+  };
+
   const operationalStats: { label: string; value: number; color: string }[] = data
     ? [
         { label: 'Новые заявки', value: data.stats.newLeads, color: 'text-emerald-400' },
         { label: 'Активные аренды', value: data.stats.activeRents, color: 'text-amber-400' },
         { label: 'Просроченные', value: data.stats.overdueRents, color: 'text-rose-400' },
         { label: 'Свободные байки', value: data.stats.freeBikes, color: 'text-cyan-400' },
+        { label: 'Возврат сегодня', value: data.stats.returningToday, color: 'text-blue-400' },
+        { label: 'Возврат завтра', value: data.stats.returningTomorrow, color: 'text-violet-400' },
       ]
     : [];
 
@@ -223,9 +277,18 @@ export default function DispatchPage() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-6 font-sans">
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold bg-gradient-to-r from-amber-500 to-orange-500 bg-clip-text text-transparent mb-8">
-          Диспетчерская
-        </h1>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-amber-500 to-orange-500 bg-clip-text text-transparent">
+            Диспетчерская
+          </h1>
+          <button
+            onClick={markOverdue}
+            disabled={markingOverdue}
+            className="px-4 py-2 bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors"
+          >
+            {markingOverdue ? 'Проверка...' : 'Пометить просрочки'}
+          </button>
+        </div>
 
         {error && (
           <div className="mb-6 px-4 py-3 rounded-lg bg-rose-950/60 border border-rose-800 text-rose-300 text-sm">
@@ -240,7 +303,7 @@ export default function DispatchPage() {
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           {loading
-            ? Array.from({ length: 4 }).map((_, i) => (
+            ? Array.from({ length: 6 }).map((_, i) => (
                 <div
                   key={i}
                   className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 animate-pulse h-24"
@@ -348,7 +411,8 @@ export default function DispatchPage() {
                             )}
                           </p>
                         </div>
-                        <div className="flex gap-2 shrink-0 flex-wrap justify-end">
+                        <div className="flex gap-2 shrink-0 flex-wrap justify-end items-start">
+                          <ContactLinks user={rent.user} />
                           <button
                             onClick={() => completeRent(rent.id)}
                             className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs transition-colors"
@@ -366,6 +430,62 @@ export default function DispatchPage() {
                     </li>
                   );
                 })}
+              </ul>
+            )}
+          </section>
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
+          <section className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
+            <h2 className="text-lg font-semibold text-slate-200 mb-4">Возвращаются сегодня</h2>
+            {loading ? (
+              <p className="text-slate-400 text-sm">Загрузка...</p>
+            ) : data && data.returningToday.length === 0 ? (
+              <p className="text-slate-400 text-sm">Сегодня никто не возвращается</p>
+            ) : (
+              <ul className="space-y-3">
+                {data?.returningToday.map((rent) => (
+                  <li
+                    key={rent.id}
+                    className="border border-slate-800 rounded-lg p-3 bg-slate-950/50"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="font-medium text-slate-100">{rent.user.name}</p>
+                        <p className="text-sm text-slate-400">{rent.user.phone}</p>
+                        <p className="text-xs text-slate-500 mt-1">{rent.bike.name} · {formatDate(rent.endDate)}</p>
+                      </div>
+                      <ContactLinks user={rent.user} />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
+            <h2 className="text-lg font-semibold text-slate-200 mb-4">Возвращаются завтра</h2>
+            {loading ? (
+              <p className="text-slate-400 text-sm">Загрузка...</p>
+            ) : data && data.returningTomorrow.length === 0 ? (
+              <p className="text-slate-400 text-sm">Завтра никто не возвращается</p>
+            ) : (
+              <ul className="space-y-3">
+                {data?.returningTomorrow.map((rent) => (
+                  <li
+                    key={rent.id}
+                    className="border border-slate-800 rounded-lg p-3 bg-slate-950/50"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="font-medium text-slate-100">{rent.user.name}</p>
+                        <p className="text-sm text-slate-400">{rent.user.phone}</p>
+                        <p className="text-xs text-slate-500 mt-1">{rent.bike.name} · {formatDate(rent.endDate)}</p>
+                      </div>
+                      <ContactLinks user={rent.user} />
+                    </div>
+                  </li>
+                ))}
               </ul>
             )}
           </section>
@@ -419,9 +539,7 @@ export default function DispatchPage() {
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 bg-slate-950/50 border border-slate-800 rounded-xl p-4">
-              <h3 className="text-sm font-semibold text-slate-200 mb-4">
-                Выручка по дням
-              </h3>
+              <h3 className="text-sm font-semibold text-slate-200 mb-4">Выручка по дням</h3>
 
               {loading ? (
                 <p className="text-slate-400 text-sm">Загрузка...</p>
@@ -448,9 +566,7 @@ export default function DispatchPage() {
             </div>
 
             <div className="bg-slate-950/50 border border-slate-800 rounded-xl p-4">
-              <h3 className="text-sm font-semibold text-slate-200 mb-4">
-                Топ байков по доходу
-              </h3>
+              <h3 className="text-sm font-semibold text-slate-200 mb-4">Топ байков по доходу</h3>
 
               {loading ? (
                 <p className="text-slate-400 text-sm">Загрузка...</p>

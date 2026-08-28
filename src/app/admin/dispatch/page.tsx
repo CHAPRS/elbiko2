@@ -164,6 +164,13 @@ export default function DispatchPage() {
   const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setSearchQuery(searchInput.trim());
+    }, 300);
+    return () => clearTimeout(timeout);
+  }, [searchInput]);
+
   const fetchDashboard = useCallback(async (selectedDays: number, silent = false) => {
     if (!silent) setLoading(true);
     try {

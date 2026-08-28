@@ -124,14 +124,7 @@ export default function Header() {
               </div>
             )}
           </div>
-          
-          <a 
-            href="/admin" 
-            className="text-xs bg-slate-900 border border-slate-800 text-slate-300 hover:border-emerald-500/50 px-4 min-h-11 rounded-xl transition-all flex items-center"
-          >
-            Диспетчерская
-          </a>
-          
+
           {/* Mobile menu button */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}

@@ -222,11 +222,12 @@ export default function HomePage() {
         </div>
         
         <div className="md:col-span-2 h-72 bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden relative shadow-inner">
-          <iframe 
-            src="https://yandex.ru/map-widget/v1/?ll=55.165434,51.823143&z=15&pt=55.165434,51.823143,pm2rdm&lang=ru_RU"
-            width="100%" 
-            height="100%" 
-            frameBorder="0" 
+          <iframe
+            src="https://www.openstreetmap.org/export/embed.html?bbox=55.155%2C51.818%2C55.175%2C51.828&layer=map&marker=51.823143%2C55.165434"
+            width="100%"
+            height="100%"
+            frameBorder="0"
+            loading="lazy"
             style={{ border: 0 }}
             allowFullScreen
             title="Карта офиса ЭльБайко"

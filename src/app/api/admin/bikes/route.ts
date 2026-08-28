@@ -49,6 +49,7 @@ export async function POST(request: Request) {
         status: parsed.data.status ?? 'FREE',
         isWaterproof: parsed.data.isWaterproof ?? false,
         pricePerDay: parsed.data.pricePerDay ?? 500,
+        externalId: parsed.data.externalId?.trim() || null,
       },
     });
 
@@ -87,6 +88,7 @@ export async function PATCH(request: Request) {
     if (fields.isWaterproof !== undefined) updateData.isWaterproof = fields.isWaterproof;
     if (fields.imageUrl !== undefined) updateData.imageUrl = fields.imageUrl;
     if (fields.pricePerDay !== undefined) updateData.pricePerDay = fields.pricePerDay;
+    if (fields.externalId !== undefined) updateData.externalId = fields.externalId?.trim() || null;
 
     if (fields.status !== undefined) {
       // Нельзя вручную освободить или отправить на сервис байк с активной арендой

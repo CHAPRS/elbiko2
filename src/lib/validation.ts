@@ -10,6 +10,7 @@ export const createBikeSchema = z.object({
   isWaterproof: z.boolean().optional(),
   pricePerDay: z.number().int().positive().max(100000),
   status: bikeStatus.optional(),
+  externalId: z.string().max(120).optional().nullable(),
   imageUrl: z.string().url().max(500).optional().nullable(),
 });
 
@@ -22,6 +23,7 @@ export const updateBikeSchema = z.object({
   isWaterproof: z.boolean().optional(),
   pricePerDay: z.number().int().positive().max(100000).optional(),
   status: bikeStatus.optional(),
+  externalId: z.string().max(120).optional().nullable(),
   imageUrl: z.string().url().max(500).optional().nullable(),
 });
 

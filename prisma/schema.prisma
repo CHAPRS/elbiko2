@@ -17,6 +17,7 @@ model Bike {
   isWaterproof Boolean // Булевый стандарт из техпаспорта v3.3
   status       String   @default("FREE") // Статусы: "FREE", "RENTED", "MAINTENANCE"
   pricePerDay  Decimal  @default(0.00) @db.Decimal(10, 2) // Цена за день
+  externalId   String?  @db.VarChar(120) // Внешний ID/серийный номер байка
   imageUrl     String? // Ссылка на фото велосипеда
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt

@@ -12,6 +12,7 @@ interface Bike {
   motor: string;
   isWaterproof: boolean;
   pricePerDay: string | number;
+  externalId: string | null;
   imageUrl: string | null;
   _count?: { rents: number };
 }
@@ -22,6 +23,7 @@ interface BikeForm {
   range: string;
   motor: string;
   pricePerDay: string;
+  externalId: string;
   imageUrl: string;
   isWaterproof: boolean;
 }
@@ -32,6 +34,7 @@ const EMPTY_FORM: BikeForm = {
   range: '',
   motor: '',
   pricePerDay: '500',
+  externalId: '',
   imageUrl: '',
   isWaterproof: false,
 };
@@ -128,6 +131,7 @@ export default function AdminPage() {
       range: bike.range,
       motor: bike.motor,
       pricePerDay: String(bike.pricePerDay),
+      externalId: bike.externalId || '',
       imageUrl: bike.imageUrl || '',
       isWaterproof: bike.isWaterproof,
     });
@@ -187,13 +191,13 @@ export default function AdminPage() {
   if (isLoading) {
     bikeRows.push(
       <tr key="loading" className="border-b border-slate-800">
-        <td colSpan={5} className="p-4 text-center text-slate-400">Загрузка данных...</td>
+        <td colSpan={6} className="p-4 text-center text-slate-400">Загрузка данных...</td>
       </tr>
     );
   } else if (bikes.length === 0) {
     bikeRows.push(
       <tr key="empty" className="border-b border-slate-800">
-        <td colSpan={5} className="p-4 text-center text-slate-400">Велосипеды не найдены</td>
+        <td colSpan={6} className="p-4 text-center text-slate-400">Велосипеды не найдены</td>
       </tr>
     );
   } else {
@@ -204,6 +208,9 @@ export default function AdminPage() {
       bikeRows.push(
         <tr key={bike.id} className="border-b border-slate-800 hover:bg-slate-900/50 transition-colors align-top">
           <td className="p-4 font-medium text-white">{bike.name}</td>
+          <td className="p-4 text-slate-400 text-sm whitespace-nowrap">
+            {bike.externalId || <span className="text-slate-600">—</span>}
+          </td>
           <td className="p-4 text-slate-300 text-sm">{specsText}</td>
           <td className="p-4 text-slate-200 text-sm whitespace-nowrap">{Number(bike.pricePerDay)} ₽/сут</td>
           <td className="p-4 text-sm font-semibold whitespace-nowrap">
@@ -332,6 +339,17 @@ export default function AdminPage() {
               </div>
 
               <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">ID байка (внешний/серийный)</label>
+                <input
+                  type="text"
+                  value={form.externalId}
+                  onChange={(e) => setForm({ ...form, externalId: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  placeholder="Например, SN-2024-001"
+                />
+              </div>
+
+              <div>
                 <label className="block text-xs font-medium text-slate-400 mb-1">Ссылка на фото (необязательно)</label>
                 <input
                   type="url"
@@ -381,6 +399,7 @@ export default function AdminPage() {
               <thead>
                 <tr className="border-b border-slate-800 text-slate-400 text-xs uppercase tracking-wider">
                   <th className="p-4">Модель</th>
+                  <th className="p-4">ID байка</th>
                   <th className="p-4">Характеристики</th>
                   <th className="p-4">Тариф</th>
                   <th className="p-4">Статус</th>

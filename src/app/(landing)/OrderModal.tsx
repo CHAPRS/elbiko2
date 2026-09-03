@@ -1,5 +1,6 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
+import { CONTACTS } from '@/app/constants';
 
 interface OrderModalProps {
   bike: any;
@@ -7,9 +8,6 @@ interface OrderModalProps {
 }
 
 export default function OrderModal({ bike, onClose }: OrderModalProps) {
-  const [phone, setPhone] = useState('');
-  const [name, setName] = useState('');
-  const [submitting, setSubmitting] = useState(false);
 
   // Блокируем скролл страницы при открытой модалке
   useEffect(() => {
@@ -20,15 +18,13 @@ export default function OrderModal({ bike, onClose }: OrderModalProps) {
     };
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitting(true);
-    // Имитация отправки лида на бэкенд
-    setTimeout(() => {
-      alert(`Заявка на модель ${bike.name} успешно отправлена! Мы свяжемся с вами по номеру ${phone}.`);
-      setSubmitting(false);
-      onClose();
-    }, 1000);
+  const handleContact = () => {
+    if (CONTACTS.maxUrl) {
+      window.open(CONTACTS.maxUrl, '_blank');
+    } else {
+      alert('Свяжитесь с нами по телефону: ' + CONTACTS.phoneDisplay);
+    }
+    onClose();
   };
 
   return (
@@ -45,28 +41,12 @@ export default function OrderModal({ bike, onClose }: OrderModalProps) {
         <h3 className="text-xl font-black text-white mb-2">Бронирование байка</h3>
         <p className="text-xs text-slate-400 mb-6"> Вы выбрали: <span className="text-yellow-400 font-bold">{bike.name} ({bike.model})</span></p>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1.5">Ваше имя</label>
-            <input 
-              type="text" required placeholder="Иван" value={name} onChange={e => setName(e.target.value)}
-              className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-yellow-500 text-white"
-            />
-          </div>
-          <div>
-            <label className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1.5">Телефон курьера</label>
-            <input 
-              type="tel" required placeholder="+7 (999) 000-00-00" value={phone} onChange={e => setPhone(e.target.value)}
-              className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-yellow-500 text-white font-mono"
-            />
-          </div>
-          <button 
-            type="submit" disabled={submitting}
-            className="w-full py-4 bg-gradient-to-r from-yellow-500 to-amber-500 text-slate-950 font-black rounded-xl text-center text-sm transition-all active:scale-98 shadow-lg disabled:opacity-50"
-          >
-            {submitting ? 'Отправка заявки...' : 'Отправить заявку на бронь'}
-          </button>
-        </form>
+        <button 
+          onClick={handleContact}
+          className="w-full py-4 bg-gradient-to-r from-purple-500 to-pink-500 text-slate-950 font-black rounded-xl text-center text-sm transition-all active:scale-98 shadow-lg"
+        >
+          Написать в MAX
+        </button>
       </div>
     </div>
   );

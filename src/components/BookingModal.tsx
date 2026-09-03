@@ -1,6 +1,7 @@
 'use client';
 import React, { useEffect } from 'react';
 import { useRentStore } from '@/store/useRentStore';
+import { CONTACTS } from '@/app/constants';
 
 // Заменили export default на именованный экспорт для предотвращения ошибок импорта
 export function BookingModal() {
@@ -35,35 +36,13 @@ export function BookingModal() {
   const currentPricePerDay = rentDays >= 30 ? 400 : rentDays >= 14 ? 450 : selectedBike.pricePerDay;
   const totalPrice = rentDays * currentPricePerDay;
 
-  const handleConfirm = async () => {
-    if (!isAuthenticated) {
-      toggleBookingModal(false);
-      toggleAuthModal(true); // Если не авторизован, мягко перенаправляем на SMS-вход
-      return;
+  const handleConfirm = () => {
+    if (CONTACTS.maxUrl) {
+      window.open(CONTACTS.maxUrl, '_blank');
+    } else {
+      alert('Свяжитесь с нами по телефону: ' + CONTACTS.phoneDisplay);
     }
-
-    try {
-      const response = await fetch('/api/rent', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phone: userPhone,
-          bikeId: selectedBike.id,
-          days: rentDays,
-        }),
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        alert(`Аренда №${data.rentId} оформлена. Менеджер свяжется с вами для подтверждения и оплаты.`);
-      } else {
-        alert(data.error || 'Ошибка при создании аренды');
-      }
-    } catch (e) {
-      alert('Ошибка соединения с сервером API');
-    } finally {
-      toggleBookingModal(false);
-    }
+    toggleBookingModal(false);
   };
 
   return (
@@ -124,9 +103,9 @@ export function BookingModal() {
         {/* Главная кнопка действия */}
         <button 
           onClick={handleConfirm} 
-          className="w-full mt-6 py-4 bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-400 hover:to-amber-400 text-slate-950 font-black rounded-xl text-center text-base tracking-wide shadow-lg shadow-yellow-500/10 transition-all active:scale-98"
+          className="w-full mt-6 py-4 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-400 hover:to-pink-400 text-slate-950 font-black rounded-xl text-center text-base tracking-wide shadow-lg shadow-purple-500/10 transition-all active:scale-98"
         >
-          {isAuthenticated ? 'Перейти к оплате' : 'Войти и забронировать'}
+          Написать в MAX
         </button>
       </div>
     </div>

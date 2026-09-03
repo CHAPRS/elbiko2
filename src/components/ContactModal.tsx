@@ -1,12 +1,10 @@
 'use client';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { useRentStore } from '@/store/useRentStore';
 import { CONTACTS } from '@/app/constants';
 
 export function ContactModal() {
   const { isContactModalOpen, toggleContactModal, contactModalType } = useRentStore();
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
 
   // Заголовки в зависимости от типа модалки
   const titles = {
@@ -35,41 +33,6 @@ export function ContactModal() {
   }, [isContactModalOpen]);
 
   if (!isContactModalOpen) return null;
-
-  const handleCallOrder = async () => {
-    const cleanName = name.trim();
-    const cleanPhone = phone.trim();
-
-    if (!cleanName || !cleanPhone) {
-      alert('Введите имя и телефон');
-      return;
-    }
-
-    try {
-      const response = await fetch('/api/leads', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: cleanName,
-          phone: cleanPhone,
-          message: 'Заказ звонка',
-        }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        alert('Заявка отправлена. Мы перезвоним вам.');
-        setName('');
-        setPhone('');
-        toggleContactModal(false);
-      } else {
-        alert(data.error || 'Ошибка при отправке заявки');
-      }
-    } catch (error) {
-      alert('Ошибка соединения с сервером');
-    }
-  };
 
   const handleContact = (type: 'telegramManager' | 'max' | 'phone') => {
     switch (type) {
@@ -119,43 +82,8 @@ export function ContactModal() {
           {descriptions[contactModalType || 'tariff']}
         </p>
 
-        {/* Форма заказа звонка */}
-        <div className="mt-6 space-y-3">
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Ваше имя"
-            className="w-full px-4 py-3 bg-slate-950/50 border border-slate-800 rounded-xl text-white placeholder:text-slate-500 focus:border-emerald-500 focus:outline-none"
-          />
-          <input
-            type="tel"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="Телефон"
-            className="w-full px-4 py-3 bg-slate-950/50 border border-slate-800 rounded-xl text-white placeholder:text-slate-500 focus:border-emerald-500 focus:outline-none"
-          />
-        </div>
-
         {/* Варианты связи */}
         <div className="mt-6 space-y-4">
-          {/* Заказать звонок */}
-          <button
-            onClick={handleCallOrder}
-            className="w-full p-4 bg-slate-950/50 border border-slate-800 rounded-2xl flex items-center gap-4 hover:border-emerald-500/50 hover:bg-slate-950/80 transition-all group"
-          >
-            <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-2xl group-hover:bg-emerald-500/20 transition-colors">
-              🤖
-            </div>
-            <div className="text-left flex-1">
-              <div className="font-bold text-white">Заказать звонок</div>
-              <div className="text-xs text-slate-400">Мы перезвоним</div>
-            </div>
-            <div className="text-slate-500 group-hover:text-emerald-400 transition-colors">
-              →
-            </div>
-          </button>
-
           {/* Telegram Manager */}
           <button
             onClick={() => handleContact('telegramManager')}

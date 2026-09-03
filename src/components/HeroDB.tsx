@@ -167,33 +167,18 @@ export default function HeroDB({ data }: HeroDBProps) {
                 </svg>
                 Telegram
               </a>
-            </div>
-            
-            {/* Альтернативные способы связи */}
-            <div className="flex items-center gap-4 pt-2 text-sm text-slate-500">
-              <span>Или напишите менеджеру:</span>
               <a
-                href={telegramManagerUrl}
+                href={maxUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-blue-400 hover:text-blue-300 transition-colors"
+                className="flex items-center justify-center gap-2 px-6 py-3 bg-purple-500/20 border border-purple-500/30 text-purple-400 font-semibold rounded-xl transition-all hover:bg-purple-500/30 hover:border-purple-500/50"
               >
-                Telegram
+                <span className="w-5 h-5 flex items-center justify-center text-xs bg-purple-500/30 text-purple-300 rounded">MAX</span>
+                Написать в MAX
               </a>
-              <span className="text-slate-700">·</span>
-              {CONTACTS.maxUrl ? (
-                <a
-                  href={CONTACTS.maxUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-purple-400 hover:text-purple-300 transition-colors"
-                >
-                  MAX
-                </a>
-              ) : (
-                <span className="text-slate-400">MAX: {CONTACTS.maxPhoneDisplay}</span>
-              )}
             </div>
+            
+
           </div>
 
           {/* Правая часть - изображение велосипеда */}

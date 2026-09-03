@@ -109,10 +109,10 @@ export default function Header() {
                       href={CONTACTS.maxUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-3 px-4 py-3 text-sm text-slate-300 hover:bg-slate-800 hover:text-emerald-400 transition-colors"
+                      className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-purple-400 bg-purple-500/10 border border-purple-500/20 rounded-lg hover:bg-purple-500/20 transition-colors"
                     >
-                      <span className="w-4 h-4 flex items-center justify-center text-xs bg-purple-500/20 text-purple-400 rounded">MAX</span>
-                      MAX
+                      <span className="w-5 h-5 flex items-center justify-center text-xs bg-purple-500/30 text-purple-300 rounded">MAX</span>
+                      Написать в MAX
                     </a>
                   ) : (
                     <div className="flex items-center gap-3 px-4 py-2 text-sm text-slate-400">

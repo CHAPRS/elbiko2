@@ -1,46 +1,39 @@
-export default {
+import { defineType, defineField } from 'sanity'
+
+export const reviewSchema = defineType({
   name: 'review',
-  title: 'Отзыв',
+  title: 'Отзывы курьеров',
   type: 'document',
   fields: [
-    {
-      name: 'author',
-      title: 'Автор',
+    defineField({
+      name: 'courierName',
+      title: 'Имя курьера',
       type: 'string',
-      validation: (Rule: any) => Rule.required(),
-    },
-    {
-      name: 'platform',
-      title: 'Платформа',
+      validation: (Rule) => Rule.required(),
+    }),
+    defineField({
+      name: 'deliveryService',
+      title: 'Служба доставки',
       type: 'string',
-    },
-    {
-      name: 'duration',
-      title: 'Длительность использования',
-      type: 'string',
-    },
-    {
+      description: 'Например: Яндекс.Еда, Самокат, Додо',
+    }),
+    defineField({
+      name: 'avatar',
+      title: 'Фото курьера',
+      type: 'image',
+      options: { hotspot: true },
+    }),
+    defineField({
       name: 'rating',
-      title: 'Рейтинг',
+      title: 'Рейтинг (1-5)',
       type: 'number',
-      validation: (Rule: any) => Rule.required().min(1).max(5),
-    },
-    {
+      validation: (Rule) => Rule.required().min(1).max(5),
+    }),
+    defineField({
       name: 'text',
       title: 'Текст отзыва',
       type: 'text',
-      validation: (Rule: any) => Rule.required(),
-    },
-    {
-      name: 'order',
-      title: 'Порядок отображения',
-      type: 'number',
-    },
+      validation: (Rule) => Rule.required(),
+    }),
   ],
-  preview: {
-    select: {
-      title: 'author',
-      subtitle: 'rating',
-    },
-  },
-}
+})

@@ -1,6 +1,7 @@
 'use client';
 import React, { useEffect } from 'react';
 import { useRentStore } from '@/store/useRentStore';
+import { CONTACTS } from '@/app/constants';
 
 // Заменили export default на именованный экспорт для предотвращения ошибок импорта
 export function BookingModal() {
@@ -35,35 +36,13 @@ export function BookingModal() {
   const currentPricePerDay = rentDays >= 30 ? 400 : rentDays >= 14 ? 450 : selectedBike.pricePerDay;
   const totalPrice = rentDays * currentPricePerDay;
 
-  const handleConfirm = async () => {
-    if (!isAuthenticated) {
-      toggleBookingModal(false);
-      toggleAuthModal(true); // Если не авторизован, мягко перенаправляем на SMS-вход
-      return;
+  const handleConfirm = () => {
+    if (CONTACTS.maxUrl) {
+      window.open(CONTACTS.maxUrl, '_blank');
+    } else {
+      alert('Свяжитесь с нами по телефону: ' + CONTACTS.phoneDisplay);
     }
-
-    try {
-      const response = await fetch('/api/rent', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phone: userPhone,
-          bikeId: selectedBike.id,
-          days: rentDays,
-        }),
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        alert(`Аренда №${data.rentId} оформлена. Менеджер свяжется с вами для подтверждения и оплаты.`);
-      } else {
-        alert(data.error || 'Ошибка при создании аренды');
-      }
-    } catch (e) {
-      alert('Ошибка соединения с сервером API');
-    } finally {
-      toggleBookingModal(false);
-    }
+    toggleBookingModal(false);
   };
 
   return (
@@ -95,7 +74,7 @@ export function BookingModal() {
         {/* Детали заказа */}
         <div className="mt-6 p-5 bg-slate-950/50 border border-slate-800/60 rounded-2xl space-y-3.5 text-sm text-slate-300">
           <div className="flex justify-between items-center">
-            <span className="text-slate-400">Модель байка</span>
+            <span className="text-slate-400">Модель электровелосипеда</span>
             <span className="font-bold text-white text-base">{selectedBike.name}</span>
           </div>
           <div className="flex justify-between items-center">
@@ -118,15 +97,15 @@ export function BookingModal() {
         {/* Предупреждение о подмене */}
         <div className="mt-4 flex items-center gap-3 p-3 bg-slate-800/40 rounded-xl border border-slate-800 text-xs text-slate-400">
           <span className="text-lg">🛠️</span>
-          <span>Бесплатное техническое обслуживание и подменный байк включены в стоимость.</span>
+          <span>Бесплатное техническое обслуживание и подменный электровелосипед включены в стоимость.</span>
         </div>
 
         {/* Главная кнопка действия */}
         <button 
           onClick={handleConfirm} 
-          className="w-full mt-6 py-4 bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-400 hover:to-amber-400 text-slate-950 font-black rounded-xl text-center text-base tracking-wide shadow-lg shadow-yellow-500/10 transition-all active:scale-98"
+          className="w-full mt-6 py-4 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-400 hover:to-pink-400 text-slate-950 font-black rounded-xl text-center text-base tracking-wide shadow-lg shadow-purple-500/10 transition-all active:scale-98"
         >
-          {isAuthenticated ? 'Перейти к оплате' : 'Войти и забронировать'}
+          Написать в MAX
         </button>
       </div>
     </div>

@@ -5,10 +5,11 @@ interface CreateRentInput {
   userId: number;
   bikeId: number;
   days: number;
+  totalPrice?: number;
 }
 
 // Оформление аренды: бронь байка, запись аренды и ожидающий платеж создаются атомарно
-export async function createRent({ userId, bikeId, days }: CreateRentInput) {
+export async function createRent({ userId, bikeId, days, totalPrice: explicitTotalPrice }: CreateRentInput) {
   return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const bike = await tx.bike.findUnique({ where: { id: bikeId } });
 
@@ -20,7 +21,7 @@ export async function createRent({ userId, bikeId, days }: CreateRentInput) {
       throw new Error('Велосипед недоступен: он уже в аренде или на сервисе');
     }
 
-    const totalPrice = Number(bike.pricePerDay) * days;
+    const totalPrice = explicitTotalPrice ?? Number(bike.pricePerDay) * days;
     const endDate = new Date();
     endDate.setDate(endDate.getDate() + days);
 

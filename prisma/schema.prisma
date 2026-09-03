@@ -17,6 +17,7 @@ model Bike {
   isWaterproof Boolean // Булевый стандарт из техпаспорта v3.3
   status       String   @default("FREE") // Статусы: "FREE", "RENTED", "MAINTENANCE"
   pricePerDay  Decimal  @default(0.00) @db.Decimal(10, 2) // Цена за день
+  externalId   String?  @db.VarChar(120) // Внешний ID/серийный номер байка
   imageUrl     String? // Ссылка на фото велосипеда
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -34,8 +35,10 @@ model User {
   password       String   @default("") // Временно добавили дефолт для прохождения миграции
   name           String   @default("Курьер") // Временно добавили дефолт для существующих строк
   balance        Decimal  @default(0.00) @db.Decimal(10, 2)
-  telegramChatId String? // Chat ID курьера для уведомлений бота
-  createdAt      DateTime @default(now())
+  telegramChatId     String? // Chat ID курьера для уведомлений бота
+  maxChatId          String? // Идентификатор/телефон курьера в MAX
+  preferredMessenger String   @default("MAX") // "MAX" | "TELEGRAM"
+  createdAt          DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   rentalSessions RentalSession[]
@@ -66,28 +69,28 @@ model RentalSession {
   @@index([bikeId])
 }
 
-// Модель Заявки (Lead)
+// Оптимизированная модель Заявки (Lead)
 model Lead {
   id           Int       @id @default(autoincrement())
   name         String
   phone        String
   bikeName     String?
-  status       String    @default("NEW") // Статусы: "NEW", "IN_PROGRESS", "CONFIRMED", "REJECTED"
-  message      String?   @db.Text // Дополнительное сообщение от клиента
-  comment      String?   @db.Text // Внутренний комментарий администратора
-  rejectReason String?   @db.Text // Причина отклонения заявки
-  processedAt  DateTime? // Момент последнего изменения статуса
-  rentId       Int? // Аренда, созданная из заявки
-  bikeId       Int? // Связь с велосипедом (если выбран конкретный)
-
-  // Отношения
-  bike Bike? @relation(fields: [bikeId], references: [id], onDelete: SetNull)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  status       String    @default("NEW")
+  message      String?   @db.Text
+  comment      String?   @db.Text
+  rejectReason String?   @db.Text
+  rentDays     Int?
+  totalPrice   Decimal?  @db.Decimal(10, 2)
+  processedAt  DateTime?
+  rentId       Int?
+  bikeId       Int?
+  bike         Bike?     @relation(fields: [bikeId], references: [id], onDelete: SetNull)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   @@index([status])
   @@index([phone])
+  @@index([createdAt])
 }
 
 // Модель Аренды (Rent)
@@ -130,4 +133,116 @@ model Payment {
   updatedAt DateTime @updatedAt
 
   @@index([status])
+}
+
+// Модель Hero секции главной страницы
+model Hero {
+  id                  Int     @id @default(autoincrement())
+  title               String
+  subtitle            String?
+  badge               String?
+  backgroundImageUrl  String?
+  bikeImageUrl        String?  // Фото электровелосипеда
+  courierImageUrl     String?  // Фото курьера
+  phone               String?  // Телефон для звонка
+  telegramUrl         String?  // Ссылка на Telegram бот
+  telegramManagerUrl  String?  // Ссылка на Telegram менеджера
+  maksUrl             String?  // Ссылка на Maks
+  price               String?  // Цена (например: "от 3000 ₽/неделя")
+  stat1Label          String?
+  stat1Value          String?
+  stat2Label          String?
+  stat2Value          String?
+  stat3Label          String?
+  stat3Value          String?
+  ctaText             String?
+  ctaLink             String?
+  secondaryCtaText    String?
+  secondaryCtaLink    String?
+  isActive            Boolean @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+// Модель Преимущества
+model Feature {
+  id          Int     @id @default(autoincrement())
+  icon        String?
+  imageUrl    String?
+  title       String
+  description String
+  order       Int     @default(0)
+  isMain      Boolean @default(false)
+  badges      String?  // JSON массив строк для badges
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([order])
+}
+
+// Модель Шага (Как это работает)
+model Step {
+  id          Int     @id @default(autoincrement())
+  number      String
+  imageUrl    String?
+  title       String
+  description String
+  order       Int     @default(0)
+  badges      String?  // JSON массив строк для badges
+  icon        String?  // Иконка emoji
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([order])
+}
+
+// Модель Тарифа
+model Tariff {
+  id          Int      @id @default(autoincrement())
+  name        String
+  subtitle    String?
+  price       Decimal  @db.Decimal(10, 2)
+  period      String
+  features    String   @db.Text // JSON массив строк
+  popular     Boolean  @default(false)
+  imageUrl    String?
+  icon        String?  // Emoji иконка тарифа
+  order       Int      @default(0)
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([order])
+}
+
+// Модель Отзыва
+model Review {
+  id          Int     @id @default(autoincrement())
+  author      String
+  avatarUrl   String?
+  platform    String?
+  duration    String?
+  rating      Int
+  text        String  @db.Text
+  order       Int     @default(0)
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([order])
+}
+
+// Модель FAQ
+model FAQ {
+  id        Int     @id @default(autoincrement())
+  question  String
+  answer    String  @db.Text
+  order     Int     @default(0)
+  isActive  Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([order])
 }

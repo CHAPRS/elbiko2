@@ -44,6 +44,8 @@ export async function GET() {
       } : null,
       bike: activeBike ? {
         id: activeBike.id,
+        name: activeBike.name,
+        externalId: activeBike.externalId,
         speed: activeBike.speed,
         range: activeBike.range,
         motor: activeBike.motor,

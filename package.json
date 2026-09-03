@@ -8,12 +8,14 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "seed": "tsx prisma/seed.ts"
+    "seed": "tsx prisma/seed.ts",
+    "seed-content": "tsx prisma/seed-content.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
     "@sanity/client": "^6.0.0",
     "@sanity/image-url": "^1.0.0",
+    "lru-cache": "^11.5.2",
     "next": "^14.2.0",
     "next-sanity": "^9.0.0",
     "nodemailer": "^9.0.3",
@@ -21,7 +23,9 @@
     "react-dom": "^18.2.0",
     "react-hook-form": "^7.50.1",
     "react-is": "^19.2.8",
+    "sharp": "^0.35.4",
     "styled-components": "^6.5.0",
+    "zod": "^4.4.3",
     "zustand": "^4.5.1"
   },
   "devDependencies": {

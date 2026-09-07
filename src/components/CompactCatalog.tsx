@@ -8,8 +8,10 @@ interface CompactCatalogProps {
 }
 
 export default function CompactCatalog({ bikes, onBook }: CompactCatalogProps) {
-  // Показать только первые 3 велосипеда для главной страницы
-  const displayBikes = bikes.slice(0, 3);
+  // Скрываем City Courier 48V, оставляем две основные модели
+  const displayBikes = bikes
+    .filter((bike) => !bike.name?.toLowerCase().includes('city courier 48v'))
+    .slice(0, 2);
 
   const bikesRenderList = displayBikes.map((bike) => (
     <BikeCard key={bike.id} bike={bike} onBook={onBook} />
@@ -28,7 +30,7 @@ export default function CompactCatalog({ bikes, onBook }: CompactCatalogProps) {
           <h2 className="text-2xl sm:text-3xl font-black text-white">Доступные модели в вашем городе</h2>
           <p className="text-sm text-slate-500 mt-2">Выберите электровелосипед для работы курьером</p>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 max-w-5xl mx-auto">
           {displayBikes.length === 0 ? catalogLoadingText : bikesRenderList}
         </div>
       </div>

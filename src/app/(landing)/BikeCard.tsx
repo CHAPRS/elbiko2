@@ -1,6 +1,7 @@
 'use client';
 import React from 'react';
 import Image from 'next/image';
+import { normalizeImageUrl } from '@/lib/image';
 
 interface BikeCardProps {
   bike: any;
@@ -8,16 +9,16 @@ interface BikeCardProps {
 }
 
 export default function BikeCard({ bike, onBook }: BikeCardProps) {
-  // Безопасное извлечение и форматирование данных
   const bikeName = String(bike.name || 'Электровелосипед');
-  const bikeVoltage = String(bike.voltage || '60V');
-  const bikeBattery = String(bike.battery || '45 Ah');
-  const bikePrice = String(bike.pricePerDay || '500');
-  const bikeImage = bike.imageUrl || null;
+  const bikeMotor = String(bike.motor || '—');
+  const bikeSpeed = String(bike.speed || '—');
+  const bikeRange = String(bike.range || '—');
+  const bikeWaterproof = bike.isWaterproof ? 'Да' : 'Нет';
+  const bikePrice = String(bike.pricePerDay || '0');
+  const bikeImage = normalizeImageUrl(bike.imageUrl);
 
   return (
     <div className="h-full min-w-0 bg-slate-900/40 backdrop-blur-md border border-slate-800/80 rounded-3xl p-5 flex flex-col hover:border-emerald-500/40 transition-all duration-300 group hover:shadow-xl hover:shadow-emerald-500/5">
-      {/* Область фото — соотношение сторон 4:3 */}
       <div className="w-full aspect-[4/3] bg-slate-950/80 rounded-2xl flex items-center justify-center relative overflow-hidden mb-4 border border-slate-800/50 group-hover:border-slate-700/50 transition-colors">
         {bikeImage ? (
           <Image
@@ -33,26 +34,30 @@ export default function BikeCard({ bike, onBook }: BikeCardProps) {
         )}
       </div>
 
-      {/* Контент карточки — flex для одинаковой высоты */}
       <div className="flex flex-col flex-1">
-        {/* Название */}
         <h3 className="text-lg font-black text-white tracking-tight group-hover:text-emerald-400 transition-colors mb-2">
           {bikeName}
         </h3>
 
-        {/* Характеристики — 2 строки */}
         <div className="space-y-2 mb-4 text-sm font-mono">
           <div className="flex justify-between items-center py-0.5">
-            <span className="text-slate-500">Напряжение</span>
-            <span className="text-slate-200 font-bold">{bikeVoltage}</span>
+            <span className="text-slate-500">Мощность мотора</span>
+            <span className="text-slate-200 font-bold">{bikeMotor}</span>
           </div>
           <div className="flex justify-between items-center py-0.5">
-            <span className="text-slate-500">Ёмкость АКБ</span>
-            <span className="text-slate-200 font-bold">{bikeBattery}</span>
+            <span className="text-slate-500">Макс. скорость</span>
+            <span className="text-slate-200 font-bold">{bikeSpeed}</span>
+          </div>
+          <div className="flex justify-between items-center py-0.5">
+            <span className="text-slate-500">Запас хода</span>
+            <span className="text-slate-200 font-bold">{bikeRange}</span>
+          </div>
+          <div className="flex justify-between items-center py-0.5">
+            <span className="text-slate-500">Влагозащита</span>
+            <span className="text-slate-200 font-bold">{bikeWaterproof}</span>
           </div>
         </div>
 
-        {/* Цена */}
         <div className="mt-auto">
           <p className="text-xs text-slate-500 uppercase font-black tracking-wider select-none">Стоимость</p>
           <p className="text-xl font-black text-white mt-0.5 tracking-tight">
@@ -61,7 +66,6 @@ export default function BikeCard({ bike, onBook }: BikeCardProps) {
           </p>
         </div>
 
-        {/* Кнопка */}
         <button
           type="button"
           onClick={() => onBook(bike)}

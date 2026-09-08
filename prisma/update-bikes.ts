@@ -12,6 +12,7 @@ const targetBikes = [
     isWaterproof: true,
     status: 'FREE',
     pricePerDay: 457,
+    imageUrl: '/images/wenbox-u6.webp',
   },
   {
     name: 'WENBOX U1 Pro',
@@ -22,6 +23,7 @@ const targetBikes = [
     isWaterproof: true,
     status: 'FREE',
     pricePerDay: 500,
+    imageUrl: '/images/wenbox-u1-pro.webp',
   },
 ];
 

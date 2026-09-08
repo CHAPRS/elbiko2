@@ -1,6 +1,5 @@
 'use client';
 import React from 'react';
-import Image from 'next/image';
 import { CONTACTS } from '@/app/constants';
 
 interface ServiceHeroProps {
@@ -105,13 +104,10 @@ export default function ServiceHero({ badge, h1, subtitle, price }: ServiceHeroP
           <div className="relative h-[60vh] lg:h-[80vh] order-1 lg:order-2 flex items-start justify-center pt-12">
             <div className="relative w-full h-full max-w-3xl mx-auto flex items-start justify-center">
               <div className="relative w-full h-full">
-                <Image
+                <img
                   src="/images/hero-bike-main.webp"
                   alt="Электровелосипед для аренды курьерам"
-                  fill
-                  className="object-contain"
-                  priority
-                  unoptimized
+                  className="object-contain w-full h-full"
                   style={{
                     filter: 'drop-shadow(0 30px 60px rgba(16, 185, 129, 0.2))',
                     transform: 'scale(2.25)',

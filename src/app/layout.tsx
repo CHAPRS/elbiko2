@@ -9,7 +9,7 @@ export const viewport: Viewport = {
 };
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://elbiko.ru";
-const description = `Аренда электровелосипедов Wenbox для курьеров в ${CONTACTS.city}. От 457 ₽/сутки, без залога, оформление за 5 минут. Звоните ${CONTACTS.phoneDisplay}.`;
+const description = `Аренда электровелосипедов для курьеров в ${CONTACTS.city} от 450 ₽/сутки. Свободные модели, быстрое оформление, без залога. Звоните ${CONTACTS.phoneDisplay}.`;
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),

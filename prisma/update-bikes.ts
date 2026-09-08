@@ -6,22 +6,22 @@ const targetBikes = [
   {
     name: 'Wenbox U6 PRO',
     speed: 'до 60 км/ч',
-    range: 'до 80 км',
-    motor: '1500W',
+    range: 'до 60 км',
+    motor: '1500W (в документах 240w)',
     battery: '30 Ah',
     isWaterproof: true,
     status: 'FREE',
-    pricePerDay: 485,
+    pricePerDay: 457,
   },
   {
     name: 'WENBOX U1 Pro',
     speed: 'до 60 км/ч',
     range: 'до 80 км',
     motor: '1500W (в документах 240w)',
-    battery: '30 Ah',
+    battery: '45 Ah',
     isWaterproof: true,
     status: 'FREE',
-    pricePerDay: 557,
+    pricePerDay: 500,
   },
 ];
 

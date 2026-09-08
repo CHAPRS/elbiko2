@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "@/app/globals.css";
-import { CONTACTS } from "@/app/constants";
+import { CONTACTS, FAQ_ITEMS } from "@/app/constants";
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -8,10 +8,13 @@ export const viewport: Viewport = {
   maximumScale: 5,
 };
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://elbiko.ru";
+const description = `Аренда электровелосипедов Wenbox для курьеров в ${CONTACTS.city}. От 457 ₽/сутки, без залога, оформление за 5 минут. Звоните ${CONTACTS.phoneDisplay}.`;
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: "ЭльБайко — аренда электровелосипедов для курьеров в Оренбурге",
-  description:
-    `Аренда электровелосипедов для курьеров в ${CONTACTS.city} от 450 ₽/сутки. Свободные модели, быстрое оформление, без залога. Звоните ${CONTACTS.phoneDisplay}.`,
+  description,
   keywords: [
     "аренда электровелосипеда Оренбург",
     "электровелосипед для курьера",
@@ -20,24 +23,31 @@ export const metadata: Metadata = {
     "электровелосипед Оренбург",
     "доставка Яндекс Еда",
     "Самокат",
+    "Wenbox U1 Pro",
+    "Wenbox U6 PRO",
   ],
   openGraph: {
     title: "ЭльБайко — аренда электровелосипедов для курьеров в Оренбурге",
-    description:
-      "Аренда электровелосипедов для курьеров от 450 ₽/сутки. Быстрое оформление, без залога.",
-    url: "https://elbiko.ru",
+    description,
+    url: "/",
     siteName: "ЭльБайко",
     locale: "ru_RU",
     type: "website",
+    images: [
+      {
+        url: `${siteUrl}/images/hero-bike-main.webp`,
+        alt: "ЭльБайко — аренда электровелосипедов для курьеров в Оренбурге",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "ЭльБайко — аренда электровелосипедов для курьеров в Оренбурге",
-    description:
-      "Аренда электровелосипедов для курьеров от 450 ₽/сутки. Быстрое оформление, без залога.",
+    description,
+    images: [`${siteUrl}/images/hero-bike-main.webp`],
   },
   alternates: {
-    canonical: "https://elbiko.ru",
+    canonical: "/",
   },
   robots: {
     index: true,
@@ -59,7 +69,7 @@ const localBusinessJsonLd = {
   "@type": "LocalBusiness",
   name: "ЭльБайко",
   description: `Аренда электровелосипедов для курьеров в ${CONTACTS.city}`,
-  url: "https://elbiko.ru",
+  url: siteUrl,
   telephone: CONTACTS.phone,
   address: {
     "@type": "PostalAddress",
@@ -67,8 +77,21 @@ const localBusinessJsonLd = {
     addressLocality: CONTACTS.city,
     addressCountry: "RU",
   },
-  openingHours: ["Mo-Su 09:00-21:00"],
+  openingHours: ["Mo-Fr 10:00-18:00"],
   areaServed: CONTACTS.city,
+};
+
+const faqJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: FAQ_ITEMS.map((item) => ({
+    "@type": "Question",
+    name: item.q,
+    acceptedAnswer: {
+      "@type": "Answer",
+      text: item.a,
+    },
+  })),
 };
 
 export default function RootLayout({
@@ -83,6 +106,12 @@ export default function RootLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{
             __html: JSON.stringify(localBusinessJsonLd),
+          }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(faqJsonLd),
           }}
         />
       </head>

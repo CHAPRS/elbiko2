@@ -11,7 +11,7 @@ const targetBikes = [
     battery: '30 Ah',
     isWaterproof: true,
     status: 'FREE',
-    pricePerDay: 485,
+    pricePerDay: 457,
   },
   {
     name: 'WENBOX U1 Pro',
@@ -21,7 +21,7 @@ const targetBikes = [
     battery: '45 Ah',
     isWaterproof: true,
     status: 'FREE',
-    pricePerDay: 557,
+    pricePerDay: 500,
   },
 ];
 

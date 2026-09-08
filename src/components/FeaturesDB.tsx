@@ -1,6 +1,7 @@
 'use client';
 import React from 'react';
 import Image from 'next/image';
+import { normalizeImageUrl } from '@/lib/image';
 
 interface FeatureData {
   icon?: string;
@@ -44,9 +45,10 @@ export default function FeaturesDB({ features }: FeaturesDBProps) {
           <div className="lg:col-span-3 relative h-[320px] bg-slate-900/50 border border-slate-800 rounded-3xl overflow-hidden group hover:border-emerald-500/30 transition-all duration-300">
             {mainFeature.imageUrl && (
               <Image
-                src={mainFeature.imageUrl}
+                src={mainFeature.imageUrl ? encodeURI(normalizeImageUrl(mainFeature.imageUrl) || '') : ''}
                 alt={mainFeature.title}
                 fill
+                unoptimized
                 className="object-cover group-hover:scale-[1.02] transition-transform duration-500"
               />
             )}
@@ -101,9 +103,10 @@ export default function FeaturesDB({ features }: FeaturesDBProps) {
           <div className="md:col-span-2 relative h-64 bg-slate-900/50 border border-slate-800 rounded-3xl overflow-hidden group hover:border-emerald-500/30 transition-all duration-300">
             {mainFeature.imageUrl && (
               <Image
-                src={mainFeature.imageUrl}
+                src={mainFeature.imageUrl ? encodeURI(normalizeImageUrl(mainFeature.imageUrl) || '') : ''}
                 alt={mainFeature.title}
                 fill
+                unoptimized
                 className="object-cover group-hover:scale-[1.02] transition-transform duration-500"
               />
             )}
@@ -156,9 +159,10 @@ export default function FeaturesDB({ features }: FeaturesDBProps) {
           <div className="relative h-56 bg-slate-900/50 border border-slate-800 rounded-3xl overflow-hidden group hover:border-emerald-500/30 transition-all duration-300">
             {mainFeature.imageUrl && (
               <Image
-                src={mainFeature.imageUrl}
+                src={mainFeature.imageUrl ? encodeURI(normalizeImageUrl(mainFeature.imageUrl) || '') : ''}
                 alt={mainFeature.title}
                 fill
+                unoptimized
                 className="object-cover group-hover:scale-[1.02] transition-transform duration-500"
               />
             )}

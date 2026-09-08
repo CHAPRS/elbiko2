@@ -14,6 +14,7 @@ export default function BikeCard({ bike, onBook }: BikeCardProps) {
   const bikeSpeed = String(bike.speed || '—');
   const bikeRange = String(bike.range || '—');
   const bikeWaterproof = bike.isWaterproof ? 'Да' : 'Нет';
+  const bikeBattery = String(bike.battery || '—');
   const bikePrice = String(bike.pricePerDay || '0');
   const bikeImage = normalizeImageUrl(bike.imageUrl);
 
@@ -55,6 +56,10 @@ export default function BikeCard({ bike, onBook }: BikeCardProps) {
           <div className="flex justify-between items-center py-0.5">
             <span className="text-slate-500">Влагозащита</span>
             <span className="text-slate-200 font-bold">{bikeWaterproof}</span>
+          </div>
+          <div className="flex justify-between items-center py-0.5">
+            <span className="text-slate-500">Ёмкость аккумулятора</span>
+            <span className="text-slate-200 font-bold">{bikeBattery}</span>
           </div>
         </div>
 

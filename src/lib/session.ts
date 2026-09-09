@@ -45,7 +45,7 @@ export async function createAdminSessionToken(role: AdminRole = 'OWNER'): Promis
   const key = await getKey();
   const payloadObj = { type: 'admin', role };
   const payload = new TextEncoder().encode(JSON.stringify(payloadObj));
-  const signature = await crypto.subtle.sign('HMAC', key, payload);
+  const signature = await crypto.subtle.sign('HMAC', key, payload as any);
   return `${base64UrlEncode(payload.buffer)}.${base64UrlEncode(signature)}`;
 }
 
@@ -73,8 +73,8 @@ export async function verifyAdminSessionToken(token: string | undefined): Promis
     const valid = await crypto.subtle.verify(
       'HMAC',
       key,
-      signature,
-      payload
+      signature as any,
+      payload as any
     );
     if (!valid) return { valid: false, role: null };
 

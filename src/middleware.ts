@@ -87,9 +87,7 @@ export async function middleware(request: NextRequest) {
 
   // 5. Защита панели администратора
   if (pathname.startsWith("/admin")) {
-    console.log('[middleware /admin] has admin_session:', !!adminSession);
     const { valid: isAdminValid } = await verifyAdminSessionToken(adminSession);
-    console.log('[middleware /admin] isAdminValid:', isAdminValid);
     if (!isAdminValid) {
       return NextResponse.redirect(new URL("/login", request.url));
     }

@@ -55,16 +55,24 @@ export interface AdminSessionResult {
 }
 
 export async function verifyAdminSessionToken(token: string | undefined): Promise<AdminSessionResult> {
-  if (!token) return { valid: false, role: null };
+  if (!token) {
+    console.error('[verifyAdminSessionToken] no token');
+    return { valid: false, role: null };
+  }
 
   try {
-    getSessionSecret();
-  } catch {
+    const secret = getSessionSecret();
+    console.log('[verifyAdminSessionToken] token present, secret prefix:', secret.slice(0, 4));
+  } catch (e) {
+    console.error('[verifyAdminSessionToken] getSessionSecret error:', (e as Error).message);
     return { valid: false, role: null };
   }
 
   const [payloadB64, signatureB64] = token.split('.');
-  if (!payloadB64 || !signatureB64) return { valid: false, role: null };
+  if (!payloadB64 || !signatureB64) {
+    console.error('[verifyAdminSessionToken] malformed token');
+    return { valid: false, role: null };
+  }
 
   try {
     const payload = await base64UrlDecode(payloadB64);
@@ -76,7 +84,10 @@ export async function verifyAdminSessionToken(token: string | undefined): Promis
       signature.buffer as ArrayBuffer,
       payload.buffer as ArrayBuffer
     );
-    if (!valid) return { valid: false, role: null };
+    if (!valid) {
+      console.error('[verifyAdminSessionToken] HMAC not valid');
+      return { valid: false, role: null };
+    }
 
     const text = new TextDecoder().decode(payload);
     let role: AdminRole = 'OWNER';
@@ -90,8 +101,10 @@ export async function verifyAdminSessionToken(token: string | undefined): Promis
       }
     }
 
+    console.log('[verifyAdminSessionToken] valid, role:', role);
     return { valid: true, role };
-  } catch {
+  } catch (e) {
+    console.error('[verifyAdminSessionToken] verify error:', (e as Error).message);
     return { valid: false, role: null };
   }
 }

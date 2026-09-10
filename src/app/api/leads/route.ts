@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { sendTelegramNotification } from '@/lib/telegram';
 import { limiter } from '@/lib/rate-limit';
 import { createLeadSchema } from '@/lib/validation';
+import { upsertContactByPhone } from '@/lib/contact';
 
 function escapeHtml(value: string): string {
   return value
@@ -11,13 +12,16 @@ function escapeHtml(value: string): string {
     .replace(/>/g, '&gt;');
 }
 
-// Заменяем Request на NextRequest для работы с IP
+function daysBetween(start: Date, end: Date): number {
+  const ms = new Date(end).getTime() - new Date(start).getTime();
+  const days = Math.ceil(ms / (1000 * 60 * 60 * 24)) + 1;
+  return Math.max(1, days);
+}
+
 export async function POST(request: NextRequest) {
-  // 1. Получаем IP-адрес пользователя для проверки лимитов
   const ip = request.ip || request.headers.get('x-forwarded-for') || '127.0.0.1';
 
   try {
-    // 2. Ограничиваем частоту: максимум 3 заявки в минуту с одного IP
     await limiter.check(3, ip);
   } catch (error) {
     return NextResponse.json(
@@ -40,13 +44,46 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 3. Создаем запись в MySQL через Prisma
+    const { name, phone, bikeId, bikeName, message, startDate, endDate } = parsed.data;
+
+    let rentDays: number | undefined = undefined;
+    let totalPrice: number | undefined = undefined;
+
+    if (startDate && endDate) {
+      if (new Date(endDate) < new Date(startDate)) {
+        return NextResponse.json({ error: 'Дата окончания не может быть раньше даты начала' }, { status: 400 });
+      }
+      rentDays = daysBetween(startDate, endDate);
+
+      if (bikeId) {
+        const bike = await prisma.bike.findUnique({ where: { id: bikeId } });
+        if (bike) {
+          totalPrice = Number(bike.pricePerDay) * rentDays;
+        }
+      }
+    }
+
     const lead = await prisma.lead.create({
       data: {
-        ...parsed.data,
-        bikeId: parsed.data.bikeId ?? null,
+        name,
+        phone,
+        bikeName: bikeName ?? null,
+        bikeId: bikeId ?? null,
+        message: message ?? null,
+        startDate: startDate ? new Date(startDate) : null,
+        endDate: endDate ? new Date(endDate) : null,
+        rentDays: rentDays ?? null,
+        totalPrice: totalPrice ? totalPrice : null,
         status: 'NEW',
       },
+    });
+
+    await upsertContactByPhone({
+      fullName: name,
+      phone,
+      status: 'INQUIRY',
+      source: 'SITE',
+      notes: message || null,
     });
 
     const notificationText = [
@@ -55,6 +92,8 @@ export async function POST(request: NextRequest) {
       `👤 Клиент: ${escapeHtml(lead.name)}`,
       `📞 Телефон: ${escapeHtml(lead.phone)}`,
       `🚲 Велосипед: ${escapeHtml(lead.bikeName || 'не выбран')}`,
+      rentDays ? `📅 Дней: ${rentDays}` : null,
+      totalPrice ? `💰 Итого: ${totalPrice} ₽` : null,
       lead.message ? `📝 Сообщение: ${escapeHtml(lead.message)}` : null,
       '────────────────────────',
       `🆔 Заявка #${lead.id}`,
@@ -62,13 +101,10 @@ export async function POST(request: NextRequest) {
       .filter(Boolean)
       .join('\n');
 
-    // 4. Оптимизация Telegram: убираем await, чтобы ответ клиенту улетал мгновенно.
-    // Запускаем отправку в фоновом режиме. Ошибки логируем, но юзер о них не знает.
     sendTelegramNotification(notificationText).catch((tgError) => {
       console.error('Фоновая ошибка отправки в Telegram:', tgError);
     });
 
-    // Мгновенно возвращаем успешный ответ курьеру на фронтенд
     return NextResponse.json({ success: true, leadId: lead.id }, { status: 201 });
   } catch (error) {
     console.error('Ошибка при создании заявки:', error);

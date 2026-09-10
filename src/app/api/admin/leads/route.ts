@@ -1,6 +1,13 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { leadStatus, createLeadManualSchema } from '@/lib/validation';
+import { upsertContactByPhone } from '@/lib/contact';
+
+function daysBetween(start: Date, end: Date): number {
+  const ms = new Date(end).getTime() - new Date(start).getTime();
+  const days = Math.ceil(ms / (1000 * 60 * 60 * 24)) + 1;
+  return Math.max(1, days);
+}
 
 export const dynamic = 'force-dynamic';
 
@@ -51,17 +58,49 @@ export async function POST(request: Request) {
       );
     }
 
+    const { name, phone, bikeName, bikeId, message, rentDays, totalPrice, startDate, endDate } = parsed.data;
+
+    let finalRentDays = rentDays;
+    let finalTotalPrice = totalPrice;
+
+    if (startDate && endDate) {
+      if (new Date(endDate) < new Date(startDate)) {
+        return NextResponse.json({ error: 'Дата окончания не может быть раньше даты начала' }, { status: 400 });
+      }
+      finalRentDays = daysBetween(startDate, endDate);
+    }
+
+    if (!finalTotalPrice && finalRentDays && bikeId) {
+      const bike = await prisma.bike.findUnique({ where: { id: bikeId } });
+      if (bike) {
+        finalTotalPrice = Number(bike.pricePerDay) * finalRentDays;
+      }
+    }
+
     const lead = await prisma.lead.create({
       data: {
-        ...parsed.data,
-        bikeName: parsed.data.bikeName ?? null,
-        bikeId: parsed.data.bikeId,
+        name,
+        phone,
+        bikeName: bikeName ?? null,
+        bikeId: bikeId ?? null,
+        message: message ?? null,
+        rentDays: finalRentDays ?? null,
+        totalPrice: finalTotalPrice ? finalTotalPrice : null,
+        startDate: startDate ? new Date(startDate) : null,
+        endDate: endDate ? new Date(endDate) : null,
         status: 'NEW',
-        totalPrice: parsed.data.totalPrice,
       },
       include: {
         bike: true,
       },
+    });
+
+    await upsertContactByPhone({
+      fullName: name,
+      phone,
+      status: 'INQUIRY',
+      source: 'ADMIN',
+      notes: message || null,
     });
 
     return NextResponse.json(lead, { status: 201 });

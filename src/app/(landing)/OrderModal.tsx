@@ -6,14 +6,20 @@ interface OrderModalProps {
   onClose: () => void;
 }
 
+function toISODate(d: Date): string {
+  return d.toISOString().split('T')[0];
+}
+
 export default function OrderModal({ bike, onClose }: OrderModalProps) {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [message, setMessage] = useState('');
+  const [startDate, setStartDate] = useState(toISODate(new Date()));
+  const [endDate, setEndDate] = useState(toISODate(new Date()));
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Блокируем скролл страницы при открытой модалке
   useEffect(() => {
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -24,9 +30,15 @@ export default function OrderModal({ bike, onClose }: OrderModalProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
 
     if (!name.trim() || !phone.trim()) {
-      alert('Пожалуйста, введите имя и телефон');
+      setError('Пожалуйста, введите имя и телефон');
+      return;
+    }
+
+    if (new Date(endDate) < new Date(startDate)) {
+      setError('Дата окончания не может быть раньше даты начала');
       return;
     }
 
@@ -42,22 +54,26 @@ export default function OrderModal({ bike, onClose }: OrderModalProps) {
           bikeId: bike?.id ?? null,
           bikeName: bike?.name ?? null,
           message: message.trim() || 'Заявка на аренду',
+          startDate,
+          endDate,
         }),
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Ошибка отправки');
+        const data = await response.json();
+        throw new Error(data.error || 'Ошибка отправки');
       }
 
       setSuccess(true);
     } catch (err: any) {
       console.error('Ошибка при отправке заявки:', err);
-      alert('Не удалось отправить заявку: ' + err.message);
+      setError('Не удалось отправить заявку: ' + err.message);
     } finally {
       setLoading(false);
     }
   };
+
+  const totalDays = Math.max(1, Math.floor((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1);
 
   if (success) {
     return (
@@ -95,6 +111,12 @@ export default function OrderModal({ bike, onClose }: OrderModalProps) {
           Вы выбрали: <span className="text-yellow-400 font-bold">{bike?.name}{bike?.model ? ` (${bike.model})` : ''}</span>
         </p>
 
+        {error && (
+          <div className="mb-4 p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm rounded-xl">
+            {error}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-1">Ваше имя</label>
@@ -118,6 +140,38 @@ export default function OrderModal({ bike, onClose }: OrderModalProps) {
               className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 transition-colors"
               required
             />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-1">Начало</label>
+              <input
+                type="date"
+                value={startDate}
+                min={toISODate(new Date())}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-emerald-500 transition-colors"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-1">Окончание</label>
+              <input
+                type="date"
+                value={endDate}
+                min={startDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-emerald-500 transition-colors"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="text-xs text-slate-400">
+            Выбрано дней: <span className="text-yellow-400 font-bold">{totalDays}</span>
+            {bike?.pricePerDay ? (
+              <span className="ml-2">≈ {Number(bike.pricePerDay) * totalDays} ₽</span>
+            ) : null}
           </div>
 
           <div>

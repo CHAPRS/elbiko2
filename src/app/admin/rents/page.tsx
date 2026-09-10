@@ -6,6 +6,7 @@ interface Rent {
   id: number;
   startDate: string;
   endDate: string;
+  actualReturnDate?: string | null;
   totalPrice: number;
   isActive: boolean;
   status: string;
@@ -23,6 +24,8 @@ interface Rent {
     id: number;
     amount: number;
     status: string;
+    paymentMethod?: string | null;
+    paidAt?: string | null;
   };
 }
 
@@ -31,6 +34,7 @@ export default function RentsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<string>('ALL');
   const [extendDays, setExtendDays] = useState<Record<number, number>>({});
+  const [paymentMethods, setPaymentMethods] = useState<Record<number, string>>({});
 
   const fetchRents = async () => {
     try {
@@ -106,9 +110,44 @@ export default function RentsPage() {
     }
   };
 
+  const handleReturn = async (id: number) => {
+    if (!confirm('Отметить возврат велосипеда? Байк станет доступен.')) return;
+
+    try {
+      const res = await fetch(`/api/admin/rents/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'RETURNED' }),
+      });
+
+      if (res.ok) {
+        fetchRents();
+      }
+    } catch (err) {
+      console.error('Ошибка при возврате:', err);
+    }
+  };
+
+  const handlePayment = async (id: number, method: string) => {
+    try {
+      const res = await fetch(`/api/admin/rents/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paymentStatus: 'COMPLETED', paymentMethod: method }),
+      });
+
+      if (res.ok) {
+        fetchRents();
+      }
+    } catch (err) {
+      console.error('Ошибка при обновлении платежа:', err);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const badges: Record<string, string> = {
       ACTIVE: 'bg-emerald-950 text-emerald-400 border border-emerald-800',
+      RETURNED: 'bg-amber-950 text-amber-400 border border-amber-800',
       COMPLETED: 'bg-blue-950 text-blue-400 border border-blue-800',
       CANCELLED: 'bg-slate-950 text-slate-400 border border-slate-800',
       OVERDUE: 'bg-rose-950 text-rose-400 border border-rose-800',
@@ -119,6 +158,7 @@ export default function RentsPage() {
   const getStatusLabel = (status: string) => {
     const labels: Record<string, string> = {
       ACTIVE: 'Активна',
+      RETURNED: 'Возвращена',
       COMPLETED: 'Завершена',
       CANCELLED: 'Отменена',
       OVERDUE: 'Просрочена',
@@ -173,17 +213,46 @@ export default function RentsPage() {
             </span>
             {overdue && <span className="ml-2 text-xs text-rose-400">(Просрочена)</span>}
           </td>
-          <td className="p-4 text-right space-x-2">
+          <td className="p-4 text-right space-x-1">
             <select
               value={rent.status}
               onChange={(e) => handleStatusChange(rent.id, e.target.value)}
               className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-white"
             >
               <option value="ACTIVE">Активна</option>
-              <option value="COMPLETED">Завершить</option>
-              <option value="CANCELLED">Отменить</option>
+              <option value="RETURNED">Возвращена</option>
+              <option value="COMPLETED">Завершена</option>
+              <option value="CANCELLED">Отменена</option>
               <option value="OVERDUE">Просрочена</option>
             </select>
+            {rent.payment && rent.payment.status !== 'COMPLETED' && (
+              <>
+                <select
+                  value={paymentMethods[rent.id] || 'CASH'}
+                  onChange={(e) => setPaymentMethods({ ...paymentMethods, [rent.id]: e.target.value })}
+                  className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-white"
+                >
+                  <option value="CASH">Наличные</option>
+                  <option value="SBP">СБП</option>
+                  <option value="CARD">Карта</option>
+                  <option value="TRANSFER">Перевод</option>
+                </select>
+                <button
+                  onClick={() => handlePayment(rent.id, paymentMethods[rent.id] || 'CASH')}
+                  className="px-2 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs transition-colors"
+                >
+                  Оплатить
+                </button>
+              </>
+            )}
+            {rent.status === 'ACTIVE' && (
+              <button
+                onClick={() => handleReturn(rent.id)}
+                className="px-2 py-1 bg-amber-600 hover:bg-amber-500 text-white rounded text-xs transition-colors"
+              >
+                Вернуть
+              </button>
+            )}
             <button
               onClick={() => handleDelete(rent.id)}
               className="px-2 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded text-xs transition-colors"

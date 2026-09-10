@@ -13,13 +13,14 @@ export async function GET() {
 
     const userId = parseInt(courierSession.value, 10);
 
-    // Ищем курьера, включая его АКТИВНУЮ сессию аренды и данные велосипеда
+    // Ищем курьера и его активную аренду
     const courier = await prisma.user.findUnique({
       where: { id: userId },
       include: {
-        rentalSessions: {
-          where: { status: 'ACTIVE' },
+        rents: {
+          where: { status: { in: ['ACTIVE', 'OVERDUE'] } },
           include: { bike: true },
+          orderBy: { createdAt: 'desc' },
           take: 1,
         },
       },
@@ -29,28 +30,29 @@ export async function GET() {
       return NextResponse.json({ error: 'Курьер не найден' }, { status: 404 });
     }
 
-    // Формируем чистый объект ответа
-    const activeSession = courier.rentalSessions[0] || null;
-    const activeBike = activeSession ? activeSession.bike : null;
+    const activeRent = courier.rents[0] || null;
 
     return NextResponse.json({
       name: courier.name,
       phone: courier.phone,
       balance: courier.balance,
-      session: activeSession ? {
-        id: activeSession.id,
-        tariff: activeSession.tariff,
-        startDate: activeSession.startDate,
-      } : null,
-      bike: activeBike ? {
-        id: activeBike.id,
-        name: activeBike.name,
-        externalId: activeBike.externalId,
-        speed: activeBike.speed,
-        range: activeBike.range,
-        motor: activeBike.motor,
-        isWaterproof: activeBike.isWaterproof,
-        status: activeBike.status,
+      activeRental: activeRent ? {
+        id: activeRent.id,
+        startDate: activeRent.startDate,
+        endDate: activeRent.endDate,
+        status: activeRent.status,
+        totalPrice: activeRent.totalPrice,
+        bike: activeRent.bike ? {
+          id: activeRent.bike.id,
+          name: activeRent.bike.name,
+          title: activeRent.bike.name,
+          externalId: activeRent.bike.externalId,
+          speed: activeRent.bike.speed,
+          range: activeRent.bike.range,
+          motor: activeRent.bike.motor,
+          isWaterproof: activeRent.bike.isWaterproof,
+          status: activeRent.bike.status,
+        } : null,
       } : null,
     });
   } catch (error) {

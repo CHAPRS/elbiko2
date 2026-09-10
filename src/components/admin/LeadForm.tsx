@@ -13,10 +13,21 @@ interface LeadFormProps {
   onSuccess: () => void;
 }
 
+function toISODate(d: Date): string {
+  return d.toISOString().split('T')[0];
+}
+
+function daysBetween(start: string, end: string): number {
+  const ms = new Date(end).getTime() - new Date(start).getTime();
+  return Math.max(1, Math.floor(ms / (1000 * 60 * 60 * 24)) + 1);
+}
+
 export function LeadForm({ bikes, onSuccess }: LeadFormProps) {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [bikeId, setBikeId] = useState('');
+  const [startDate, setStartDate] = useState(toISODate(new Date()));
+  const [endDate, setEndDate] = useState(toISODate(new Date()));
   const [rentDays, setRentDays] = useState('1');
   const [totalPrice, setTotalPrice] = useState('');
   const [message, setMessage] = useState('');
@@ -30,13 +41,15 @@ export function LeadForm({ bikes, onSuccess }: LeadFormProps) {
   }, [bikes, bikeId]);
 
   useEffect(() => {
+    const days = daysBetween(startDate, endDate);
+    setRentDays(String(days));
+
     const bike = bikes.find((b) => b.id === Number(bikeId));
-    const days = Number(rentDays);
     if (bike && days > 0) {
       const computed = Number(bike.pricePerDay) * days;
       setTotalPrice(String(Math.round(computed)));
     }
-  }, [bikeId, rentDays, bikes]);
+  }, [bikeId, startDate, endDate, bikes]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,6 +60,11 @@ export function LeadForm({ bikes, onSuccess }: LeadFormProps) {
 
     if (!name || !phone || !bikeId || days <= 0 || price < 0) {
       setFormError('Заполните имя, телефон, байк, срок и сумму');
+      return;
+    }
+
+    if (new Date(endDate) < new Date(startDate)) {
+      setFormError('Дата окончания не может быть раньше даты начала');
       return;
     }
 
@@ -63,6 +81,8 @@ export function LeadForm({ bikes, onSuccess }: LeadFormProps) {
           rentDays: days,
           totalPrice: price,
           message: message.trim() || null,
+          startDate,
+          endDate,
         }),
       });
 
@@ -76,6 +96,8 @@ export function LeadForm({ bikes, onSuccess }: LeadFormProps) {
       setName('');
       setPhone('');
       setBikeId(bikes.length > 0 ? String(bikes[0].id) : '');
+      setStartDate(toISODate(new Date()));
+      setEndDate(toISODate(new Date()));
       setRentDays('1');
       setTotalPrice('');
       setMessage('');
@@ -137,15 +159,38 @@ export function LeadForm({ bikes, onSuccess }: LeadFormProps) {
           </select>
         </div>
 
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="block text-xs font-medium text-slate-400 mb-1">Начало</label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              required
+              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-400 mb-1">Окончание</label>
+            <input
+              type="date"
+              value={endDate}
+              min={startDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              required
+              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+            />
+          </div>
+        </div>
+
         <div>
           <label className="block text-xs font-medium text-slate-400 mb-1">Срок, дней</label>
           <input
             type="number"
             min="1"
             value={rentDays}
-            onChange={(e) => setRentDays(e.target.value)}
-            required
-            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+            readOnly
+            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-400 focus:outline-none"
           />
         </div>
 
@@ -164,7 +209,7 @@ export function LeadForm({ bikes, onSuccess }: LeadFormProps) {
           </p>
         </div>
 
-        <div>
+        <div className="md:col-span-2">
           <label className="block text-xs font-medium text-slate-400 mb-1">Комментарий</label>
           <input
             type="text"

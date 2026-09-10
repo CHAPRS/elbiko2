@@ -156,17 +156,6 @@ export async function DELETE(request: Request) {
       );
     }
 
-    const activeSessions = await prisma.rentalSession.count({
-      where: { bikeId: Number(id), status: 'ACTIVE' },
-    });
-
-    if (activeSessions > 0) {
-      return NextResponse.json(
-        { error: 'Невозможно удалить велосипед с активной сессией аренды' },
-        { status: 409 }
-      );
-    }
-
     await prisma.bike.delete({
       where: { id: Number(id) },
     });

@@ -42,6 +42,8 @@ export const createLeadSchema = z.object({
   bikeName: z.string().max(120).optional().nullable(),
   bikeId: z.number().int().positive().optional().nullable(),
   message: z.string().max(2000).optional().nullable(),
+  startDate: z.coerce.date().optional().nullable(),
+  endDate: z.coerce.date().optional().nullable(),
 });
 
 export const createLeadManualSchema = z.object({
@@ -50,8 +52,10 @@ export const createLeadManualSchema = z.object({
   bikeName: z.string().max(120).optional().nullable(),
   bikeId: z.number().int().positive(),
   message: z.string().max(2000).optional().nullable(),
-  rentDays: z.number().int().positive().max(365),
-  totalPrice: z.number().positive().max(10000000),
+  rentDays: z.number().int().positive().max(365).optional().nullable(),
+  totalPrice: z.number().positive().max(10000000).optional().nullable(),
+  startDate: z.coerce.date().optional().nullable(),
+  endDate: z.coerce.date().optional().nullable(),
 });
 
 export const createOrderSchema = z.object({

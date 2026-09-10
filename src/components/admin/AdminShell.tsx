@@ -9,6 +9,7 @@ const NAV = [
   { href: '/admin', label: 'Автопарк' },
   { href: '/admin/leads', label: 'Заявки' },
   { href: '/admin/rents', label: 'Аренды' },
+  { href: '/admin/contacts', label: 'Контакты' },
 ];
 
 function isActive(pathname: string, href: string): boolean {

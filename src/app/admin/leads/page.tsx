@@ -18,6 +18,8 @@ interface Lead {
   bikeId?: number | null;
   rentDays?: number | null;
   totalPrice?: number | null;
+  startDate?: string | null;
+  endDate?: string | null;
   createdAt: string;
   bike?: {
     id: number;
@@ -151,8 +153,9 @@ export default function LeadsPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          days: Number(rentDays) || 1,
           bikeId: rentBikeId ? Number(rentBikeId) : null,
+          startDate: selectedLead.startDate,
+          endDate: selectedLead.endDate,
         }),
       });
       const data = await res.json();
@@ -330,6 +333,13 @@ export default function LeadsPage() {
                   </p>
                   {selectedLead.message && (
                     <p className="text-sm text-slate-400 mt-2 whitespace-pre-wrap">{selectedLead.message}</p>
+                  )}
+                  {selectedLead.startDate && selectedLead.endDate && (
+                    <p className="text-sm text-slate-400 mt-2">
+                      Период: {new Date(selectedLead.startDate).toLocaleDateString('ru-RU')} — {new Date(selectedLead.endDate).toLocaleDateString('ru-RU')}
+                      {selectedLead.rentDays ? ` (${selectedLead.rentDays} дн.)` : ''}
+                      {selectedLead.totalPrice ? ` · ${Number(selectedLead.totalPrice).toLocaleString()} ₽` : ''}
+                    </p>
                   )}
                   {selectedLead.processedAt && (
                     <p className="text-xs text-slate-500 mt-2">

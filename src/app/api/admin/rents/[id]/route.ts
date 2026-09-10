@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-// PATCH - Обновление аренды (завершение, продление, изменение статуса)
+// PATCH - Обновление аренды (завершение, продление, изменение статуса, оплата)
 export async function PATCH(
   request: Request,
   { params }: { params: { id: string } }
@@ -9,11 +9,11 @@ export async function PATCH(
   try {
     const id = Number(params.id);
     const body = await request.json();
-    const { status, endDate, extendDays } = body;
+    const { status, endDate, extendDays, paymentStatus, paymentMethod } = body;
 
     const rent = await prisma.rent.findUnique({
       where: { id },
-      include: { bike: true },
+      include: { bike: true, payment: true },
     });
 
     if (!rent) {
@@ -23,71 +23,138 @@ export async function PATCH(
       );
     }
 
-    let updateData: any = {};
+    const updatedRent = await prisma.$transaction(async (tx) => {
+      let updateData: any = {};
 
-    // Обновление статуса
-    if (status) {
-      updateData.status = status;
+      // Обновление статуса
+      if (status) {
+        updateData.status = status;
 
-      // При завершении аренды - освобождаем велосипед
-      if (status === 'COMPLETED' || status === 'CANCELLED') {
-        updateData.isActive = false;
-        await prisma.bike.update({
+        if (status === 'RETURNED') {
+          updateData.isActive = false;
+          updateData.actualReturnDate = new Date();
+          if (rent.bike.status !== 'FREE') {
+            await tx.bike.update({
+              where: { id: rent.bikeId },
+              data: { status: 'FREE' },
+            });
+          }
+        }
+
+        if (status === 'COMPLETED' || status === 'CANCELLED') {
+          updateData.isActive = false;
+          if (rent.bike.status !== 'FREE') {
+            await tx.bike.update({
+              where: { id: rent.bikeId },
+              data: { status: 'FREE' },
+            });
+          }
+        }
+
+        if (status === 'OVERDUE') {
+          updateData.isActive = false;
+        }
+      }
+
+      // Продление аренды
+      if (extendDays && extendDays > 0) {
+        const currentEndDate = new Date(rent.endDate);
+        const newEndDate = new Date(currentEndDate);
+        newEndDate.setDate(newEndDate.getDate() + extendDays);
+
+        const bike = await tx.bike.findUnique({
           where: { id: rent.bikeId },
-          data: { status: 'FREE' },
         });
+
+        const additionalPrice = bike ? Number(bike.pricePerDay) * extendDays : 0;
+        const newTotal = Number(rent.totalPrice) + additionalPrice;
+
+        updateData.endDate = newEndDate;
+        updateData.totalPrice = newTotal;
+
+        if (additionalPrice > 0) {
+          await tx.rentTransaction.create({
+            data: {
+              rentId: id,
+              type: 'EXTEND',
+              amount: additionalPrice,
+              comment: `Продление на ${extendDays} дн.`,
+            },
+          });
+
+          if (rent.payment && rent.payment.status === 'PENDING') {
+            await tx.payment.update({
+              where: { id: rent.payment.id },
+              data: { amount: newTotal },
+            });
+          }
+        }
       }
 
-      // При просрочке
-      if (status === 'OVERDUE') {
-        updateData.isActive = false;
+      // Обновление даты окончания
+      if (endDate) {
+        updateData.endDate = new Date(endDate);
       }
-    }
 
-    // Продление аренды
-    if (extendDays && extendDays > 0) {
-      const currentEndDate = rent.endDate;
-      const newEndDate = new Date(currentEndDate);
-      newEndDate.setDate(newEndDate.getDate() + extendDays);
-      updateData.endDate = newEndDate;
-
-      // Пересчет стоимости (упрощенно - можно добавить логику тарифов)
-      const daysDiff = extendDays;
-      const bike = await prisma.bike.findUnique({
-        where: { id: rent.bikeId },
+      const updated = await tx.rent.update({
+        where: { id },
+        data: updateData,
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              phone: true,
+            },
+          },
+          bike: {
+            select: {
+              id: true,
+              name: true,
+              status: true,
+            },
+          },
+          payment: true,
+        },
       });
-      if (bike) {
-        const additionalPrice = Number(bike.pricePerDay) * daysDiff;
-        const currentTotal = Number(rent.totalPrice);
-        updateData.totalPrice = currentTotal + additionalPrice;
+
+      // Обновление статуса платежа
+      if (paymentStatus && updated.payment) {
+        const paidAt = paymentStatus === 'COMPLETED' ? new Date() : null;
+
+        await tx.payment.update({
+          where: { id: updated.payment.id },
+          data: {
+            status: paymentStatus,
+            paymentMethod,
+            paidAt,
+          },
+        });
+
+        if (paymentStatus === 'COMPLETED') {
+          await tx.rentTransaction.create({
+            data: {
+              rentId: id,
+              type: 'PAYMENT',
+              amount: updated.payment.amount,
+              method: paymentMethod,
+              comment: paymentMethod ? `Оплата: ${paymentMethod}` : null,
+            },
+          });
+        } else if (paymentStatus === 'REFUNDED') {
+          await tx.rentTransaction.create({
+            data: {
+              rentId: id,
+              type: 'REFUND',
+              amount: updated.payment.amount,
+              method: paymentMethod,
+              comment: paymentMethod ? `Возврат: ${paymentMethod}` : null,
+            },
+          });
+        }
       }
-    }
 
-    // Обновление даты окончания
-    if (endDate) {
-      updateData.endDate = new Date(endDate);
-    }
-
-    const updatedRent = await prisma.rent.update({
-      where: { id },
-      data: updateData,
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            phone: true,
-          },
-        },
-        bike: {
-          select: {
-            id: true,
-            name: true,
-            status: true,
-          },
-        },
-        payment: true,
-      },
+      return updated;
     });
 
     return NextResponse.json(updatedRent);

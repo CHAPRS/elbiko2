@@ -52,6 +52,23 @@ export function LeadForm({ bikes, onSuccess }: LeadFormProps) {
     }
   }, [bikeId, startDate, endDate, bikes]);
 
+  // Автозаполнение ФИО по телефону из базы контактов
+  useEffect(() => {
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length < 10 || name) return;
+
+    fetch(`/api/admin/contacts?phone=${encodeURIComponent(phone)}`)
+      .then((res) => (res.ok ? res.json() : []))
+      .then((contacts) => {
+        const contact = contacts[0];
+        if (contact) {
+          const fullName = [contact.firstName, contact.lastName].filter(Boolean).join(' ');
+          if (fullName) setName(fullName);
+        }
+      })
+      .catch(() => {});
+  }, [phone, name]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);

@@ -10,6 +10,7 @@ interface Rent {
   totalPrice: number;
   isActive: boolean;
   status: string;
+  comment?: string | null;
   user: {
     id: number;
     name: string;
@@ -36,6 +37,18 @@ export default function RentsPage() {
   const [filter, setFilter] = useState<string>('ALL');
   const [extendDays, setExtendDays] = useState<Record<number, number>>({});
   const [paymentMethods, setPaymentMethods] = useState<Record<number, string>>({});
+
+  const [editingRent, setEditingRent] = useState<Rent | null>(null);
+  const [editStart, setEditStart] = useState('');
+  const [editEnd, setEditEnd] = useState('');
+  const [editPrice, setEditPrice] = useState('');
+  const [editComment, setEditComment] = useState('');
+
+  const toInputDate = (dateString: string) => {
+    const d = new Date(dateString);
+    const offset = d.getTimezoneOffset() * 60000;
+    return new Date(d.getTime() - offset).toISOString().split('T')[0];
+  };
 
   const fetchRents = async () => {
     try {
@@ -129,6 +142,41 @@ export default function RentsPage() {
     }
   };
 
+  const handleEdit = (rent: Rent) => {
+    setEditingRent(rent);
+    setEditStart(toInputDate(rent.startDate));
+    setEditEnd(toInputDate(rent.endDate));
+    setEditPrice(String(rent.totalPrice));
+    setEditComment(rent.comment || '');
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingRent) return;
+
+    try {
+      const res = await fetch(`/api/admin/rents/${editingRent.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          startDate: editStart,
+          endDate: editEnd,
+          totalPrice: Number(editPrice),
+          comment: editComment,
+        }),
+      });
+
+      if (res.ok) {
+        setEditingRent(null);
+        fetchRents();
+      } else {
+        const data = await res.json();
+        console.error('Ошибка сохранения аренды:', data.error);
+      }
+    } catch (err) {
+      console.error('Ошибка связи при сохранении аренды:', err);
+    }
+  };
+
   const handlePayment = async (id: number, method: string) => {
     try {
       const res = await fetch(`/api/admin/rents/${id}`, {
@@ -186,13 +234,13 @@ export default function RentsPage() {
   if (isLoading) {
     rentRows.push(
       <tr key="loading" className="border-b border-slate-800">
-        <td colSpan={8} className="p-4 text-center text-slate-400">Загрузка данных...</td>
+        <td colSpan={9} className="p-4 text-center text-slate-400">Загрузка данных...</td>
       </tr>
     );
   } else if (rents.length === 0) {
     rentRows.push(
       <tr key="empty" className="border-b border-slate-800">
-        <td colSpan={8} className="p-4 text-center text-slate-400">Аренды не найдены</td>
+        <td colSpan={9} className="p-4 text-center text-slate-400">Аренды не найдены</td>
       </tr>
     );
   } else {
@@ -217,6 +265,12 @@ export default function RentsPage() {
             {overdue && <span className="ml-2 text-xs text-rose-400">(Просрочена)</span>}
           </td>
           <td className="p-4 text-right space-x-1">
+            <button
+              onClick={() => handleEdit(rent)}
+              className="px-2 py-1 bg-slate-700 hover:bg-slate-600 text-white rounded text-xs transition-colors"
+            >
+              Ред.
+            </button>
             <select
               value={rent.status}
               onChange={(e) => handleStatusChange(rent.id, e.target.value)}
@@ -340,6 +394,79 @@ export default function RentsPage() {
             </tbody>
           </table>
         </div>
+
+        {/* Модал редактирования аренды */}
+        {editingRent && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+            <div className="w-full max-w-md rounded-xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
+              <h2 className="mb-4 text-lg font-semibold text-slate-100">
+                Редактирование аренды #{editingRent.id}
+              </h2>
+              <p className="mb-4 text-sm text-slate-400">
+                {editingRent.user.name} · {editingRent.user.phone}
+                <br />
+                {editingRent.bike.name}{editingRent.bike.externalId ? ` (ID: ${editingRent.bike.externalId})` : ''}
+              </p>
+
+              <div className="mb-4 grid grid-cols-2 gap-4">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-400">Начало</label>
+                  <input
+                    type="date"
+                    value={editStart}
+                    onChange={(e) => setEditStart(e.target.value)}
+                    className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-400">Окончание</label>
+                  <input
+                    type="date"
+                    value={editEnd}
+                    onChange={(e) => setEditEnd(e.target.value)}
+                    className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+              </div>
+
+              <div className="mb-4">
+                <label className="mb-1 block text-xs font-medium text-slate-400">Стоимость, ₽</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={editPrice}
+                  onChange={(e) => setEditPrice(e.target.value)}
+                  className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+
+              <div className="mb-4">
+                <label className="mb-1 block text-xs font-medium text-slate-400">Комментарий</label>
+                <textarea
+                  value={editComment}
+                  onChange={(e) => setEditComment(e.target.value)}
+                  rows={3}
+                  className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => setEditingRent(null)}
+                  className="rounded-lg bg-slate-800 px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
+                >
+                  Отмена
+                </button>
+                <button
+                  onClick={handleSaveEdit}
+                  className="rounded-lg bg-cyan-600 px-4 py-2 text-sm text-white hover:bg-cyan-500 transition-colors"
+                >
+                  Сохранить
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Статистика */}
         <div className="mt-6 grid grid-cols-4 gap-4">

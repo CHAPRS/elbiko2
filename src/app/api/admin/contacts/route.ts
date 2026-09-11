@@ -8,6 +8,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const q = searchParams.get('q')?.trim();
     const status = searchParams.get('status')?.trim();
+    const phone = searchParams.get('phone')?.trim();
 
     const where: any = {};
 
@@ -15,7 +16,9 @@ export async function GET(request: Request) {
       where.status = status;
     }
 
-    if (q) {
+    if (phone) {
+      where.phone = phone;
+    } else if (q) {
       const filters = [
         { firstName: { contains: q } },
         { lastName: { contains: q } },

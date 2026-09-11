@@ -9,7 +9,16 @@ export async function PATCH(
   try {
     const id = Number(params.id);
     const body = await request.json();
-    const { status, endDate, extendDays, paymentStatus, paymentMethod } = body;
+    const {
+      status,
+      startDate,
+      endDate,
+      totalPrice,
+      comment,
+      extendDays,
+      paymentStatus,
+      paymentMethod,
+    } = body;
 
     const rent = await prisma.rent.findUnique({
       where: { id },
@@ -91,9 +100,26 @@ export async function PATCH(
         }
       }
 
-      // Обновление даты окончания
+      // Ручная корректировка срока, стоимости и комментария
+      if (startDate) {
+        updateData.startDate = new Date(startDate);
+      }
       if (endDate) {
         updateData.endDate = new Date(endDate);
+      }
+      if (totalPrice !== undefined && totalPrice !== null && totalPrice !== '') {
+        updateData.totalPrice = Number(totalPrice);
+      }
+      if (comment !== undefined) {
+        updateData.comment = comment.trim() || null;
+      }
+
+      // Синхронизируем сумму ожидаемого платежа, если аренда ещё не оплачена
+      if (updateData.totalPrice && rent.payment && rent.payment.status === 'PENDING') {
+        await tx.payment.update({
+          where: { id: rent.payment.id },
+          data: { amount: Number(updateData.totalPrice) },
+        });
       }
 
       const updated = await tx.rent.update({
@@ -111,6 +137,7 @@ export async function PATCH(
             select: {
               id: true,
               name: true,
+              externalId: true,
               status: true,
             },
           },

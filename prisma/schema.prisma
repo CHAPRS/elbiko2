@@ -127,6 +127,7 @@ model Rent {
   totalPrice       Decimal   @db.Decimal(10, 2)
   isActive         Boolean   @default(true)
   status           String    @default("ACTIVE") // Статусы: "ACTIVE", "RETURNED", "COMPLETED", "CANCELLED", "OVERDUE"
+  comment          String?   @db.Text // Комментарий менеджера
 
   // Отношения
   user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)

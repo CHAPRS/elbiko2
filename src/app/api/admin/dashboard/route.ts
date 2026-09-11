@@ -9,6 +9,12 @@ function startOfDay(date: Date): Date {
   return d;
 }
 
+function endOfDay(date: Date): Date {
+  const d = new Date(date);
+  d.setHours(23, 59, 59, 999);
+  return d;
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -212,13 +218,17 @@ export async function GET(request: Request) {
         return end.getTime() === day.getTime();
       });
 
-      const occupied = activeRents.filter((r) => {
-        const start = new Date(r.startDate).getTime();
-        const end = new Date(r.endDate).getTime();
-        return start <= day.getTime() && end > day.getTime();
-      }).length;
+      const occupiedBikeIds = new Set<number>();
+      activeRents.forEach((r) => {
+        const start = startOfDay(new Date(r.startDate)).getTime();
+        const end = endOfDay(new Date(r.endDate)).getTime();
+        if (start <= day.getTime() && end > day.getTime()) {
+          occupiedBikeIds.add(r.bikeId);
+        }
+      });
+      const occupied = occupiedBikeIds.size;
 
-      const freeCount = availableForRent - occupied;
+      const freeCount = Math.max(0, rentableFleet - occupied);
 
       timeline.push({
         date: day.toISOString().split('T')[0],

@@ -26,11 +26,18 @@ export async function createRent({ userId, bikeId, days, startDate, endDate, tot
 
     const start = startDate ? new Date(startDate) : new Date();
     const finalEndDate = endDate ? new Date(endDate) : new Date(start);
+    let rentDays = days && days > 0 ? days : 1;
+
     if (!endDate && days && days > 0) {
       finalEndDate.setDate(finalEndDate.getDate() + days);
+    } else if (endDate && (!days || days <= 0)) {
+      const diffMs = finalEndDate.getTime() - start.getTime();
+      rentDays = Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+    } else if (!endDate && (!days || days <= 0)) {
+      finalEndDate.setDate(finalEndDate.getDate() + 1);
     }
 
-    const totalPrice = explicitTotalPrice ?? Number(bike.pricePerDay) * (days || 1);
+    const totalPrice = explicitTotalPrice ?? Number(bike.pricePerDay) * rentDays;
 
     await tx.bike.update({
       where: { id: bike.id },

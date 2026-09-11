@@ -49,6 +49,7 @@ export async function POST(
       bikeId: targetBikeId,
       startDate,
       endDate,
+      days: lead.rentDays && lead.rentDays > 0 ? Number(lead.rentDays) : undefined,
       totalPrice: lead.totalPrice !== null && lead.totalPrice !== undefined ? Number(lead.totalPrice) : undefined,
     });
 

@@ -11,6 +11,7 @@ export async function PATCH(
     const body = await request.json();
     const {
       status,
+      bikeId,
       startDate,
       endDate,
       totalPrice,
@@ -112,6 +113,23 @@ export async function PATCH(
       }
       if (comment !== undefined) {
         updateData.comment = comment.trim() || null;
+      }
+
+      // Замена велосипеда во время аренды
+      const newBikeId = bikeId ? Number(bikeId) : null;
+      if (newBikeId && newBikeId !== rent.bikeId) {
+        const newBike = await tx.bike.findUnique({ where: { id: newBikeId } });
+        if (!newBike) {
+          throw new Error('Новый велосипед не найден');
+        }
+        if (newBike.status !== 'FREE') {
+          throw new Error('Новый велосипед недоступен для замены');
+        }
+
+        await tx.bike.update({ where: { id: rent.bikeId }, data: { status: 'FREE' } });
+        await tx.bike.update({ where: { id: newBikeId }, data: { status: 'RENTED' } });
+
+        updateData.bikeId = newBikeId;
       }
 
       // Синхронизируем сумму ожидаемого платежа, если аренда ещё не оплачена

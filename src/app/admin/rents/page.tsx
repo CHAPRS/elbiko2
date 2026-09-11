@@ -31,6 +31,13 @@ interface Rent {
   };
 }
 
+interface Bike {
+  id: number;
+  name: string;
+  externalId?: string | null;
+  status: string;
+}
+
 export default function RentsPage() {
   const [rents, setRents] = useState<Rent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -43,6 +50,9 @@ export default function RentsPage() {
   const [editEnd, setEditEnd] = useState('');
   const [editPrice, setEditPrice] = useState('');
   const [editComment, setEditComment] = useState('');
+  const [editBikeId, setEditBikeId] = useState('');
+
+  const [bikes, setBikes] = useState<Bike[]>([]);
 
   const toInputDate = (dateString: string) => {
     const d = new Date(dateString);
@@ -71,6 +81,13 @@ export default function RentsPage() {
   useEffect(() => {
     fetchRents();
   }, [filter]);
+
+  useEffect(() => {
+    fetch('/api/admin/bikes')
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => setBikes(Array.isArray(data) ? data : []))
+      .catch((err) => console.error('Ошибка загрузки автопарка:', err));
+  }, []);
 
   const handleStatusChange = async (id: number, newStatus: string) => {
     try {
@@ -148,6 +165,7 @@ export default function RentsPage() {
     setEditEnd(toInputDate(rent.endDate));
     setEditPrice(String(rent.totalPrice));
     setEditComment(rent.comment || '');
+    setEditBikeId(String(rent.bike.id));
   };
 
   const handleSaveEdit = async () => {
@@ -158,6 +176,7 @@ export default function RentsPage() {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          bikeId: editBikeId ? Number(editBikeId) : undefined,
           startDate: editStart,
           endDate: editEnd,
           totalPrice: Number(editPrice),
@@ -407,6 +426,23 @@ export default function RentsPage() {
                 <br />
                 {editingRent.bike.name}{editingRent.bike.externalId ? ` (ID: ${editingRent.bike.externalId})` : ''}
               </p>
+
+              <div className="mb-4">
+                <label className="mb-1 block text-xs font-medium text-slate-400">Велосипед</label>
+                <select
+                  value={editBikeId}
+                  onChange={(e) => setEditBikeId(e.target.value)}
+                  className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+                >
+                  {bikes
+                    .filter((bike) => bike.status === 'FREE' || bike.id === editingRent.bike.id)
+                    .map((bike) => (
+                      <option key={bike.id} value={bike.id}>
+                        {bike.name}{bike.externalId ? ` (ID: ${bike.externalId})` : ''} — {bike.status === 'FREE' ? 'Свободен' : 'Выдан'}
+                      </option>
+                    ))}
+                </select>
+              </div>
 
               <div className="mb-4 grid grid-cols-2 gap-4">
                 <div>

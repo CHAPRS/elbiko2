@@ -29,6 +29,7 @@ interface Stats {
 interface Bike {
   id: number;
   name: string;
+  externalId?: string | null;
   status: string;
   pricePerDay: number;
 }
@@ -39,7 +40,7 @@ interface Lead {
   phone: string;
   bikeName?: string | null;
   createdAt: string;
-  bike?: { id: number; name: string } | null;
+  bike?: { id: number; name: string; externalId?: string | null } | null;
 }
 
 interface RentUser {
@@ -54,6 +55,7 @@ interface RentUser {
 interface RentBike {
   id: number;
   name: string;
+  externalId?: string | null;
   status: string;
 }
 
@@ -457,7 +459,9 @@ export default function DispatchPage() {
                         <p className="font-medium text-slate-100">{lead.name}</p>
                         <p className="text-sm text-slate-400">{lead.phone}</p>
                         <p className="text-xs text-slate-500 mt-1">
-                          {lead.bike?.name || lead.bikeName || 'Байк не выбран'} · {formatDateTime(lead.createdAt)}
+                          {lead.bike
+                            ? `${lead.bike.name}${lead.bike.externalId ? ` (ID: ${lead.bike.externalId})` : ''}`
+                            : (lead.bikeName || 'Байк не выбран')} · {formatDateTime(lead.createdAt)}
                         </p>
                       </div>
                       <div className="flex gap-2 shrink-0">
@@ -514,7 +518,7 @@ export default function DispatchPage() {
                           <p className="font-medium text-slate-100">{rent.user.name}</p>
                           <p className="text-sm text-slate-400">{rent.user.phone}</p>
                           <p className="text-xs text-slate-500 mt-1">
-                            {rent.bike.name} · до {formatDate(rent.endDate)}
+                            {rent.bike.name}{rent.bike.externalId ? ` (ID: ${rent.bike.externalId})` : ''} · до {formatDate(rent.endDate)}
                             {overdue && (
                               <span className="ml-2 text-rose-400 font-medium">(просрочена)</span>
                             )}
@@ -562,7 +566,7 @@ export default function DispatchPage() {
                       <div>
                         <p className="font-medium text-slate-100">{rent.user.name}</p>
                         <p className="text-sm text-slate-400">{rent.user.phone}</p>
-                        <p className="text-xs text-slate-500 mt-1">{rent.bike.name} · {formatDate(rent.endDate)}</p>
+                        <p className="text-xs text-slate-500 mt-1">{rent.bike.name}{rent.bike.externalId ? ` (ID: ${rent.bike.externalId})` : ''} · {formatDate(rent.endDate)}</p>
                       </div>
                       <ContactLinks user={rent.user} />
                     </div>
@@ -589,7 +593,7 @@ export default function DispatchPage() {
                       <div>
                         <p className="font-medium text-slate-100">{rent.user.name}</p>
                         <p className="text-sm text-slate-400">{rent.user.phone}</p>
-                        <p className="text-xs text-slate-500 mt-1">{rent.bike.name} · {formatDate(rent.endDate)}</p>
+                        <p className="text-xs text-slate-500 mt-1">{rent.bike.name}{rent.bike.externalId ? ` (ID: ${rent.bike.externalId})` : ''} · {formatDate(rent.endDate)}</p>
                       </div>
                       <ContactLinks user={rent.user} />
                     </div>
@@ -627,7 +631,7 @@ export default function DispatchPage() {
                         <ul className="space-y-1 text-xs text-slate-400">
                           {day.returning.slice(0, 3).map((rent) => (
                             <li key={rent.id} className="truncate">
-                              {rent.bike.name} · {rent.user.name}
+                              {rent.bike.name}{rent.bike.externalId ? ` (ID: ${rent.bike.externalId})` : ''} · {rent.user.name}
                             </li>
                           ))}
                           {day.returning.length > 3 && (
@@ -760,7 +764,7 @@ export default function DispatchPage() {
                     key={bike.id}
                     className="border border-slate-800 rounded-lg p-3 bg-slate-950/50 text-sm"
                   >
-                    <p className="font-medium text-slate-100">{bike.name}</p>
+                    <p className="font-medium text-slate-100">{bike.name}{bike.externalId ? ` (ID: ${bike.externalId})` : ''}</p>
                     <p className="text-slate-400">{Number(bike.pricePerDay)} ₽/сут</p>
                   </li>
                 ))}
@@ -781,7 +785,7 @@ export default function DispatchPage() {
                     key={bike.id}
                     className="border border-slate-800 rounded-lg p-3 bg-slate-950/50 text-sm"
                   >
-                    <p className="font-medium text-slate-100">{bike.name}</p>
+                    <p className="font-medium text-slate-100">{bike.name}{bike.externalId ? ` (ID: ${bike.externalId})` : ''}</p>
                     <p className="text-slate-400">{Number(bike.pricePerDay)} ₽/сут</p>
                   </li>
                 ))}

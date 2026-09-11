@@ -42,6 +42,7 @@ export const SHOW_REPAIR_SECTION = false;
 export interface Bike {
   id: number;
   name: string;
+  externalId?: string | null;
   status: 'FREE' | 'RENTED' | 'MAINTENANCE' | 'BLOCKED';
   speed: string;
   range: string;
@@ -226,7 +227,9 @@ export function getAdminBikesTableUI(
     rows.push(
       React.createElement('tr', { key: bike.id, className: 'border-b border-slate-800 hover:bg-slate-900/50 transition-colors' },
         React.createElement('td', { className: 'p-4 font-mono text-slate-500 text-sm' }, `#${bike.id}`),
-        React.createElement('td', { className: 'p-4 font-medium text-slate-200' }, bike.name),
+        React.createElement('td', { className: 'p-4 font-medium text-slate-200' }, 
+          `${bike.name}${bike.externalId ? ` (ID: ${bike.externalId})` : ''}`
+        ),
         React.createElement('td', { className: 'p-4 text-slate-400 text-sm' }, `${bike.motor} / ${bike.speed}`),
         React.createElement('td', { className: 'p-4 text-slate-400 text-sm' }, bike.range),
         React.createElement('td', { className: 'p-4 text-slate-400 text-sm' }, bike.isWaterproof ? 'Да' : 'Нет'),

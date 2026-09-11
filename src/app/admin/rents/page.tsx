@@ -18,6 +18,7 @@ interface Rent {
   bike: {
     id: number;
     name: string;
+    externalId?: string | null;
     status: string;
   };
   payment?: {
@@ -203,7 +204,9 @@ export default function RentsPage() {
           <td className="p-4 font-medium text-white">{rent.id}</td>
           <td className="p-4 text-white">{rent.user.name}</td>
           <td className="p-4 text-slate-300">{rent.user.phone}</td>
-          <td className="p-4 text-slate-300">{rent.bike.name}</td>
+          <td className="p-4 text-slate-300">
+            {rent.bike.name}{rent.bike.externalId ? ` (ID: ${rent.bike.externalId})` : ''}
+          </td>
           <td className="p-4 text-slate-300">{formatDate(rent.startDate)}</td>
           <td className="p-4 text-slate-300">{formatDate(rent.endDate)}</td>
           <td className="p-4 text-emerald-400 font-medium">{rent.totalPrice.toLocaleString()} ₽</td>

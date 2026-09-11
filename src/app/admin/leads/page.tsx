@@ -24,6 +24,7 @@ interface Lead {
   bike?: {
     id: number;
     name: string;
+    externalId?: string | null;
     status: string;
   } | null;
 }
@@ -31,6 +32,7 @@ interface Lead {
 interface Bike {
   id: number;
   name: string;
+  externalId?: string | null;
   status: string;
   pricePerDay: number;
 }
@@ -222,7 +224,11 @@ export default function LeadsPage() {
           <td className="p-4 font-medium text-white">{lead.id}</td>
           <td className="p-4 text-white">{lead.name}</td>
           <td className="p-4 text-slate-300">{lead.phone}</td>
-          <td className="p-4 text-slate-300">{lead.bike?.name || lead.bikeName || '-'}</td>
+          <td className="p-4 text-slate-300">
+            {lead.bike
+              ? `${lead.bike.name}${lead.bike.externalId ? ` (ID: ${lead.bike.externalId})` : ''}`
+              : (lead.bikeName || '-')}
+          </td>
           <td className="p-4 text-slate-400 text-xs whitespace-nowrap">
             {new Date(lead.createdAt).toLocaleString('ru-RU')}
           </td>
@@ -410,7 +416,7 @@ export default function LeadsPage() {
                             .filter((bike) => bike.status === 'FREE' || bike.id === selectedLead.bikeId)
                             .map((bike) => (
                               <option key={bike.id} value={bike.id}>
-                                {bike.name}
+                                {bike.name}{bike.externalId ? ` (ID: ${bike.externalId})` : ''}
                               </option>
                             ))}
                         </select>

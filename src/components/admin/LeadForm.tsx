@@ -5,6 +5,7 @@ import React, { useEffect, useState } from 'react';
 interface BikeOption {
   id: number;
   name: string;
+  externalId?: string | null;
   pricePerDay: number;
 }
 
@@ -151,11 +152,14 @@ export function LeadForm({ bikes, onSuccess }: LeadFormProps) {
             className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
           >
             {bikes.length === 0 && <option value="">Нет свободных байков</option>}
-            {bikes.map((bike) => (
-              <option key={bike.id} value={bike.id}>
-                {bike.name} — {Number(bike.pricePerDay)} ₽/сут
-              </option>
-            ))}
+            {bikes.map((bike) => {
+              const externalLabel = bike.externalId ? ` / ID: ${bike.externalId}` : '';
+              return (
+                <option key={bike.id} value={bike.id}>
+                  {bike.name}{externalLabel} — {Number(bike.pricePerDay)} ₽/сут
+                </option>
+              );
+            })}
           </select>
         </div>
 

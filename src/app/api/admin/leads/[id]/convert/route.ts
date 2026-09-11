@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { createRent } from '@/lib/rent';
+import { upsertContactByPhone } from '@/lib/contact';
 
 // POST - Превращение заявки в аренду: создаёт курьера (если новый), аренду и закрывает заявку
 export async function POST(
@@ -10,7 +11,6 @@ export async function POST(
   try {
     const leadId = Number(params.id);
     const body = await request.json().catch(() => ({}));
-    const days = Number(body.days) > 0 ? Number(body.days) : 1;
     const bikeId = body.bikeId ? Number(body.bikeId) : null;
 
     const lead = await prisma.lead.findUnique({ where: { id: leadId } });
@@ -41,7 +41,24 @@ export async function POST(
       create: { phone: lead.phone, name: lead.name },
     });
 
-    const rent = await createRent({ userId: user.id, bikeId: targetBikeId, days });
+    const startDate = body.startDate ? new Date(body.startDate) : (lead.startDate ? new Date(lead.startDate) : undefined);
+    const endDate = body.endDate ? new Date(body.endDate) : (lead.endDate ? new Date(lead.endDate) : undefined);
+
+    const rent = await createRent({
+      userId: user.id,
+      bikeId: targetBikeId,
+      startDate,
+      endDate,
+      days: lead.rentDays && lead.rentDays > 0 ? Number(lead.rentDays) : undefined,
+      totalPrice: lead.totalPrice !== null && lead.totalPrice !== undefined ? Number(lead.totalPrice) : undefined,
+    });
+
+    await upsertContactByPhone({
+      fullName: lead.name,
+      phone: lead.phone,
+      status: 'CUSTOMER',
+      source: 'ADMIN',
+    });
 
     const updatedLead = await prisma.lead.update({
       where: { id: leadId },

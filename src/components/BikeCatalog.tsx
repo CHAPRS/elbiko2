@@ -1,5 +1,6 @@
 'use client';
 import React, { useEffect, useState } from 'react';
+import Image from 'next/image';
 import { useRentStore } from '@/store/useRentStore';
 import { Bike } from '@/types';
 
@@ -45,12 +46,18 @@ export function BikeCatalog() {
         <div className="grid gap-6 mt-12 sm:grid-cols-2">
           {bikes.map((bike) => (
             <div key={bike.id} className="flex flex-col bg-slate-900/60 rounded-3xl overflow-hidden border border-slate-800/80 backdrop-blur-md shadow-xl hover:border-slate-700/60 transition-all duration-300">
-              <div className="h-48 bg-slate-950/50 flex items-center justify-center text-slate-500 font-medium border-b border-slate-800/50 overflow-hidden">
+              <div className="h-48 bg-slate-950/50 relative flex items-center justify-center text-slate-500 font-medium border-b border-slate-800/50 overflow-hidden">
                 {bike.imageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={bike.imageUrl} alt={bike.name} className="w-full h-full object-cover" />
+                  <Image
+                    src={bike.imageUrl}
+                    alt={bike.name}
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 640px) 100vw, 50vw"
+                    unoptimized={bike.imageUrl.startsWith('http')}
+                  />
                 ) : (
-                  <span>📸 {bike.name}</span>
+                  <span className="z-10">📸 {bike.name}</span>
                 )}
               </div>
               <div className="p-6 flex flex-col flex-grow">
@@ -62,7 +69,7 @@ export function BikeCatalog() {
                 </div>
                 <div className="mt-6 pt-4 border-t border-slate-800 flex justify-between items-center flex-wrap gap-2">
                   <div><span className="text-xs text-slate-400">Тариф:</span><div className="text-lg font-bold text-yellow-400">от {bike.pricePerDay} ₽/день</div></div>
-                  <button onClick={() => handleSelect(bike)} className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700/50 text-white font-medium rounded-xl text-sm transition-colors">Выбрать</button>
+                  <button onClick={() => handleSelect(bike)} className="px-5 py-2.5 min-h-11 bg-slate-800 hover:bg-slate-700 border border-slate-700/50 text-white font-medium rounded-xl text-sm transition-colors">Выбрать</button>
                 </div>
               </div>
             </div>

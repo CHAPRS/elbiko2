@@ -1,14 +1,18 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
+import { upsertContactByPhone } from './contact';
 
 interface CreateRentInput {
   userId: number;
   bikeId: number;
-  days: number;
+  days?: number;
+  startDate?: Date;
+  endDate?: Date;
+  totalPrice?: number;
 }
 
-// Оформление аренды: бронь байка, запись аренды и ожидающий платеж создаются атомарно
-export async function createRent({ userId, bikeId, days }: CreateRentInput) {
+// Оформление аренды: бронь байка, запись аренды и ожидающий платёж создаются атомарно
+export async function createRent({ userId, bikeId, days, startDate, endDate, totalPrice: explicitTotalPrice }: CreateRentInput) {
   return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const bike = await tx.bike.findUnique({ where: { id: bikeId } });
 
@@ -20,9 +24,20 @@ export async function createRent({ userId, bikeId, days }: CreateRentInput) {
       throw new Error('Велосипед недоступен: он уже в аренде или на сервисе');
     }
 
-    const totalPrice = Number(bike.pricePerDay) * days;
-    const endDate = new Date();
-    endDate.setDate(endDate.getDate() + days);
+    const start = startDate ? new Date(startDate) : new Date();
+    const finalEndDate = endDate ? new Date(endDate) : new Date(start);
+    let rentDays = days && days > 0 ? days : 1;
+
+    if (!endDate && days && days > 0) {
+      finalEndDate.setDate(finalEndDate.getDate() + days);
+    } else if (endDate && (!days || days <= 0)) {
+      const diffMs = finalEndDate.getTime() - start.getTime();
+      rentDays = Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+    } else if (!endDate && (!days || days <= 0)) {
+      finalEndDate.setDate(finalEndDate.getDate() + 1);
+    }
+
+    const totalPrice = explicitTotalPrice ?? Number(bike.pricePerDay) * rentDays;
 
     await tx.bike.update({
       where: { id: bike.id },
@@ -33,7 +48,8 @@ export async function createRent({ userId, bikeId, days }: CreateRentInput) {
       data: {
         userId,
         bikeId: bike.id,
-        endDate,
+        startDate: start,
+        endDate: finalEndDate,
         totalPrice,
         isActive: true,
         status: 'ACTIVE',
@@ -50,4 +66,17 @@ export async function createRent({ userId, bikeId, days }: CreateRentInput) {
 
     return rent;
   });
+}
+
+export async function createRentAndMarkContact(input: CreateRentInput & { fullName: string; phone: string }) {
+  const rent = await createRent(input);
+
+  await upsertContactByPhone({
+    fullName: input.fullName,
+    phone: input.phone,
+    status: 'CUSTOMER',
+    source: 'RENT',
+  });
+
+  return rent;
 }

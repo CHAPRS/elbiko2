@@ -1,64 +1,32 @@
-export default {
+import { defineType, defineField } from 'sanity'
+
+export const bikeSchema = defineType({
   name: 'bike',
-  title: 'Велосипед',
+  title: 'Электровелосипеды',
   type: 'document',
   fields: [
-    {
-      name: 'name',
-      title: 'Название модели',
+    defineField({
+      name: 'modelName',
+      title: 'Модель',
       type: 'string',
-      validation: (Rule: any) => Rule.required(),
-    },
-    {
-      name: 'description',
-      title: 'Описание',
-      type: 'text',
-    },
-    {
-      name: 'price',
-      title: 'Цена аренды в день',
-      type: 'number',
-      validation: (Rule: any) => Rule.required(),
-    },
-    {
-      name: 'range',
-      title: 'Запас хода',
+      validation: (Rule) => Rule.required(),
+    }),
+    defineField({
+      name: 'serialNumber',
+      title: 'Серийный номер / ID рамы',
       type: 'string',
-    },
-    {
-      name: 'speed',
-      title: 'Максимальная скорость',
+    }),
+    defineField({
+      name: 'condition',
+      title: 'Техническое состояние',
       type: 'string',
-    },
-    {
-      name: 'power',
-      title: 'Мощность',
-      type: 'string',
-    },
-    {
-      name: 'image',
-      title: 'Изображение',
-      type: 'image',
       options: {
-        hotspot: true,
+        list: [
+          { title: 'Отличное (Новый)', value: 'excellent' },
+          { title: 'Хорошее (После ТО)', value: 'good' },
+          { title: 'Требуется ремонт', value: 'needs_repair' },
+        ],
       },
-    },
-    {
-      name: 'available',
-      title: 'Доступен для аренды',
-      type: 'boolean',
-      defaultValue: true,
-    },
-    {
-      name: 'order',
-      title: 'Порядок отображения',
-      type: 'number',
-    },
+    }),
   ],
-  preview: {
-    select: {
-      title: 'name',
-      media: 'image',
-    },
-  },
-}
+})

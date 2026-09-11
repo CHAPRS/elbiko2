@@ -10,6 +10,14 @@ export default {
       validation: (Rule) => Rule.required(),
     },
     {
+      name: 'avatar',
+      title: 'Аватар автора',
+      type: 'image',
+      options: {
+        hotspot: true,
+      },
+    },
+    {
       name: 'platform',
       title: 'Платформа',
       type: 'string',

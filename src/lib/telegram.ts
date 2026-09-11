@@ -8,11 +8,48 @@ function getAdminChatId(): string | undefined {
   return process.env.TELEGRAM_ADMIN_CHAT_ID || process.env.TELEGRAM_CHAT_ID;
 }
 
+function getRelayUrl(): string | undefined {
+  return process.env.TELEGRAM_RELAY_URL;
+}
+
+function getRelaySecret(): string | undefined {
+  return process.env.TELEGRAM_RELAY_SECRET;
+}
+
 export async function sendTelegramMessage(
   chatId: string | number,
   message: string,
   parseMode: 'HTML' | 'Markdown' = 'HTML'
 ): Promise<boolean> {
+  const relayUrl = getRelayUrl();
+
+  if (relayUrl) {
+    try {
+      const response = await fetch(relayUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Relay-Secret': getRelaySecret() || '',
+        },
+        body: JSON.stringify({
+          text: message,
+          parse_mode: parseMode,
+        }),
+      });
+
+      if (!response.ok) {
+        const details = await response.text();
+        console.error('Telegram relay responded with an error:', details);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Failed to send Telegram notification via relay:', error);
+      return false;
+    }
+  }
+
   const botToken = getBotToken();
 
   if (!botToken) {

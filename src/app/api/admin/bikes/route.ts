@@ -91,15 +91,18 @@ export async function PATCH(request: Request) {
     if (fields.externalId !== undefined) updateData.externalId = fields.externalId?.trim() || null;
 
     if (fields.status !== undefined) {
-      // Нельзя вручную освободить или отправить на сервис байк с активной арендой
+      // Нельзя вручную освободить или отправить на сервис байк с активной/просроченной арендой
       if (fields.status !== 'RENTED') {
         const activeRents = await prisma.rent.count({
-          where: { bikeId: id, isActive: true },
+          where: {
+            bikeId: id,
+            status: { in: ['ACTIVE', 'OVERDUE'] },
+          },
         });
 
         if (activeRents > 0) {
           return NextResponse.json(
-            { error: 'У велосипеда есть активная аренда — сначала завершите её' },
+            { error: 'У велосипеда есть активная или просроченная аренда — сначала завершите её' },
             { status: 409 }
           );
         }

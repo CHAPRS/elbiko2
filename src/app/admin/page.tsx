@@ -52,6 +52,7 @@ export default function AdminPage() {
   const [form, setForm] = useState<BikeForm>(EMPTY_FORM);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isReconciling, setIsReconciling] = useState(false);
 
   const fetchBikes = useCallback(async () => {
     try {
@@ -80,6 +81,32 @@ export default function AdminPage() {
   const resetForm = () => {
     setForm(EMPTY_FORM);
     setEditingId(null);
+  };
+
+  const handleReconcile = async () => {
+    setIsReconciling(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/admin/bikes/reconcile', { method: 'POST' });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || 'Не удалось сверить статусы');
+        return;
+      }
+
+      await fetchBikes();
+      setError(
+        data.fixed > 0
+          ? `Сверка выполнена: обновлено ${data.fixed} байков. В аренде ${data.rentedBikeCount}.`
+          : `Сверка выполнена: расхождений не найдено. В аренде ${data.rentedBikeCount}.`
+      );
+    } catch (err) {
+      console.error('Ошибка сверки статусов:', err);
+      setError('Нет связи с сервером');
+    } finally {
+      setIsReconciling(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -254,9 +281,18 @@ export default function AdminPage() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-6 font-sans">
       <div className="max-w-6xl mx-auto">
-        <h1 className="text-3xl font-bold bg-gradient-to-r from-amber-500 to-orange-500 bg-clip-text text-transparent mb-8">
-          Панель администратора Elbiko
-        </h1>
+        <div className="flex items-start justify-between mb-8">
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-amber-500 to-orange-500 bg-clip-text text-transparent">
+            Панель администратора Elbiko
+          </h1>
+          <button
+            onClick={handleReconcile}
+            disabled={isReconciling}
+            className="px-3 py-2 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 text-white rounded-lg text-sm transition-colors"
+          >
+            {isReconciling ? 'Сверка...' : 'Сверить статусы'}
+          </button>
+        </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4">

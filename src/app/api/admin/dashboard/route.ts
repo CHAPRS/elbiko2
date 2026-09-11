@@ -136,15 +136,20 @@ export async function GET(request: Request) {
     ]);
 
     const activeRents = activeAndOverdueRents;
-    const rentedBikes = bikes.filter((b) => b.status === 'RENTED').length;
-    const freeBikes = bikes.filter((b) => b.status === 'FREE');
+    const rentedBikeIds = new Set(activeAndOverdueRents.map((r) => r.bikeId));
+    const rentedBikes = rentedBikeIds.size;
+    const freeBikes = bikes.filter(
+      (b) => !rentedBikeIds.has(b.id) && b.status !== 'MAINTENANCE' && b.status !== 'BLOCKED'
+    );
     const maintenanceBikes = bikes.filter((b) => b.status === 'MAINTENANCE');
+    const blockedBikes = bikes.filter((b) => b.status === 'BLOCKED');
     const overdueRents = activeRents.filter((r) => new Date(r.endDate) < now);
 
-    const availableForRent = bikes.length - maintenanceBikes.length;
+    const availableForRent = freeBikes.length;
+    const rentableFleet = bikes.length - maintenanceBikes.length - blockedBikes.length;
     const occupancyRate =
-      availableForRent > 0
-        ? Math.round((rentedBikes / availableForRent) * 1000) / 10
+      rentableFleet > 0
+        ? Math.round((rentedBikes / rentableFleet) * 1000) / 10
         : 0;
 
     const expectedRevenue = activeRents.reduce(

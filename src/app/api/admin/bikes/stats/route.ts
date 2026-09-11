@@ -62,7 +62,7 @@ export async function GET(request: Request) {
     const rangeEnd = to;
     const totalDays = periodDays(rangeStart, rangeEnd);
 
-    const [bikes, rents, payments] = await Promise.all([
+    const [bikes, rents] = await Promise.all([
       prisma.bike.findMany({
         select: { id: true, name: true, externalId: true },
         orderBy: { id: 'desc' },
@@ -82,29 +82,13 @@ export async function GET(request: Request) {
           startDate: true,
           endDate: true,
           actualReturnDate: true,
+          totalPrice: true,
           status: true,
-        },
-      }),
-      prisma.rentTransaction.findMany({
-        where: {
-          type: 'PAYMENT',
-          createdAt: { gte: rangeStart, lte: rangeEnd },
-        },
-        include: {
-          rent: {
-            select: { bikeId: true },
-          },
         },
       }),
     ]);
 
     const revenueByBike: Record<number, number> = {};
-    payments.forEach((tx) => {
-      const bikeId = tx.rent?.bikeId;
-      if (!bikeId) return;
-      revenueByBike[bikeId] = (revenueByBike[bikeId] || 0) + Number(tx.amount);
-    });
-
     const rentDaysByBike: Record<number, number> = {};
     const rentCountByBike: Record<number, number> = {};
 
@@ -119,6 +103,16 @@ export async function GET(request: Request) {
       const safeEnd = end < new Date(rent.startDate) ? new Date(rent.endDate) : end;
       const days = overlapDays(new Date(rent.startDate), safeEnd, rangeStart, rangeEnd);
       if (days > 0) {
+        const fullDays = overlapDays(
+          new Date(rent.startDate),
+          safeEnd,
+          new Date(rent.startDate),
+          safeEnd
+        );
+        const total = Number(rent.totalPrice) || 0;
+        const revenue = fullDays > 0 ? Math.round(total * (days / fullDays)) : total;
+
+        revenueByBike[rent.bikeId] = (revenueByBike[rent.bikeId] || 0) + revenue;
         rentDaysByBike[rent.bikeId] = (rentDaysByBike[rent.bikeId] || 0) + days;
         rentCountByBike[rent.bikeId] = (rentCountByBike[rent.bikeId] || 0) + 1;
       }

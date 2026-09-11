@@ -7,6 +7,7 @@ import React from 'react';
 const NAV = [
   { href: '/admin/dispatch', label: 'Диспетчерская' },
   { href: '/admin', label: 'Автопарк' },
+  { href: '/admin/bike-stats', label: 'Статистика' },
   { href: '/admin/leads', label: 'Заявки' },
   { href: '/admin/rents', label: 'Аренды' },
   { href: '/admin/contacts', label: 'Контакты' },

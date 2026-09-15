@@ -78,11 +78,21 @@ export async function POST(request: Request) {
     });
 
     if (!sent) {
-      await prisma.user.delete({ where: { id: user.id } });
-      return NextResponse.json(
-        { error: 'Не удалось отправить письмо. Проверьте настройки SMTP.' },
-        { status: 500 }
-      );
+      // Если SMTP не работает, не удаляем курьера — сохраняем ссылку в логах,
+      // чтобы админ мог передать её курьеру или проверить флоу.
+      console.log('');
+      console.log('========== VERIFICATION LINK (email not sent) ==========');
+      console.log('Email:', user.email);
+      console.log('Phone:', user.phone);
+      console.log('Link:', verificationLink);
+      console.log('=======================================================');
+      console.log('');
+
+      return NextResponse.json({
+        success: true,
+        message:
+          'Регистрация выполнена, но письмо не отправлено. Ссылка записана в логи. Обратитесь к администратору.',
+      });
     }
 
     return NextResponse.json({ success: true, message: 'Регистрация выполнена. Проверьте почту.' });

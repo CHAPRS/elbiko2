@@ -11,12 +11,14 @@ export default function RegisterPage() {
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setSuccess(false);
+    setSuccessMessage('');
 
     if (password !== confirm) {
       setError('Пароли не совпадают');
@@ -48,6 +50,7 @@ export default function RegisterPage() {
         setError(data.error || 'Ошибка регистрации');
       } else {
         setSuccess(true);
+        setSuccessMessage(data.message || 'Регистрация выполнена. Проверьте почту.');
       }
     } catch {
       setError('Не удалось связаться с сервером');
@@ -75,7 +78,7 @@ export default function RegisterPage() {
         {success ? (
           <div className="text-center space-y-4">
             <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm rounded-xl">
-              Регистрация выполнена. Проверьте почту и перейдите по ссылке для подтверждения email.
+              {successMessage}
             </div>
             <p className="text-sm text-gray-500">
               После подтверждения можно{' '}

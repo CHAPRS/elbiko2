@@ -1,6 +1,5 @@
 'use client';
-import React from 'react';
-import Image from 'next/image';
+import React, { useState } from 'react';
 import { normalizeImageUrl, resolveDefaultBikeImage } from '@/lib/image';
 
 interface BikeCardProps {
@@ -9,6 +8,7 @@ interface BikeCardProps {
 }
 
 export default function BikeCard({ bike, onBook }: BikeCardProps) {
+  const [imgError, setImgError] = useState(false);
   const bikeName = String(bike.name || 'Электровелосипед');
   const bikeMotor = String(bike.motor || '—');
   const bikeSpeed = String(bike.speed || '—');
@@ -21,14 +21,14 @@ export default function BikeCard({ bike, onBook }: BikeCardProps) {
   return (
     <div className="h-full min-w-0 bg-slate-900/40 backdrop-blur-md border border-slate-800/80 rounded-3xl p-5 flex flex-col hover:border-emerald-500/40 transition-all duration-300 group hover:shadow-xl hover:shadow-emerald-500/5">
       <div className="w-full aspect-[4/3] bg-slate-950/80 rounded-2xl flex items-center justify-center relative overflow-hidden mb-4 border border-slate-800/50 group-hover:border-slate-700/50 transition-colors">
-        {bikeImage ? (
-          <Image
+        {!imgError ? (
+          <img
             src={encodeURI(bikeImage)}
             alt={bikeName}
-            fill
-            className="object-contain p-2 group-hover:scale-105 transition-transform duration-500"
-            sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
-            unoptimized
+            className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-500"
+            loading="lazy"
+            decoding="async"
+            onError={() => setImgError(true)}
           />
         ) : (
           <span className="text-7xl group-hover:scale-105 group-hover:-rotate-3 transition-transform duration-500 select-none">🚲</span>

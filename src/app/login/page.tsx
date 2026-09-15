@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
@@ -161,6 +162,25 @@ export default function LoginPage() {
             {loading ? 'Загрузка...' : 'Войти в систему'}
           </button>
         </form>
+
+        <div className="mt-6 text-center space-y-2">
+          {!isAdmin && (
+            <>
+              <p className="text-sm text-gray-500">
+                Нет пароля?{' '}
+                <Link href="/setup-password" className="text-amber-400 hover:underline">
+                  Установить пароль
+                </Link>
+              </p>
+              <p className="text-sm text-gray-500">
+                Забыли пароль?{' '}
+                <Link href="/setup-password" className="text-amber-400 hover:underline">
+                  Восстановить через Telegram
+                </Link>
+              </p>
+            </>
+          )}
+        </div>
 
       </div>
     </div>

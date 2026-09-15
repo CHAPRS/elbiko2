@@ -58,7 +58,10 @@ export async function POST(request: Request) {
       },
     });
 
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || new URL(request.url).origin;
+    const baseUrl =
+      process.env.NODE_ENV === 'development'
+        ? new URL(request.url).origin
+        : (process.env.NEXT_PUBLIC_SITE_URL || new URL(request.url).origin);
     const verificationLink = `${baseUrl}/verify-email?token=${token}`;
 
     const sent = await sendMail({

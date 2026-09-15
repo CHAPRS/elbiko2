@@ -17,3 +17,15 @@ export const tariffFallbackImages = [
   '/images/tariff-earning.webp',
   '/images/tariff-partner.webp',
 ];
+
+const defaultBikeImages: Record<string, string> = {
+  u6: '/images/wenbox-u6.webp',
+  u1: '/images/wenbox-u1-pro.webp',
+};
+
+export function resolveDefaultBikeImage(name?: string | null): string {
+  const n = (name || '').toLowerCase();
+  if (n.includes('u6') || n.includes('wenbox u6')) return defaultBikeImages.u6;
+  if (n.includes('u1') || n.includes('wenbox')) return defaultBikeImages.u1;
+  return defaultBikeImages.u1;
+}

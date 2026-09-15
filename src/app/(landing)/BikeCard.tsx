@@ -1,7 +1,7 @@
 'use client';
 import React from 'react';
 import Image from 'next/image';
-import { normalizeImageUrl } from '@/lib/image';
+import { normalizeImageUrl, resolveDefaultBikeImage } from '@/lib/image';
 
 interface BikeCardProps {
   bike: any;
@@ -16,7 +16,7 @@ export default function BikeCard({ bike, onBook }: BikeCardProps) {
   const bikeWaterproof = bike.isWaterproof ? 'Да' : 'Нет';
   const bikeBattery = String(bike.battery || '—');
   const bikePrice = String(bike.pricePerDay || '0');
-  const bikeImage = normalizeImageUrl(bike.imageUrl);
+  const bikeImage = normalizeImageUrl(bike.imageUrl) ?? resolveDefaultBikeImage(bike.name);
 
   return (
     <div className="h-full min-w-0 bg-slate-900/40 backdrop-blur-md border border-slate-800/80 rounded-3xl p-5 flex flex-col hover:border-emerald-500/40 transition-all duration-300 group hover:shadow-xl hover:shadow-emerald-500/5">

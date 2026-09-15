@@ -15,24 +15,40 @@ export async function POST(request: Request) {
       );
     }
 
-    const { phone, password } = await request.json();
+    const { login, password } = await request.json();
 
-    // 1. Ищем курьера в MySQL
-    const courier = await prisma.user.findUnique({
-      where: { phone },
+    if (!login || typeof login !== 'string' || !password || typeof password !== 'string') {
+      return NextResponse.json(
+        { error: 'Укажите email/телефон и пароль' },
+        { status: 400 }
+      );
+    }
+
+    const trimmed = login.trim();
+    const isEmail = trimmed.includes('@');
+
+    const courier = await prisma.user.findFirst({
+      where: isEmail
+        ? { email: trimmed.toLowerCase() }
+        : { phone: trimmed },
     });
 
     if (!courier) {
       return NextResponse.json({ error: 'Курьер не найден' }, { status: 404 });
     }
 
-    // 2. Проверяем пароль
+    if (isEmail && !courier.emailVerified) {
+      return NextResponse.json(
+        { error: 'Email не подтверждён. Проверьте почту.' },
+        { status: 403 }
+      );
+    }
+
     const isValid = await verifyPassword(password, courier.password);
     if (!isValid) {
       return NextResponse.json({ error: 'Неверный пароль' }, { status: 401 });
     }
 
-    // 3. Миграция: если пароль хранился в открытом виде — пересохраняем хеш
     if (courier.password && !courier.password.includes(':')) {
       const hashed = await hashPassword(password);
       await prisma.user.update({
@@ -41,10 +57,8 @@ export async function POST(request: Request) {
       });
     }
 
-    // 4. Формируем сессию (сохраняем ID курьера)
     const response = NextResponse.json({ success: true, name: courier.name });
 
-    // Устанавливаем защищенную httpOnly куку на 30 дней
     response.cookies.set('courier_session', courier.id.toString(), {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',

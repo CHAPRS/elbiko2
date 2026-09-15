@@ -44,6 +44,11 @@ model User {
   passwordResetCode        String?
   passwordResetCodeExpiresAt DateTime?
 
+  email                      String?  @unique
+  emailVerified              Boolean  @default(false)
+  emailVerificationToken     String?  @unique
+  emailVerificationTokenExpiresAt DateTime?
+
   rentalSessions RentalSession[]
   rents          Rent[]
 }

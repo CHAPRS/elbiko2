@@ -41,11 +41,18 @@ export async function POST(request: Request) {
       },
     });
 
-    await sendTelegramMessage(
+    const sent = await sendTelegramMessage(
       user.telegramChatId,
       `Код для установки пароля Elbiko: <b>${code}</b>\n\nЕсли это не вы — проигнорируйте сообщение.`,
       'HTML'
     );
+
+    if (!sent) {
+      return NextResponse.json(
+        { error: 'Не удалось отправить Telegram. Убедитесь, что курьер запустил бота.' },
+        { status: 502 }
+      );
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

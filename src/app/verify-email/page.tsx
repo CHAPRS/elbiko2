@@ -1,12 +1,10 @@
 'use client';
 
-export const dynamic = 'force-dynamic';
-
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
-export default function VerifyEmailPage() {
+function VerifyEmailContent() {
   const searchParams = useSearchParams();
   const token = searchParams?.get('token') ?? '';
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
@@ -73,5 +71,19 @@ export default function VerifyEmailPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function VerifyEmailPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#0F0F12] text-white flex flex-col justify-center items-center px-4">
+          <div className="text-gray-400 text-sm">Загрузка...</div>
+        </div>
+      }
+    >
+      <VerifyEmailContent />
+    </Suspense>
   );
 }

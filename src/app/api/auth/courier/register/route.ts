@@ -58,7 +58,7 @@ export async function POST(request: Request) {
       },
     });
 
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || `http://${request.headers.get('host')}` || 'http://localhost:3000';
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || new URL(request.url).origin;
     const verificationLink = `${baseUrl}/verify-email?token=${token}`;
 
     const sent = await sendMail({

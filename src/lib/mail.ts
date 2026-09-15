@@ -15,6 +15,18 @@ interface SendMailOptions {
 }
 
 export async function sendMail(options: SendMailOptions): Promise<boolean> {
+  if (process.env.NODE_ENV === 'development' || process.env.DEBUG_EMAIL === 'true') {
+    console.log('');
+    console.log('========== DEV EMAIL (не отправляется) ==========');
+    console.log('Кому:', options.to);
+    console.log('Тема:', options.subject);
+    console.log('Содержимое:');
+    console.log(options.html);
+    console.log('=================================================');
+    console.log('');
+    return true;
+  }
+
   if (!smtpUser || !smtpPass || !smtpFrom) {
     console.error('SMTP-настройки не заданы в .env');
     return false;

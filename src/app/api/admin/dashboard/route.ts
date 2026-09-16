@@ -154,8 +154,8 @@ export async function GET(request: Request) {
     const availableForRent = freeBikes.length;
     const rentableFleet = bikes.length - maintenanceBikes.length - blockedBikes.length;
     const occupancyRate =
-      rentableFleet > 0
-        ? Math.round((rentedBikes / rentableFleet) * 1000) / 10
+      bikes.length > 0
+        ? Math.round((rentedBikes / bikes.length) * 1000) / 10
         : 0;
 
     const expectedRevenue = activeRents.reduce(

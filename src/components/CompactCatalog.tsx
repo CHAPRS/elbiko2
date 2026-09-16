@@ -8,10 +8,20 @@ interface CompactCatalogProps {
 }
 
 export default function CompactCatalog({ bikes, onBook }: CompactCatalogProps) {
-  // Скрываем City Courier 48V, оставляем две основные модели
-  const displayBikes = bikes
-    .filter((bike) => !bike.name?.toLowerCase().includes('city courier 48v'))
-    .slice(0, 2);
+  // Скрываем City Courier 48V и убираем дубли по названию,
+  // чтобы всегда было две разные модели (например, U1 Pro и U6 PRO).
+  const uniqueBikes = new Map<string, any>();
+  const sortedBikes = [...bikes].sort((a, b) => (a.id ?? 0) - (b.id ?? 0));
+
+  for (const bike of sortedBikes) {
+    if (bike.name?.toLowerCase().includes('city courier 48v')) continue;
+    const key = bike.name?.toLowerCase().trim() ?? String(bike.id);
+    if (!uniqueBikes.has(key)) {
+      uniqueBikes.set(key, bike);
+    }
+  }
+
+  const displayBikes = Array.from(uniqueBikes.values()).slice(0, 2);
 
   const bikesRenderList = displayBikes.map((bike) => (
     <BikeCard key={bike.id} bike={bike} onBook={onBook} />

@@ -36,13 +36,21 @@ interface Bike {
   name: string;
   externalId?: string | null;
   status: string;
+  pricePerDay: number;
 }
 
 export default function RentsPage() {
   const [rents, setRents] = useState<Rent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<string>('ALL');
-  const [extendDays, setExtendDays] = useState<Record<number, number>>({});
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [extendRentId, setExtendRentId] = useState<number | null>(null);
+  const [extendDays, setExtendDays] = useState<string>('1');
+  const [extendBikeId, setExtendBikeId] = useState<string>('');
+  const [extendPrice, setExtendPrice] = useState<string>('');
+  const [extendPriceManuallySet, setExtendPriceManuallySet] = useState(false);
+  const [isExtending, setIsExtending] = useState(false);
   const [paymentMethods, setPaymentMethods] = useState<Record<number, string>>({});
 
   const [editingRent, setEditingRent] = useState<Rent | null>(null);
@@ -89,6 +97,17 @@ export default function RentsPage() {
       .catch((err) => console.error('Ошибка загрузки автопарка:', err));
   }, []);
 
+  // Авторасчёт стоимости продления при смене дней или байка
+  useEffect(() => {
+    if (extendRentId !== null && !extendPriceManuallySet) {
+      const selectedBike = bikes.find((b) => String(b.id) === extendBikeId);
+      const days = Number(extendDays) || 0;
+      if (selectedBike) {
+        setExtendPrice(String(Number(selectedBike.pricePerDay) * days));
+      }
+    }
+  }, [extendDays, extendBikeId, extendPriceManuallySet, extendRentId, bikes]);
+
   const handleStatusChange = async (id: number, newStatus: string) => {
     try {
       const res = await fetch(`/api/admin/rents/${id}`, {
@@ -105,23 +124,68 @@ export default function RentsPage() {
     }
   };
 
-  const handleExtend = async (id: number) => {
-    const days = extendDays[id];
-    if (!days || days <= 0) return;
+  const openExtend = (rent: Rent) => {
+    const selectedBike = bikes.find((b) => b.id === rent.bike.id);
+    const days = 1;
+    setExtendRentId(rent.id);
+    setExtendDays(String(days));
+    setExtendBikeId(String(rent.bike.id));
+    setExtendPriceManuallySet(false);
+    setError(null);
+    setNotice(null);
+
+    if (selectedBike) {
+      setExtendPrice(String(Number(selectedBike.pricePerDay) * days));
+    }
+  };
+
+  const closeExtendModal = () => {
+    setExtendRentId(null);
+    setExtendDays('1');
+    setExtendBikeId('');
+    setExtendPrice('');
+    setExtendPriceManuallySet(false);
+    setError(null);
+  };
+
+  const handleExtend = async () => {
+    if (!extendRentId) return;
+    const days = Number(extendDays);
+    if (!days || days <= 0) {
+      setError('Укажите корректное количество дней продления');
+      return;
+    }
+    const priceVal = extendPrice.trim() === '' ? undefined : Number(extendPrice);
+
+    setIsExtending(true);
+    setError(null);
+    setNotice(null);
 
     try {
-      const res = await fetch(`/api/admin/rents/${id}`, {
+      const res = await fetch(`/api/admin/rents/${extendRentId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ extendDays: days }),
+        body: JSON.stringify({
+          extendDays: days,
+          extendBikeId: extendBikeId ? Number(extendBikeId) : undefined,
+          extendPrice: priceVal,
+        }),
       });
+      const data = await res.json();
 
-      if (res.ok) {
-        setExtendDays({ ...extendDays, [id]: 0 });
-        fetchRents();
+      if (!res.ok) {
+        setError(data.error || 'Не удалось продлить аренду');
+        return;
       }
+
+      setNotice(`Аренда №${extendRentId} продлена на ${days} дн.`);
+      closeExtendModal();
+      fetchRents();
     } catch (err) {
-      console.error('Ошибка при продлении аренды:', err);
+      console.error('Ошибка продления аренды:', err);
+      setError('Нет связи с сервером');
+    } finally {
+      setIsExtending(false);
     }
   };
 
@@ -301,6 +365,14 @@ export default function RentsPage() {
               <option value="CANCELLED">Отменена</option>
               <option value="OVERDUE">Просрочена</option>
             </select>
+            {['ACTIVE', 'OVERDUE'].includes(rent.status) && (
+              <button
+                onClick={() => openExtend(rent)}
+                className="px-2 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-xs transition-colors"
+              >
+                Продлить
+              </button>
+            )}
             {rent.payment && rent.payment.status !== 'COMPLETED' && (
               <>
                 <select
@@ -341,12 +413,25 @@ export default function RentsPage() {
     });
   }
 
+  const extendRent = extendRentId ? rents.find((r) => r.id === extendRentId) : undefined;
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-6 font-sans">
       <div className="max-w-7xl mx-auto">
         <h1 className="text-3xl font-bold bg-gradient-to-r from-cyan-500 to-blue-500 bg-clip-text text-transparent mb-8">
           Управление арендами
         </h1>
+
+        {error && (
+          <div className="mb-6 px-4 py-3 rounded-lg bg-rose-950/60 border border-rose-800 text-rose-300 text-sm">
+            {error}
+          </div>
+        )}
+        {notice && (
+          <div className="mb-6 px-4 py-3 rounded-lg bg-emerald-950/60 border border-emerald-800 text-emerald-300 text-sm">
+            {notice}
+          </div>
+        )}
 
         {/* Фильтры */}
         <div className="mb-6 flex gap-4">
@@ -498,6 +583,97 @@ export default function RentsPage() {
                   className="rounded-lg bg-cyan-600 px-4 py-2 text-sm text-white hover:bg-cyan-500 transition-colors"
                 >
                   Сохранить
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Модал продления аренды */}
+        {extendRentId && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+            <div className="w-full max-w-md rounded-xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
+              <h2 className="mb-4 text-lg font-semibold text-slate-100">
+                Продление аренды #{extendRentId}
+              </h2>
+              {extendRent && (
+                <p className="mb-4 text-sm text-slate-400">
+                  {extendRent.user.name} · {extendRent.user.phone}
+                  <br />
+                  {extendRent.bike.name}
+                  {extendRent.bike.externalId ? ` (ID: ${extendRent.bike.externalId})` : ''}
+                </p>
+              )}
+
+              <div className="mb-4">
+                <label className="mb-1 block text-xs font-medium text-slate-400">
+                  Количество дней
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={extendDays}
+                  onChange={(e) => setExtendDays(e.target.value)}
+                  className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+
+              <div className="mb-4">
+                <label className="mb-1 block text-xs font-medium text-slate-400">
+                  Заменить на байк
+                </label>
+                <select
+                  value={extendBikeId}
+                  onChange={(e) => setExtendBikeId(e.target.value)}
+                  className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+                >
+                  {bikes
+                    .filter(
+                      (bike) =>
+                        bike.status === 'FREE' || (extendRent && bike.id === extendRent.bike.id)
+                    )
+                    .map((bike) => (
+                      <option key={bike.id} value={bike.id}>
+                        {bike.name}
+                        {bike.externalId ? ` (ID: ${bike.externalId})` : ''} —{' '}
+                        {bike.status === 'FREE' ? 'Свободен' : 'Выдан'}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <div className="mb-4">
+                <label className="mb-1 block text-xs font-medium text-slate-400">
+                  Стоимость продления, ₽
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={extendPrice}
+                  onChange={(e) => {
+                    setExtendPrice(e.target.value);
+                    setExtendPriceManuallySet(true);
+                  }}
+                  className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+                />
+                <p className="mt-1 text-xs text-slate-500">
+                  Если оставить пустым — рассчитается автоматически по тарифу байка.
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={closeExtendModal}
+                  className="rounded-lg bg-slate-800 px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
+                >
+                  Отмена
+                </button>
+                <button
+                  onClick={handleExtend}
+                  disabled={isExtending}
+                  className="rounded-lg bg-cyan-600 px-4 py-2 text-sm text-white hover:bg-cyan-500 disabled:opacity-50 transition-colors"
+                >
+                  {isExtending ? 'Сохранение...' : 'Продлить'}
                 </button>
               </div>
             </div>

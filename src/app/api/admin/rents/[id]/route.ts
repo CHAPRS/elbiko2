@@ -17,6 +17,8 @@ export async function PATCH(
       totalPrice,
       comment,
       extendDays,
+      extendBikeId,
+      extendPrice,
       paymentStatus,
       paymentMethod,
     } = body;
@@ -66,39 +68,68 @@ export async function PATCH(
         }
       }
 
-      // Продление аренды
+      // Продление аренды с возможностью замены байка и ручной стоимости
       if (extendDays && extendDays > 0) {
+        if (['COMPLETED', 'CANCELLED', 'RETURNED'].includes(rent.status)) {
+          throw new Error('Нельзя продлить завершённую или отменённую аренду');
+        }
+
+        const extensionDays = Number(extendDays);
+        const targetBikeId = extendBikeId ? Number(extendBikeId) : rent.bikeId;
+        const targetBike =
+          targetBikeId === rent.bikeId
+            ? rent.bike
+            : await tx.bike.findUnique({ where: { id: targetBikeId } });
+
+        if (!targetBike) {
+          throw new Error('Выбранный велосипед не найден');
+        }
+
+        if (targetBikeId !== rent.bikeId && targetBike.status !== 'FREE') {
+          throw new Error('Новый велосипед недоступен для замены');
+        }
+
+        let additionalPrice = 0;
+        if (extendPrice !== undefined && extendPrice !== null && extendPrice !== '') {
+          additionalPrice = Number(extendPrice);
+        } else {
+          additionalPrice = Number(targetBike.pricePerDay) * extensionDays;
+        }
+
+        if (additionalPrice < 0) {
+          throw new Error('Стоимость продления не может быть отрицательной');
+        }
+
         const currentEndDate = new Date(rent.endDate);
         const newEndDate = new Date(currentEndDate);
-        newEndDate.setDate(newEndDate.getDate() + extendDays);
-
-        const bike = await tx.bike.findUnique({
-          where: { id: rent.bikeId },
-        });
-
-        const additionalPrice = bike ? Number(bike.pricePerDay) * extendDays : 0;
-        const newTotal = Number(rent.totalPrice) + additionalPrice;
+        newEndDate.setDate(newEndDate.getDate() + extensionDays);
 
         updateData.endDate = newEndDate;
-        updateData.totalPrice = newTotal;
+        updateData.totalPrice = Number(rent.totalPrice) + additionalPrice;
 
-        if (additionalPrice > 0) {
-          await tx.rentTransaction.create({
-            data: {
-              rentId: id,
-              type: 'EXTEND',
-              amount: additionalPrice,
-              comment: `Продление на ${extendDays} дн.`,
-            },
-          });
-
-          if (rent.payment && rent.payment.status === 'PENDING') {
-            await tx.payment.update({
-              where: { id: rent.payment.id },
-              data: { amount: newTotal },
-            });
-          }
+        // Замена велосипеда при продлении
+        if (targetBikeId !== rent.bikeId) {
+          await tx.bike.update({ where: { id: rent.bikeId }, data: { status: 'FREE' } });
+          await tx.bike.update({ where: { id: targetBikeId }, data: { status: 'RENTED' } });
+          updateData.bikeId = targetBikeId;
         }
+
+        // Если аренда была просрочена, а теперь endDate в будущем — возвращаем ACTIVE
+        if (rent.status === 'OVERDUE' && newEndDate > new Date()) {
+          updateData.status = 'ACTIVE';
+          updateData.isActive = true;
+        }
+
+        await tx.rentTransaction.create({
+          data: {
+            rentId: id,
+            type: 'EXTEND',
+            amount: additionalPrice,
+            comment: `Продление на ${extensionDays} дн.${
+              targetBikeId !== rent.bikeId ? ` (замена на ${targetBike.name})` : ''
+            }`,
+          },
+        });
       }
 
       // Ручная корректировка срока, стоимости и комментария

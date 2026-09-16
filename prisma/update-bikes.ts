@@ -27,32 +27,46 @@ const targetBikes = [
   },
 ];
 
+function normalizeName(name?: string | null): string {
+  return (name || '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 async function main() {
+  // Загружаем все байки один раз, чтобы искать по нормализованному названию
+  const allBikes = await prisma.bike.findMany();
+  const keepIds = new Set<number>();
+
   for (const bike of targetBikes) {
-    const existing = await prisma.bike.findFirst({
-      where: { name: bike.name },
-    });
+    const targetKey = normalizeName(bike.name);
+    const existing = allBikes.find((b) => normalizeName(b.name) === targetKey);
 
     if (existing) {
-      await prisma.bike.update({
+      const updated = await prisma.bike.update({
         where: { id: existing.id },
-        data: bike,
+        data: { ...bike, status: 'FREE' as const },
       });
-      console.log(`Обновлён: ${bike.name}`);
+      keepIds.add(updated.id);
+      console.log(`Обновлён: ${bike.name} (id=${updated.id})`);
     } else {
-      await prisma.bike.create({ data: bike });
-      console.log(`Создан: ${bike.name}`);
+      const created = await prisma.bike.create({
+        data: { ...bike, status: 'FREE' as const },
+      });
+      keepIds.add(created.id);
+      console.log(`Создан: ${bike.name} (id=${created.id})`);
     }
   }
 
-  // Остальные велосипеды (например, City Courier 48V) скрываем из каталога
-  const updated = await prisma.bike.updateMany({
-    where: { name: { notIn: targetBikes.map((b) => b.name) } },
+  // Все остальные байки (дубли, City Courier и пр.) скрываем из каталога
+  const hidden = await prisma.bike.updateMany({
+    where: { id: { notIn: Array.from(keepIds) } },
     data: { status: 'MAINTENANCE' },
   });
 
-  if (updated.count > 0) {
-    console.log(`Скрыто лишних моделей: ${updated.count}`);
+  if (hidden.count > 0) {
+    console.log(`Скрыто лишних моделей: ${hidden.count}`);
   }
 }
 

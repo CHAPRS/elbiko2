@@ -16,18 +16,29 @@ export async function upsertContactByPhone(input: {
   notes?: string | null;
 }) {
   const { firstName, lastName } = parseName(input.fullName);
+  const digits = input.phone.replace(/\D/g, '');
 
-  return prisma.contact.upsert({
-    where: { phone: input.phone },
-    update: {
-      firstName: firstName ?? undefined,
-      lastName: lastName ?? undefined,
-      status: input.status,
-      source: input.source,
-      notes: input.notes === undefined ? undefined : input.notes,
-      lastContactAt: new Date(),
-    },
-    create: {
+  const existing = (await prisma.$queryRaw`
+    SELECT * FROM Contact
+    WHERE REGEXP_REPLACE(phone, '[^0-9]', '') = ${digits}
+    LIMIT 1
+  `) as { id: number; status: string; source: string | null }[];
+
+  if (existing.length > 0) {
+    const contact = existing[0];
+    return prisma.contact.update({
+      where: { id: contact.id },
+      data: {
+        lastContactAt: new Date(),
+        status: input.status ?? contact.status,
+        source: input.source ?? contact.source,
+        notes: input.notes === undefined ? undefined : input.notes,
+      },
+    });
+  }
+
+  return prisma.contact.create({
+    data: {
       phone: input.phone,
       firstName,
       lastName,

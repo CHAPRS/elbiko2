@@ -21,13 +21,13 @@ function periodDays(from: Date, to: Date) {
 
 function overlapDays(start: Date, end: Date, from: Date, to: Date) {
   const s = startOfDay(start).getTime();
-  const e = endOfDay(end).getTime();
+  const e = startOfDay(end).getTime();
   const f = from.getTime();
   const t = to.getTime();
   const overlapStart = Math.max(s, f);
   const overlapEnd = Math.min(e, t);
   if (overlapEnd < overlapStart) return 0;
-  return Math.floor((overlapEnd - overlapStart) / (1000 * 60 * 60 * 24)) + 1;
+  return Math.max(1, Math.ceil((overlapEnd - overlapStart) / (1000 * 60 * 60 * 24)));
 }
 
 function getDefaultRange() {
@@ -93,10 +93,9 @@ export async function GET(request: Request) {
     const rentCountByBike: Record<number, number> = {};
 
     rents.forEach((rent) => {
-      const end = rent.actualReturnDate
+      const isFinished = rent.status === 'RETURNED' || rent.status === 'COMPLETED';
+      const end = isFinished && rent.actualReturnDate
         ? new Date(rent.actualReturnDate)
-        : rent.status === 'RETURNED'
-        ? new Date(rent.endDate)
         : new Date(rent.endDate);
 
       // Реальная дата окончания аренды не может быть раньше начала

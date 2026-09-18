@@ -23,9 +23,18 @@ function daysBetween(start: string, end: string): number {
   return Math.max(1, Math.floor(ms / (1000 * 60 * 60 * 24)) + 1);
 }
 
+interface Contact {
+  id: number;
+  firstName: string | null;
+  lastName: string | null;
+  phone: string;
+}
+
 export function LeadForm({ bikes, onSuccess }: LeadFormProps) {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [contactSearch, setContactSearch] = useState('');
+  const [contactResults, setContactResults] = useState<Contact[]>([]);
   const [bikeId, setBikeId] = useState('');
   const [startDate, setStartDate] = useState(toISODate(new Date()));
   const [endDate, setEndDate] = useState(toISODate(new Date()));
@@ -68,6 +77,26 @@ export function LeadForm({ bikes, onSuccess }: LeadFormProps) {
       })
       .catch(() => {});
   }, [phone, name]);
+
+  // Поиск контакта по имени или телефону
+  useEffect(() => {
+    const q = contactSearch.trim();
+    if (q.length < 3) {
+      setContactResults([]);
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      fetch(`/api/admin/contacts?q=${encodeURIComponent(q)}`)
+        .then((res) => (res.ok ? res.json() : []))
+        .then((contacts) => {
+          setContactResults(Array.isArray(contacts) ? contacts.slice(0, 8) : []);
+        })
+        .catch(() => setContactResults([]));
+    }, 300);
+
+    return () => clearTimeout(timeout);
+  }, [contactSearch]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -134,6 +163,37 @@ export function LeadForm({ bikes, onSuccess }: LeadFormProps) {
           {formError}
         </div>
       )}
+
+      <div className="relative">
+        <label className="block text-xs font-medium text-slate-400 mb-1">Найти контакт</label>
+        <input
+          type="text"
+          value={contactSearch}
+          onChange={(e) => setContactSearch(e.target.value)}
+          className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+          placeholder="Введите имя или телефон"
+        />
+        {contactResults.length > 0 && contactSearch.trim().length >= 3 && (
+          <ul className="absolute z-10 w-full bg-slate-900 border border-slate-800 rounded-lg mt-1 max-h-48 overflow-auto">
+            {contactResults.map((c) => (
+              <li
+                key={c.id}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  const fullName = [c.firstName, c.lastName].filter(Boolean).join(' ');
+                  setName(fullName);
+                  setPhone(c.phone);
+                  setContactSearch('');
+                  setContactResults([]);
+                }}
+                className="px-3 py-2 hover:bg-slate-800 cursor-pointer text-sm text-slate-200"
+              >
+                {[c.firstName, c.lastName].filter(Boolean).join(' ')} — {c.phone}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>

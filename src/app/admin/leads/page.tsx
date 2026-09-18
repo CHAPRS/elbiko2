@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import Link from 'next/link';
+import { LeadForm } from '@/components/admin/LeadForm';
 import { LEAD_STATUSES, LEAD_STATUS_LABELS, LeadStatus } from '@/lib/leadStatus';
 
 interface Lead {
@@ -16,10 +16,15 @@ interface Lead {
   processedAt?: string | null;
   rentId?: number | null;
   bikeId?: number | null;
+  rentDays?: number | null;
+  totalPrice?: number | null;
+  startDate?: string | null;
+  endDate?: string | null;
   createdAt: string;
   bike?: {
     id: number;
     name: string;
+    externalId?: string | null;
     status: string;
   } | null;
 }
@@ -27,7 +32,9 @@ interface Lead {
 interface Bike {
   id: number;
   name: string;
+  externalId?: string | null;
   status: string;
+  pricePerDay: number;
 }
 
 const STATUS_BADGE: Record<LeadStatus, string> = {
@@ -94,7 +101,7 @@ export default function LeadsPage() {
     setComment(lead.comment || '');
     setRejectReason(lead.rejectReason || '');
     setRentBikeId(lead.bikeId ? String(lead.bikeId) : '');
-    setRentDays('1');
+    setRentDays(lead.rentDays ? String(lead.rentDays) : '1');
     setNotice(null);
     setError(null);
   };
@@ -148,8 +155,9 @@ export default function LeadsPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          days: Number(rentDays) || 1,
           bikeId: rentBikeId ? Number(rentBikeId) : null,
+          startDate: selectedLead.startDate,
+          endDate: selectedLead.endDate,
         }),
       });
       const data = await res.json();
@@ -216,7 +224,11 @@ export default function LeadsPage() {
           <td className="p-4 font-medium text-white">{lead.id}</td>
           <td className="p-4 text-white">{lead.name}</td>
           <td className="p-4 text-slate-300">{lead.phone}</td>
-          <td className="p-4 text-slate-300">{lead.bike?.name || lead.bikeName || '-'}</td>
+          <td className="p-4 text-slate-300">
+            {lead.bike
+              ? `${lead.bike.name}${lead.bike.externalId ? ` (ID: ${lead.bike.externalId})` : ''}`
+              : (lead.bikeName || '-')}
+          </td>
           <td className="p-4 text-slate-400 text-xs whitespace-nowrap">
             {new Date(lead.createdAt).toLocaleString('ru-RU')}
           </td>
@@ -265,25 +277,9 @@ export default function LeadsPage() {
           Управление заявками
         </h1>
 
-        <div className="mb-8 flex gap-4 flex-wrap">
-          <Link
-            href="/admin"
-            className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg font-medium hover:bg-slate-700 transition-colors"
-          >
-            🚲 Велосипеды
-          </Link>
-          <Link
-            href="/admin/leads"
-            className="px-4 py-2 bg-emerald-500 text-slate-950 rounded-lg font-medium hover:bg-emerald-400 transition-colors"
-          >
-            📋 Заявки
-          </Link>
-          <Link
-            href="/admin/rents"
-            className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg font-medium hover:bg-slate-700 transition-colors"
-          >
-            📊 Аренды
-          </Link>
+        <div className="mb-8 bg-slate-900/50 border border-slate-800 rounded-xl p-6">
+          <h2 className="text-lg font-semibold text-slate-200 mb-4">Новая заявка</h2>
+          <LeadForm bikes={bikes.filter((b) => b.status === 'FREE')} onSuccess={fetchLeads} />
         </div>
 
         <div className="mb-6 flex gap-3 flex-wrap">
@@ -343,6 +339,13 @@ export default function LeadsPage() {
                   </p>
                   {selectedLead.message && (
                     <p className="text-sm text-slate-400 mt-2 whitespace-pre-wrap">{selectedLead.message}</p>
+                  )}
+                  {selectedLead.startDate && selectedLead.endDate && (
+                    <p className="text-sm text-slate-400 mt-2">
+                      Период: {new Date(selectedLead.startDate).toLocaleDateString('ru-RU')} — {new Date(selectedLead.endDate).toLocaleDateString('ru-RU')}
+                      {selectedLead.rentDays ? ` (${selectedLead.rentDays} дн.)` : ''}
+                      {selectedLead.totalPrice ? ` · ${Number(selectedLead.totalPrice).toLocaleString()} ₽` : ''}
+                    </p>
                   )}
                   {selectedLead.processedAt && (
                     <p className="text-xs text-slate-500 mt-2">
@@ -413,7 +416,7 @@ export default function LeadsPage() {
                             .filter((bike) => bike.status === 'FREE' || bike.id === selectedLead.bikeId)
                             .map((bike) => (
                               <option key={bike.id} value={bike.id}>
-                                {bike.name}
+                                {bike.name}{bike.externalId ? ` (ID: ${bike.externalId})` : ''}
                               </option>
                             ))}
                         </select>

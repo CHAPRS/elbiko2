@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { hashPassword } from '../src/lib/password';
 
 const prisma = new PrismaClient();
 
@@ -49,10 +50,12 @@ async function main() {
   ]);
   console.log(`✅ Создано велосипедов: ${bikes.length}`);
 
+  const hashedPassword = await hashPassword('courier-password-2026');
+
   const courier = await prisma.user.create({
     data: {
       phone: '+79991112233',
-      password: 'courier-password-2026',
+      password: hashedPassword,
       name: 'Иван Курьер',
       balance: 1500.0,
     },

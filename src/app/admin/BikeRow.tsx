@@ -15,7 +15,7 @@ export default function BikeRow({ bike, updatingId, onToggleStatus }: BikeRowPro
   return (
     <div className="p-4 bg-slate-950 border border-slate-800 rounded-2xl flex justify-between items-center text-sm">
       <div>
-        <div className="font-bold text-white">{bike.name}</div>
+        <div className="font-bold text-white">{bike.name}{bike.externalId ? ` (ID: ${bike.externalId})` : ''}</div>
         <div className="text-xs text-slate-400 mt-0.5">{infoText}</div>
       </div>
       <div className="flex items-center gap-4">

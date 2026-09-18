@@ -3,7 +3,9 @@ import React from 'react';
 
 export default function RentCard({ rent }: { rent: any }) {
   const phoneText = rent.user && rent.user.phone ? rent.user.phone : "Нет телефона";
-  const bikeNameText = rent.bike && rent.bike.name ? rent.bike.name : "Удален";
+  const bikeNameText = rent.bike && rent.bike.name
+    ? `${rent.bike.name}${rent.bike.externalId ? ` (ID: ${rent.bike.externalId})` : ''}`
+    : "Удален";
 
   return (
     <div className="p-4 bg-slate-950 border border-slate-800 rounded-2xl text-xs space-y-2">

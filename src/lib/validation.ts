@@ -27,7 +27,7 @@ export const updateBikeSchema = z.object({
   imageUrl: z.string().url().max(500).optional().nullable(),
 });
 
-export const leadStatus = z.enum(['NEW', 'IN_PROGRESS', 'CONVERTED', 'REJECTED']);
+export const leadStatus = z.enum(['NEW', 'IN_PROGRESS', 'CONFIRMED', 'REJECTED']);
 
 export const updateLeadSchema = z.object({
   status: leadStatus.optional(),

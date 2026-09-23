@@ -35,7 +35,8 @@ export async function PATCH(
       );
     }
 
-    const updatedRent = await prisma.$transaction(async (tx) => {
+    const updatedRent = await prisma.$transaction(
+      async (tx) => {
       let updateData: any = {};
 
       // Обновление статуса
@@ -231,7 +232,9 @@ export async function PATCH(
       }
 
       return updated;
-    });
+    },
+    { maxWait: 10000, timeout: 60000 }
+    );
 
     return NextResponse.json(updatedRent);
   } catch (error) {

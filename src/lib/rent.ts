@@ -13,7 +13,8 @@ interface CreateRentInput {
 
 // Оформление аренды: бронь байка, запись аренды и ожидающий платёж создаются атомарно
 export async function createRent({ userId, bikeId, days, startDate, endDate, totalPrice: explicitTotalPrice }: CreateRentInput) {
-  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+  return prisma.$transaction(
+    async (tx: Prisma.TransactionClient) => {
     const bike = await tx.bike.findUnique({ where: { id: bikeId } });
 
     if (!bike) {
@@ -65,7 +66,9 @@ export async function createRent({ userId, bikeId, days, startDate, endDate, tot
     });
 
     return rent;
-  });
+  },
+  { maxWait: 10000, timeout: 60000 }
+  );
 }
 
 export async function createRentAndMarkContact(input: CreateRentInput & { fullName: string; phone: string }) {

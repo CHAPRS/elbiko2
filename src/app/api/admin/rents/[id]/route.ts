@@ -35,7 +35,7 @@ export async function PATCH(
       );
     }
 
-    const updatedRent = await prisma.$transaction(
+    const updatedRentId = await prisma.$transaction(
       async (tx) => {
       let updateData: any = {};
 
@@ -164,43 +164,33 @@ export async function PATCH(
         updateData.bikeId = newBikeId;
       }
 
+      // Актуальная сумма платежа после возможного обновления
+      const updatedPaymentAmount =
+        updateData.totalPrice !== undefined && rent.payment && rent.payment.status === 'PENDING'
+          ? Number(updateData.totalPrice)
+          : rent.payment
+          ? Number(rent.payment.amount)
+          : null;
+
       // Синхронизируем сумму ожидаемого платежа, если аренда ещё не оплачена
       if (updateData.totalPrice && rent.payment && rent.payment.status === 'PENDING') {
         await tx.payment.update({
           where: { id: rent.payment.id },
-          data: { amount: Number(updateData.totalPrice) },
+          data: { amount: updatedPaymentAmount as number },
         });
       }
 
       const updated = await tx.rent.update({
         where: { id },
         data: updateData,
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              phone: true,
-            },
-          },
-          bike: {
-            select: {
-              id: true,
-              name: true,
-              externalId: true,
-              status: true,
-            },
-          },
-          payment: true,
-        },
       });
 
       // Обновление статуса платежа
-      if (paymentStatus && updated.payment) {
+      if (paymentStatus && rent.payment) {
         const paidAt = paymentStatus === 'COMPLETED' ? new Date() : null;
 
         await tx.payment.update({
-          where: { id: updated.payment.id },
+          where: { id: rent.payment.id },
           data: {
             status: paymentStatus,
             paymentMethod,
@@ -213,7 +203,7 @@ export async function PATCH(
             data: {
               rentId: id,
               type: 'PAYMENT',
-              amount: updated.payment.amount,
+              amount: updatedPaymentAmount as number,
               method: paymentMethod,
               comment: paymentMethod ? `Оплата: ${paymentMethod}` : null,
             },
@@ -223,7 +213,7 @@ export async function PATCH(
             data: {
               rentId: id,
               type: 'REFUND',
-              amount: updated.payment.amount,
+              amount: updatedPaymentAmount as number,
               method: paymentMethod,
               comment: paymentMethod ? `Возврат: ${paymentMethod}` : null,
             },
@@ -231,10 +221,32 @@ export async function PATCH(
         }
       }
 
-      return updated;
+      return updated.id;
     },
     { maxWait: 10000, timeout: 60000 }
     );
+
+    const updatedRent = await prisma.rent.findUnique({
+      where: { id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+          },
+        },
+        bike: {
+          select: {
+            id: true,
+            name: true,
+            externalId: true,
+            status: true,
+          },
+        },
+        payment: true,
+      },
+    });
 
     return NextResponse.json(updatedRent);
   } catch (error) {

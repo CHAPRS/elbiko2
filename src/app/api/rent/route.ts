@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { createRent } from '@/lib/rent';
+import { upsertContactByPhone } from '@/lib/contact';
+import { sendTelegramNotification } from '@/lib/telegram';
+import { escapeHtml } from '@/lib/html';
 
 export async function POST(request: Request) {
   try {
@@ -23,7 +26,43 @@ export async function POST(request: Request) {
       create: { phone: String(phone), name },
     });
 
-    const rent = await createRent({ userId: user.id, bikeId: Number(bikeId), days });
+    const startDate = body.startDate ? new Date(body.startDate) : undefined;
+    const endDate = body.endDate ? new Date(body.endDate) : undefined;
+
+    const rent = await createRent({
+      userId: user.id,
+      bikeId: Number(bikeId),
+      days,
+      startDate,
+      endDate,
+      totalPrice: body.totalPrice ? Number(body.totalPrice) : undefined,
+    });
+
+    await upsertContactByPhone({
+      fullName: name,
+      phone: String(phone),
+      status: 'CUSTOMER',
+      source: 'RENT',
+    });
+
+    const bike = await prisma.bike.findUnique({ where: { id: Number(bikeId) } });
+
+    const notificationText = [
+      '⚡ <b>Новая аренда</b>',
+      '────────────────────────',
+      `👤 Клиент: ${escapeHtml(user.name || 'Клиент с сайта')}`,
+      `📞 Телефон: ${escapeHtml(String(phone))}`,
+      `🚲 Велосипед: ${escapeHtml(bike?.name || 'не выбран')}`,
+      `📅 Дней: ${days}`,
+      `💰 Сумма: ${rent.totalPrice} ₽`,
+      `🆔 Аренда #${rent.id}`,
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    sendTelegramNotification(notificationText).catch((error) => {
+      console.error('Ошибка отправки Telegram при аренде:', error);
+    });
 
     return NextResponse.json({ success: true, rentId: rent.id, totalPrice: rent.totalPrice });
   } catch (error: any) {

@@ -1,73 +1,94 @@
 import { client } from './sanity'
 
 export async function getHero() {
-  return client.fetch(`
-    *[_type == "hero"][0]{
-      title,
-      subtitle,
-      badge,
-      stat1_label,
-      stat1_value,
-      stat2_label,
-      stat2_value,
-      stat3_label,
-      stat3_value,
-      cta_text,
-      cta_link,
-      secondary_cta_text,
-      secondary_cta_link
-    }
-  `)
+  const query = `*[_type == "hero"][0]{
+    backgroundImage,
+    title,
+    subtitle,
+    badge,
+    stat1_label,
+    stat1_value,
+    stat2_label,
+    stat2_value,
+    stat3_label,
+    stat3_value,
+    cta_text,
+    cta_link,
+    secondary_cta_text,
+    secondary_cta_link
+  }`
+  return await client.fetch(query)
 }
 
 export async function getTariffs() {
-  return client.fetch(`
-    *[_type == "tariff"] | order(order asc){
-      _id,
-      name,
-      subtitle,
-      price,
-      period,
-      features,
-      popular
-    }
-  `)
+  const query = `*[_type == "tariff"] | order(order asc){
+    name,
+    subtitle,
+    price,
+    period,
+    features,
+    popular,
+    order,
+    image
+  }`
+  return await client.fetch(query)
 }
 
 export async function getReviews() {
-  return client.fetch(`
-    *[_type == "review"] | order(order asc){
-      _id,
-      author,
-      platform,
-      duration,
-      rating,
-      text
-    }
-  `)
+  const query = `*[_type == "review"] | order(order asc){
+    author,
+    avatar,
+    platform,
+    duration,
+    rating,
+    text,
+    order
+  }`
+  return await client.fetch(query)
 }
 
 export async function getFAQ() {
-  return client.fetch(`
-    *[_type == "faq"] | order(order asc){
-      _id,
-      question,
-      answer
-    }
-  `)
+  const query = `*[_type == "faq"] | order(order asc){
+    question,
+    answer,
+    order
+  }`
+  return await client.fetch(query)
 }
 
 export async function getBikes() {
-  return client.fetch(`
-    *[_type == "bike" && available == true] | order(order asc){
-      _id,
-      name,
-      description,
-      price,
-      range,
-      speed,
-      power,
-      image
-    }
-  `)
+  const query = `*[_type == "bike" && available == true] | order(order asc){
+    name,
+    description,
+    price,
+    range,
+    speed,
+    power,
+    image,
+    available,
+    order
+  }`
+  return await client.fetch(query)
+}
+
+export async function getFeatures() {
+  const query = `*[_type == "feature"] | order(order asc){
+    icon,
+    image,
+    title,
+    description,
+    order
+  }`
+  return await client.fetch(query)
+}
+
+export async function getSteps() {
+  const query = `*[_type == "step"] | order(order asc){
+    number,
+    image,
+    title,
+    description,
+    order
+  }`
+  return await client.fetch(query)
 }

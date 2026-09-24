@@ -3,12 +3,13 @@ import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
-// Публичный каталог: отдаем только байки, которые можно забронировать
+// Публичный каталог: отдаём все велосипеды, чтобы карточки
+// отображались независимо от статуса (FREE, RENTED, MAINTENANCE и т.д.).
+// CompactCatalog сам отфильтрует дубли и скроет City Courier.
 export async function GET() {
   try {
     const bikes = await prisma.bike.findMany({
-      where: { status: { not: 'MAINTENANCE' } },
-      orderBy: { name: 'asc' },
+      orderBy: { id: 'asc' },
     });
 
     return NextResponse.json(bikes);

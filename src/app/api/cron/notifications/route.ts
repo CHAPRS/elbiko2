@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { sendTelegramMessage } from '@/lib/telegram';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     const activeRents = await prisma.rent.findMany({
@@ -29,7 +31,7 @@ export async function GET() {
       }
 
       const message =
-        `⚠️ <b>Внимание, шеринг ELBIKO!</b>\n\n` +
+        `⚠️ <b>Внимание, шеринг ЭльБайко!</b>\n\n` +
         `До автоматического списания средств за следующие сутки аренды велосипеда ` +
         `<b>${rent.bike.name}</b> осталось около 3 часов.\n\n` +
         `Если вы хотите завершить аренду, сдайте байк через личный кабинет до наступления расчетного часа.`;

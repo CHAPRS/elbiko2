@@ -43,12 +43,15 @@ export async function PATCH(
       if (status) {
         updateData.status = status;
 
+        const currentBike =
+          rent.bike ?? (rent.bikeId ? await tx.bike.findUnique({ where: { id: rent.bikeId } }) : null);
+
         if (status === 'RETURNED') {
           updateData.isActive = false;
           updateData.actualReturnDate = new Date();
-          if (rent.bike.status !== 'FREE') {
+          if (currentBike && currentBike.status !== 'FREE') {
             await tx.bike.update({
-              where: { id: rent.bikeId },
+              where: { id: currentBike.id },
               data: { status: 'FREE' },
             });
           }
@@ -56,9 +59,9 @@ export async function PATCH(
 
         if (status === 'COMPLETED' || status === 'CANCELLED') {
           updateData.isActive = false;
-          if (rent.bike.status !== 'FREE') {
+          if (currentBike && currentBike.status !== 'FREE') {
             await tx.bike.update({
-              where: { id: rent.bikeId },
+              where: { id: currentBike.id },
               data: { status: 'FREE' },
             });
           }
@@ -77,10 +80,7 @@ export async function PATCH(
 
         const extensionDays = Number(extendDays);
         const targetBikeId = extendBikeId ? Number(extendBikeId) : rent.bikeId;
-        const targetBike =
-          targetBikeId === rent.bikeId
-            ? rent.bike
-            : await tx.bike.findUnique({ where: { id: targetBikeId } });
+        const targetBike = await tx.bike.findUnique({ where: { id: targetBikeId } });
 
         if (!targetBike) {
           throw new Error('Выбранный велосипед не найден');
@@ -110,7 +110,7 @@ export async function PATCH(
 
         // Замена велосипеда при продлении
         if (targetBikeId !== rent.bikeId) {
-          await tx.bike.update({ where: { id: rent.bikeId }, data: { status: 'FREE' } });
+          await tx.bike.updateMany({ where: { id: rent.bikeId }, data: { status: 'FREE' } });
           await tx.bike.update({ where: { id: targetBikeId }, data: { status: 'RENTED' } });
           updateData.bikeId = targetBikeId;
         }
@@ -158,7 +158,7 @@ export async function PATCH(
           throw new Error('Новый велосипед недоступен для замены');
         }
 
-        await tx.bike.update({ where: { id: rent.bikeId }, data: { status: 'FREE' } });
+        await tx.bike.updateMany({ where: { id: rent.bikeId }, data: { status: 'FREE' } });
         await tx.bike.update({ where: { id: newBikeId }, data: { status: 'RENTED' } });
 
         updateData.bikeId = newBikeId;
@@ -272,7 +272,7 @@ export async function DELETE(
 
     if (rent) {
       // Освобождаем велосипед
-      await prisma.bike.update({
+      await prisma.bike.updateMany({
         where: { id: rent.bikeId },
         data: { status: 'FREE' },
       });

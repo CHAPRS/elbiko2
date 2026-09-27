@@ -261,18 +261,26 @@ export default function RentsPage() {
   };
 
   const handlePayment = async (id: number, method: string) => {
+    setError(null);
+    setNotice(null);
     try {
       const res = await fetch(`/api/admin/rents/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ paymentStatus: 'COMPLETED', paymentMethod: method }),
       });
+      const data = await res.json();
 
-      if (res.ok) {
-        fetchRents();
+      if (!res.ok) {
+        setError(data.error || 'Не удалось обновить платёж');
+        return;
       }
+
+      setNotice('Платёж отмечен');
+      fetchRents();
     } catch (err) {
       console.error('Ошибка при обновлении платежа:', err);
+      setError('Нет связи с сервером');
     }
   };
 
@@ -373,7 +381,7 @@ export default function RentsPage() {
                 Продлить
               </button>
             )}
-            {rent.payment && rent.payment.status !== 'COMPLETED' && (
+            {(!rent.payment || rent.payment.status !== 'COMPLETED') && (
               <>
                 <select
                   value={paymentMethods[rent.id] || 'CASH'}

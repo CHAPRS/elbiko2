@@ -39,8 +39,13 @@ interface Lead {
   name: string;
   phone: string;
   bikeName?: string | null;
+  rentDays?: number | null;
+  totalPrice?: number | null;
+  startDate?: string | null;
+  endDate?: string | null;
   createdAt: string;
   bike?: { id: number; name: string; externalId?: string | null } | null;
+  bikeId?: number | null;
 }
 
 interface RentUser {
@@ -165,6 +170,12 @@ export default function DispatchPage() {
   const [markingOverdue, setMarkingOverdue] = useState(false);
   const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [convertingLead, setConvertingLead] = useState<Lead | null>(null);
+  const [convertBikeId, setConvertBikeId] = useState('');
+  const [convertDays, setConvertDays] = useState('1');
+  const [convertTotalPrice, setConvertTotalPrice] = useState('');
+  const [convertPriceManual, setConvertPriceManual] = useState(false);
+  const [converting, setConverting] = useState(false);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -217,6 +228,84 @@ export default function DispatchPage() {
       }
     } catch {
       setError('Нет связи с сервером');
+    }
+  };
+
+  const openConvert = (lead: Lead) => {
+    setConvertingLead(lead);
+    setConvertPriceManual(false);
+    const defaultBikeId = lead.bikeId
+      ? String(lead.bikeId)
+      : lead.bike
+      ? String(lead.bike.id)
+      : '';
+    setConvertBikeId(defaultBikeId);
+    const defaultDays = lead.rentDays && lead.rentDays > 0 ? String(lead.rentDays) : '1';
+    setConvertDays(defaultDays);
+
+    const bike = data?.freeBikes.find((b) => String(b.id) === defaultBikeId);
+    const price =
+      lead.totalPrice !== null && lead.totalPrice !== undefined
+        ? String(lead.totalPrice)
+        : bike
+        ? String(Number(bike.pricePerDay) * Number(defaultDays))
+        : '';
+    setConvertTotalPrice(price);
+  };
+
+  const closeConvert = () => {
+    setConvertingLead(null);
+    setConvertBikeId('');
+    setConvertDays('1');
+    setConvertTotalPrice('');
+    setConvertPriceManual(false);
+    setConverting(false);
+  };
+
+  useEffect(() => {
+    if (!convertingLead || convertPriceManual) return;
+    const bike = data?.freeBikes.find((b) => String(b.id) === convertBikeId);
+    if (!bike) return;
+    const days = Number(convertDays) || 1;
+    setConvertTotalPrice(String(Number(bike.pricePerDay) * days));
+  }, [convertBikeId, convertDays, convertingLead, data?.freeBikes, convertPriceManual]);
+
+  const handleConvert = async () => {
+    if (!convertingLead) return;
+    if (!convertBikeId) {
+      setError('Выберите велосипед');
+      return;
+    }
+    const rentDays = Number(convertDays);
+    if (!rentDays || rentDays <= 0) {
+      setError('Укажите корректное количество дней');
+      return;
+    }
+    setConverting(true);
+    try {
+      const res = await fetch(`/api/admin/leads/${convertingLead.id}/convert`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bikeId: Number(convertBikeId),
+          days: rentDays,
+          totalPrice: convertTotalPrice ? Number(convertTotalPrice) : undefined,
+          startDate: convertingLead.startDate,
+          endDate: convertingLead.endDate,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error || 'Не удалось оформить аренду');
+        return;
+      }
+      setNotice(`Аренда №${json.rentId} оформлена по заявке №${convertingLead.id}`);
+      closeConvert();
+      fetchDashboard(days);
+    } catch {
+      setError('Нет связи с сервером');
+    } finally {
+      setConverting(false);
     }
   };
 
@@ -464,12 +553,18 @@ export default function DispatchPage() {
                             : (lead.bikeName || 'Байк не выбран')} · {formatDateTime(lead.createdAt)}
                         </p>
                       </div>
-                      <div className="flex gap-2 shrink-0">
+                      <div className="flex gap-2 shrink-0 flex-wrap justify-end">
                         <button
                           onClick={() => takeLead(lead.id)}
                           className="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded text-xs transition-colors"
                         >
                           В работу
+                        </button>
+                        <button
+                          onClick={() => openConvert(lead)}
+                          className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs transition-colors"
+                        >
+                          Оформить
                         </button>
                         <Link
                           href="/admin/leads"
@@ -794,6 +889,83 @@ export default function DispatchPage() {
           </section>
         </div>
       </div>
+
+      {convertingLead && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
+            <h2 className="mb-2 text-lg font-semibold text-slate-100">
+              Оформить аренду по заявке #{convertingLead.id}
+            </h2>
+            <p className="mb-4 text-sm text-slate-400">
+              {convertingLead.name} · {convertingLead.phone}
+            </p>
+
+            <div className="mb-4">
+              <label className="block text-xs font-medium text-slate-400 mb-1">Велосипед</label>
+              <select
+                value={convertBikeId}
+                onChange={(e) => setConvertBikeId(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500"
+              >
+                <option value="">— выберите —</option>
+                {data?.freeBikes.map((bike) => (
+                  <option key={bike.id} value={bike.id}>
+                    {bike.name}{bike.externalId ? ` (ID: ${bike.externalId})` : ''} — {Number(bike.pricePerDay)} ₽/сут
+                  </option>
+                ))}
+                {convertingLead.bikeId && !data?.freeBikes.some((b) => b.id === convertingLead.bikeId) && convertingLead.bike && (
+                  <option value={convertingLead.bike.id}>
+                    {convertingLead.bike.name}{convertingLead.bike.externalId ? ` (ID: ${convertingLead.bike.externalId})` : ''} — текущий выбор
+                  </option>
+                )}
+              </select>
+            </div>
+
+            <div className="mb-4 grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">Срок, дней</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={convertDays}
+                  onChange={(e) => setConvertDays(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">Стоимость, ₽</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={convertTotalPrice}
+                  onChange={(e) => {
+                    setConvertPriceManual(true);
+                    setConvertTotalPrice(e.target.value);
+                  }}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={handleConvert}
+                disabled={converting}
+                className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors"
+              >
+                {converting ? 'Оформление...' : 'Оформить аренду'}
+              </button>
+              <button
+                onClick={closeConvert}
+                disabled={converting}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-300 rounded-lg text-sm transition-colors"
+              >
+                Отмена
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

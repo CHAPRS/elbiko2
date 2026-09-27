@@ -164,58 +164,59 @@ export async function PATCH(
         updateData.bikeId = newBikeId;
       }
 
-      // Актуальная сумма платежа после возможного обновления
-      const updatedPaymentAmount =
-        updateData.totalPrice !== undefined && rent.payment && rent.payment.status === 'PENDING'
-          ? Number(updateData.totalPrice)
-          : rent.payment
-          ? Number(rent.payment.amount)
-          : null;
-
-      // Синхронизируем сумму ожидаемого платежа, если аренда ещё не оплачена
-      if (updateData.totalPrice && rent.payment && rent.payment.status === 'PENDING') {
-        await tx.payment.update({
-          where: { id: rent.payment.id },
-          data: { amount: updatedPaymentAmount as number },
-        });
-      }
-
       const updated = await tx.rent.update({
         where: { id },
         data: updateData,
       });
 
-      // Обновление статуса платежа
-      if (paymentStatus && rent.payment) {
+      // Обновляем/создаём платёж по аренде
+      if (paymentStatus) {
+        const allowedPaymentStatuses = ['PENDING', 'COMPLETED', 'FAILED', 'REFUNDED'];
+        if (!allowedPaymentStatuses.includes(paymentStatus)) {
+          throw new Error('Некорректный статус платежа');
+        }
+
         const paidAt = paymentStatus === 'COMPLETED' ? new Date() : null;
 
-        await tx.payment.update({
-          where: { id: rent.payment.id },
-          data: {
-            status: paymentStatus,
-            paymentMethod,
-            paidAt,
-          },
-        });
+        const finalPaymentAmount =
+          updateData.totalPrice !== undefined && updateData.totalPrice !== null && updateData.totalPrice !== ''
+            ? Number(updateData.totalPrice)
+            : rent.payment
+            ? Number(rent.payment.amount)
+            : Number(rent.totalPrice);
 
-        if (paymentStatus === 'COMPLETED') {
-          await tx.rentTransaction.create({
+        if (rent.payment) {
+          await tx.payment.update({
+            where: { id: rent.payment.id },
             data: {
-              rentId: id,
-              type: 'PAYMENT',
-              amount: updatedPaymentAmount as number,
-              method: paymentMethod,
-              comment: paymentMethod ? `Оплата: ${paymentMethod}` : null,
+              amount: finalPaymentAmount,
+              status: paymentStatus,
+              paymentMethod,
+              paidAt,
             },
           });
-        } else if (paymentStatus === 'REFUNDED') {
+        } else {
+          await tx.payment.create({
+            data: {
+              rentId: id,
+              amount: finalPaymentAmount,
+              status: paymentStatus,
+              paymentMethod,
+              paidAt,
+            },
+          });
+        }
+
+        if (paymentStatus === 'COMPLETED' || paymentStatus === 'REFUNDED') {
           await tx.rentTransaction.create({
             data: {
               rentId: id,
-              type: 'REFUND',
-              amount: updatedPaymentAmount as number,
+              type: paymentStatus === 'COMPLETED' ? 'PAYMENT' : 'REFUND',
+              amount: finalPaymentAmount,
               method: paymentMethod,
-              comment: paymentMethod ? `Возврат: ${paymentMethod}` : null,
+              comment: paymentMethod
+                ? `${paymentStatus === 'COMPLETED' ? 'Оплата' : 'Возврат'}: ${paymentMethod}`
+                : null,
             },
           });
         }

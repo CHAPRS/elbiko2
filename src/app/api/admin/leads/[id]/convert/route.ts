@@ -44,13 +44,27 @@ export async function POST(
     const startDate = body.startDate ? new Date(body.startDate) : (lead.startDate ? new Date(lead.startDate) : undefined);
     const endDate = body.endDate ? new Date(body.endDate) : (lead.endDate ? new Date(lead.endDate) : undefined);
 
+    const rentDays =
+      body.days !== undefined && body.days !== null && body.days !== ''
+        ? Number(body.days)
+        : lead.rentDays && lead.rentDays > 0
+        ? Number(lead.rentDays)
+        : undefined;
+
+    const totalPrice =
+      body.totalPrice !== undefined && body.totalPrice !== null && body.totalPrice !== ''
+        ? Number(body.totalPrice)
+        : lead.totalPrice !== null && lead.totalPrice !== undefined
+        ? Number(lead.totalPrice)
+        : undefined;
+
     const rent = await createRent({
       userId: user.id,
       bikeId: targetBikeId,
       startDate,
       endDate,
-      days: lead.rentDays && lead.rentDays > 0 ? Number(lead.rentDays) : undefined,
-      totalPrice: lead.totalPrice !== null && lead.totalPrice !== undefined ? Number(lead.totalPrice) : undefined,
+      days: rentDays,
+      totalPrice,
     });
 
     await upsertContactByPhone({

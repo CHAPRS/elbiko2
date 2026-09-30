@@ -12,7 +12,7 @@
 
 ## 2. Стек
 
-- Next.js `14.2.0`, React `18`, TypeScript `5.9.3`, Tailwind CSS `3.4.1`.
+- Next.js `14.2.35`, React `18`, TypeScript `5.9.3`, Tailwind CSS `3.4.1`.
 - Prisma `6.19.3`, MySQL.
 - Zod `^4.4.3`, Zustand `^4.5.1`, react-hook-form `^7.50.1`.
 - next-sanity, nodemailer, sharp, styled-components.
@@ -104,6 +104,7 @@
 ### Действия на диспетчерской
 
 - `takeLead` — `PATCH /api/admin/leads/:id` → `{ status: 'IN_PROGRESS' }`.
+- `convertRent` — `POST /api/admin/leads/:id/convert` → `{ bikeId, days, totalPrice, startDate, endDate }`. Кнопка «Оформить» открывает модалку с выбором байка, срока и цены.
 - `completeRent` — `PATCH /api/admin/rents/:id` → `{ status: 'COMPLETED' }`.
 - `extendRent` — `PATCH /api/admin/rents/:id` → `{ extendDays: 1 }`.
 - `markOverdue` — `POST /api/admin/overdue`.
@@ -126,19 +127,28 @@
   - Продление: `extendDays`, `extendBikeId`, `extendPrice`.
   - Ручная замена байка: `bikeId`.
   - Корректировка дат, цены, комментария.
-  - Обновление платежа: `paymentStatus`, `paymentMethod`.
+  - Обновление платежа: `paymentStatus`, `paymentMethod`. Если `Payment` отсутствует — создаётся новый (upsert); если есть — обновляется.
 
 ### Последние правки в арендах
 
 - `tx.rent.update` без `include`; связи загружаются после коммита транзакции.
 - Защита от отсутствующего байка (`rent.bike === null`).
 - Освобождение старого байка через `updateMany`.
+- Валидация сумм: `extendPrice`, `totalPrice`, `paymentAmount` проверяются на `Number.isFinite` и неотрицательность — это предотвращает `NaN`/`Infinity` и падение `prisma.rentTransaction.create()`.
+- API возвращает точный текст ошибки (`error.message`) в ответе, чтобы в UI видеть реальную причину, а не только «Ошибка при обновлении аренды».
+- Для аренд без `Payment` кнопка «Оплатить» в `/admin/rents` теперь отображается (`!rent.payment || rent.payment.status !== 'COMPLETED'`).
+
+### Конвертация заявки в аренду
+
+- `src/app/api/admin/leads/[id]/convert/route.ts` теперь принимает `days`, `totalPrice`, `startDate`, `endDate` из тела запроса, с fallback на поля заявки.
+- Логика: upsert `User` по телефону → `createRent` (атомарно создаёт `Rent` + `Payment` + меняет `bike.status` на `RENTED`) → upsert `Contact` → `lead.status = 'CONFIRMED'`, `lead.rentId = createdRent.id`.
+- Из диспетчерской доступно через кнопку «Оформить» у новой заявки.
 
 ### Заявки
 
 - `src/app/api/admin/leads/route.ts` — GET/POST заявок.
 - `src/app/api/admin/leads/[id]/route.ts` — PATCH заявки.
-- `src/app/api/admin/leads/[id]/convert/route.ts` — конвертация заявки в аренду.
+- `src/app/api/admin/leads/[id]/convert/route.ts` — конвертация заявки в аренду (см. выше).
 - Статусы: `NEW`, `IN_PROGRESS`, `CONFIRMED`, `REJECTED`.
 
 ## 8. Личный кабинет курьера
@@ -183,6 +193,15 @@
 
 ## 11. Последние изменения (актуально)
 
+- **2025-09-30** — `fix(admin/rents): валидация сумм при продлении/оплате и точные ошибки в UI` (`113ca5e`):
+  - проверяем, что `additionalPrice`, `newTotalPrice`, `finalPaymentAmount` — конечные неотрицательные числа;
+  - защита от `NaN`/`Infinity`, которые приводили к `prisma.rentTransaction.create()` `ConnectorError`;
+  - `PATCH /api/admin/rents/:id` теперь возвращает `error.message`, а не общее «Ошибка при обновлении аренды».
+- **2025-09-30** — `feat(dispatch, rents): конвертация заявки в аренду из диспетчерской и upsert платежа` (`0c98287`):
+  - в `/admin/dispatch` появилась кнопка «Оформить» с модалкой конвертации заявки;
+  - `POST /api/admin/leads/:id/convert` принимает `days`, `totalPrice`, `startDate`, `endDate`;
+  - `PATCH /api/admin/rents/:id` делает upsert `Payment` и создаёт `RentTransaction` для `COMPLETED`/`REFUNDED`;
+  - `/admin/rents` показывает кнопку «Оплатить» для аренд без `Payment` и выводит ошибки.
 - Расчёт дней в статистике (`src/app/api/admin/bikes/stats/route.ts`): `actualReturnDate` используется только для `RETURNED`/`COMPLETED`, `overlapDays` без `+1`.
 - Продление аренды с заменой байка и ручной стоимостью.
 - Поиск/выбор контактов в `LeadForm` (`src/components/admin/LeadForm.tsx`).
@@ -191,16 +210,25 @@
 - Исправлен MySQL `Lock wait timeout` (`code 1205`): `tx.rent.update` без `include`, связи загружаются после коммита транзакции.
 - Добавлена защита от `rent.bike === null` при завершении/продлении.
 
-## 12. Планы по доработке
+## 12. Текущее состояние и остаточные задачи
 
-- **Диспетчерская:**
-  - мобильная адаптация (меню, карточки, touch-targets, таблицы);
-  - возможно PWA / мобильное приложение.
-- **Личный кабинет курьера:**
-  - довести `/dashboard` до production-качества;
-  - интеграция `/profile` с реальной сессией;
-  - функция сдачи/возврата байка;
-  - уведомления и баланс.
+- **Продакшен:** последний деплой был прерван:
+  1. `SIGKILL` при `npx next build` из-за нехватки RAM.
+  2. `No space left on device` из-за забитого диска (`/dev/vda2` 9.8G на 100%).
+- **После очистки диска** нужно повторить деплой по командам ниже.
+- **Возможный backfill:** `prisma/seed.ts` создаёт `Rent` без `Payment`. Если в проде есть старые аренды без платежа, выполнить:
+  ```sql
+  INSERT INTO Payment (rentId, amount, status, createdAt, updatedAt)
+  SELECT r.id, r.totalPrice, 'PENDING', NOW(), NOW()
+  FROM Rent r
+  LEFT JOIN Payment p ON p.rentId = r.id
+  WHERE p.id IS NULL;
+  ```
+
+### Планы по доработке
+
+- **Диспетчерская:** мобильная адаптация (меню, карточки, touch-targets, таблицы); возможно PWA.
+- **Личный кабинет курьера:** довести `/dashboard` до production-качества; интеграция `/profile` с реальной сессией; функция сдачи/возврата байка; уведомления и баланс.
 
 ## 13. Команды
 
@@ -216,13 +244,18 @@ npm run dev
 
 ```bash
 cd /var/www/elbiko
+# Убедиться, что на диске есть место (df -h)
 git pull origin master
 npx prisma generate
+systemctl stop elbiko
 rm -rf .next
-NODE_OPTIONS=--max-old-space-size=1536 npx next build
+NODE_OPTIONS=--max-old-space-size=1280 npx next build
 systemctl daemon-reload
-systemctl restart elbiko
+systemctl start elbiko
+systemctl status elbiko -n 20
 ```
+
+Если сборка упадёт с `SIGKILL` — увеличить swap и повторить с `NODE_OPTIONS=--max-old-space-size=1024`.
 
 ### Проверка после деплоя
 
@@ -239,7 +272,10 @@ curl -I http://127.0.0.1:3000/admin/leads
 
 - `public/images/` содержит файлы с пробелами и кириллицей; `normalizeImageUrl` не должен заменять пробелы на дефисы.
 - Перед каждым продакшен-билдом нужно `rm -rf .next`.
-- VPS сильно ограничен по RAM/swap; при `SIGKILL` уменьшить `NODE_OPTIONS` до `1280`.
+- VPS сильно ограничен по RAM/swap; при `SIGKILL` уменьшить `NODE_OPTIONS` до `1280` или `1024`.
+- Диск `/dev/vda2` (9.8G) забит под 100% — перед `git pull`/`build` нужно освобождать место (`/var/log/journal`, `/var/www/elbiko/.next`, `/var/cache/apt`, npm-кэш).
 - Yandex SMTP не работает на сервере; email-верификация пишет ссылку в лог.
 - `AdminShell` имеет фиксированный сайдбар `w-64` — не работает на мобильных без переделки.
 - Таблицы в `/admin` и `/admin/rents` не адаптированы под телефоны.
+- Не коммитить `.env`, `admin_cookie.txt`, `login.json` — в них могут быть токены/пароли. Локально лежат в корне репозитория как untracked.
+- Локальная MySQL (XAMPP) содержит тестовые данные; на проде могут быть аренды без `Payment` — см. backfill в разделе 12.

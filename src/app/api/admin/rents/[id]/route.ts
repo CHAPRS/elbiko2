@@ -94,19 +94,24 @@ export async function PATCH(
         if (extendPrice !== undefined && extendPrice !== null && extendPrice !== '') {
           additionalPrice = Number(extendPrice);
         } else {
-          additionalPrice = Number(targetBike.pricePerDay) * extensionDays;
+          additionalPrice = Number(targetBike.pricePerDay ?? 0) * extensionDays;
         }
 
-        if (additionalPrice < 0) {
-          throw new Error('Стоимость продления не может быть отрицательной');
+        if (!Number.isFinite(additionalPrice) || additionalPrice < 0) {
+          throw new Error('Стоимость продления не может быть отрицательной или некорректной');
         }
 
         const currentEndDate = new Date(rent.endDate);
         const newEndDate = new Date(currentEndDate);
         newEndDate.setDate(newEndDate.getDate() + extensionDays);
 
+        const newTotalPrice = Number(rent.totalPrice ?? 0) + additionalPrice;
+        if (!Number.isFinite(newTotalPrice) || newTotalPrice < 0) {
+          throw new Error('Итоговая стоимость аренды некорректна');
+        }
+
         updateData.endDate = newEndDate;
-        updateData.totalPrice = Number(rent.totalPrice) + additionalPrice;
+        updateData.totalPrice = newTotalPrice;
 
         // Замена велосипеда при продлении
         if (targetBikeId !== rent.bikeId) {
@@ -141,7 +146,11 @@ export async function PATCH(
         updateData.endDate = new Date(endDate);
       }
       if (totalPrice !== undefined && totalPrice !== null && totalPrice !== '') {
-        updateData.totalPrice = Number(totalPrice);
+        const manualTotal = Number(totalPrice);
+        if (!Number.isFinite(manualTotal) || manualTotal < 0) {
+          throw new Error('Некорректная стоимость аренды');
+        }
+        updateData.totalPrice = manualTotal;
       }
       if (comment !== undefined) {
         updateData.comment = comment.trim() || null;
@@ -178,12 +187,17 @@ export async function PATCH(
 
         const paidAt = paymentStatus === 'COMPLETED' ? new Date() : null;
 
-        const finalPaymentAmount =
+        const finalPaymentAmountSource =
           updateData.totalPrice !== undefined && updateData.totalPrice !== null && updateData.totalPrice !== ''
             ? Number(updateData.totalPrice)
             : rent.payment
             ? Number(rent.payment.amount)
-            : Number(rent.totalPrice);
+            : Number(rent.totalPrice ?? 0);
+        const finalPaymentAmount = Math.round(finalPaymentAmountSource * 100) / 100;
+
+        if (!Number.isFinite(finalPaymentAmount) || finalPaymentAmount < 0) {
+          throw new Error('Некорректная сумма платежа');
+        }
 
         if (rent.payment) {
           await tx.payment.update({
@@ -251,9 +265,10 @@ export async function PATCH(
 
     return NextResponse.json(updatedRent);
   } catch (error) {
+    const message = error instanceof Error ? error.message : 'Ошибка при обновлении аренды';
     console.error('Ошибка при обновлении аренды:', error);
     return NextResponse.json(
-      { error: 'Ошибка при обновлении аренды' },
+      { error: message },
       { status: 500 }
     );
   }

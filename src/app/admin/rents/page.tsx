@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { MileagePrompt } from '@/components/admin/MileagePrompt';
 
 interface Rent {
   id: number;
@@ -37,6 +38,7 @@ interface Bike {
   externalId?: string | null;
   status: string;
   pricePerDay: number;
+  mileage?: number | null;
 }
 
 export default function RentsPage() {
@@ -50,7 +52,10 @@ export default function RentsPage() {
   const [extendBikeId, setExtendBikeId] = useState<string>('');
   const [extendPrice, setExtendPrice] = useState<string>('');
   const [extendPriceManuallySet, setExtendPriceManuallySet] = useState(false);
+  const [extendMileage, setExtendMileage] = useState('');
   const [isExtending, setIsExtending] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState<{ rent: Rent; status: string } | null>(null);
+  const [statusSaving, setStatusSaving] = useState(false);
   const [paymentMethods, setPaymentMethods] = useState<Record<number, string>>({});
 
   const [editingRent, setEditingRent] = useState<Rent | null>(null);
@@ -108,12 +113,12 @@ export default function RentsPage() {
     }
   }, [extendDays, extendBikeId, extendPriceManuallySet, extendRentId, bikes]);
 
-  const handleStatusChange = async (id: number, newStatus: string) => {
+  const applyStatus = async (id: number, newStatus: string, mileage?: number | null) => {
     try {
       const res = await fetch(`/api/admin/rents/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify(mileage != null ? { status: newStatus, mileage } : { status: newStatus }),
       });
 
       if (res.ok) {
@@ -121,6 +126,26 @@ export default function RentsPage() {
       }
     } catch (err) {
       console.error('Ошибка при обновлении статуса:', err);
+    }
+  };
+
+  const handleStatusChange = async (id: number, newStatus: string) => {
+    const rent = rents.find((r) => r.id === id);
+    if (rent && (newStatus === 'COMPLETED' || newStatus === 'RETURNED')) {
+      setPendingStatus({ rent, status: newStatus });
+      return;
+    }
+    await applyStatus(id, newStatus);
+  };
+
+  const submitStatusMileage = async (mileage: number | null) => {
+    if (!pendingStatus) return;
+    setStatusSaving(true);
+    try {
+      await applyStatus(pendingStatus.rent.id, pendingStatus.status, mileage);
+      setPendingStatus(null);
+    } finally {
+      setStatusSaving(false);
     }
   };
 
@@ -145,6 +170,7 @@ export default function RentsPage() {
     setExtendBikeId('');
     setExtendPrice('');
     setExtendPriceManuallySet(false);
+    setExtendMileage('');
     setError(null);
   };
 
@@ -169,6 +195,7 @@ export default function RentsPage() {
           extendDays: days,
           extendBikeId: extendBikeId ? Number(extendBikeId) : undefined,
           extendPrice: priceVal,
+          mileage: extendMileage.trim() !== '' ? Number(extendMileage) : undefined,
         }),
       });
       const data = await res.json();
@@ -205,22 +232,8 @@ export default function RentsPage() {
     }
   };
 
-  const handleReturn = async (id: number) => {
-    if (!confirm('Отметить возврат велосипеда? Байк станет доступен.')) return;
-
-    try {
-      const res = await fetch(`/api/admin/rents/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'RETURNED' }),
-      });
-
-      if (res.ok) {
-        fetchRents();
-      }
-    } catch (err) {
-      console.error('Ошибка при возврате:', err);
-    }
+  const handleReturn = (rent: Rent) => {
+    setPendingStatus({ rent, status: 'RETURNED' });
   };
 
   const handleEdit = (rent: Rent) => {
@@ -403,7 +416,7 @@ export default function RentsPage() {
             )}
             {rent.status === 'ACTIVE' && (
               <button
-                onClick={() => handleReturn(rent.id)}
+                onClick={() => handleReturn(rent)}
                 className="px-2 py-1 bg-amber-600 hover:bg-amber-500 text-white rounded text-xs transition-colors"
               >
                 Вернуть
@@ -669,6 +682,27 @@ export default function RentsPage() {
                 </p>
               </div>
 
+              <div className="mb-4">
+                <label className="mb-1 block text-xs font-medium text-slate-400">
+                  Пробег, км (необязательно)
+                  {(() => {
+                    const current = bikes.find((b) => String(b.id) === extendBikeId)?.mileage;
+                    return current != null ? (
+                      <span className="text-slate-500"> — было {current.toLocaleString('ru-RU')} км</span>
+                    ) : null;
+                  })()}
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={extendMileage}
+                  onChange={(e) => setExtendMileage(e.target.value)}
+                  className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+                  placeholder="Оставьте пустым, чтобы не записывать"
+                />
+              </div>
+
               <div className="flex justify-end gap-2">
                 <button
                   onClick={closeExtendModal}
@@ -686,6 +720,23 @@ export default function RentsPage() {
               </div>
             </div>
           </div>
+        )}
+
+        {pendingStatus && (
+          <MileagePrompt
+            title={
+              pendingStatus.status === 'RETURNED'
+                ? `Возврат по аренде #${pendingStatus.rent.id}`
+                : `Завершение аренды #${pendingStatus.rent.id}`
+            }
+            subtitle={`${pendingStatus.rent.user.name} · ${pendingStatus.rent.bike.name}${pendingStatus.rent.bike.externalId ? ` (ID: ${pendingStatus.rent.bike.externalId})` : ''}`}
+            currentMileage={
+              bikes.find((b) => b.id === pendingStatus.rent.bike.id)?.mileage ?? null
+            }
+            busy={statusSaving}
+            onSubmit={submitStatusMileage}
+            onCancel={() => !statusSaving && setPendingStatus(null)}
+          />
         )}
 
         {/* Статистика */}

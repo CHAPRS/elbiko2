@@ -21,6 +21,8 @@ export async function PATCH(
       extendPrice,
       paymentStatus,
       paymentMethod,
+      mileage,
+      mileageNote,
     } = body;
 
     const rent = await prisma.rent.findUnique({
@@ -34,6 +36,22 @@ export async function PATCH(
         { status: 404 }
       );
     }
+
+    // Опциональный пробег: фиксируется при завершении/продлении аренды
+    let mileageValue: number | null = null;
+    if (mileage !== undefined && mileage !== null && mileage !== '') {
+      const parsed = Number(mileage);
+      if (!Number.isFinite(parsed) || parsed < 0 || !Number.isInteger(parsed)) {
+        return NextResponse.json(
+          { error: 'Некорректное значение пробега' },
+          { status: 400 }
+        );
+      }
+      mileageValue = parsed;
+    }
+    const previousMileage = rent.bike?.mileage ?? null;
+    const mileageWarning =
+      mileageValue !== null && previousMileage !== null && mileageValue < previousMileage;
 
     const updatedRentId = await prisma.$transaction(
       async (tx) => {
@@ -178,6 +196,22 @@ export async function PATCH(
         data: updateData,
       });
 
+      // Фиксируем пробег на байке, который был в этой аренде
+      if (mileageValue !== null) {
+        await tx.mileageLog.create({
+          data: {
+            bikeId: rent.bikeId,
+            rentId: id,
+            mileage: mileageValue,
+            note: typeof mileageNote === 'string' && mileageNote.trim() ? mileageNote.trim() : null,
+          },
+        });
+        await tx.bike.update({
+          where: { id: rent.bikeId },
+          data: { mileage: mileageValue },
+        });
+      }
+
       // Обновляем/создаём платёж по аренде
       if (paymentStatus) {
         const allowedPaymentStatuses = ['PENDING', 'COMPLETED', 'FAILED', 'REFUNDED'];
@@ -263,7 +297,7 @@ export async function PATCH(
       },
     });
 
-    return NextResponse.json(updatedRent);
+    return NextResponse.json({ ...updatedRent, mileageWarning });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Ошибка при обновлении аренды';
     console.error('Ошибка при обновлении аренды:', error);

@@ -3,6 +3,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { LeadForm } from '@/components/admin/LeadForm';
+import { MileagePrompt } from '@/components/admin/MileagePrompt';
+import { BuyoutSection, Buyout } from '@/components/admin/BuyoutSection';
 import { buildMaxLink } from '@/lib/messenger';
 
 interface Stats {
@@ -24,6 +26,13 @@ interface Stats {
   overdueRevenue: number;
   averageCheck: number;
   failedRefundedRevenue: number;
+  miscIncomeToday: number;
+  miscIncomePeriod: number;
+  expensesToday: number;
+  expensesPeriod: number;
+  buyoutIncomeToday: number;
+  buyoutIncomePeriod: number;
+  netProfitPeriod: number;
 }
 
 interface Bike {
@@ -32,6 +41,7 @@ interface Bike {
   externalId?: string | null;
   status: string;
   pricePerDay: number;
+  mileage?: number | null;
 }
 
 interface Lead {
@@ -77,6 +87,21 @@ interface Rent {
 interface RevenueDay {
   date: string;
   revenue: number;
+  misc?: number;
+  expense?: number;
+  buyout?: number;
+}
+
+interface MiscTransaction {
+  id: number;
+  kind: string;
+  title: string;
+  amount: number;
+  method?: string | null;
+  bikeId?: number | null;
+  bike?: { id: number; name: string; externalId?: string | null } | null;
+  comment?: string | null;
+  createdAt: string;
 }
 
 interface TopBike {
@@ -103,6 +128,9 @@ interface DashboardData {
   revenueByDay: RevenueDay[];
   topBikes: TopBike[];
   timeline: TimelineDay[];
+  bikes: Bike[];
+  recentMisc: MiscTransaction[];
+  buyouts: Buyout[];
 }
 
 function formatDate(date: string): string {
@@ -135,6 +163,24 @@ function formatShortDay(date: string): string {
 function formatMoney(value: number): string {
   return `${Math.round(value).toLocaleString('ru-RU')} ₽`;
 }
+
+const METHOD_LABELS: Record<string, string> = {
+  CASH: 'Наличные',
+  SBP: 'СБП',
+  CARD: 'Карта',
+  TRANSFER: 'Перевод',
+};
+
+const MISC_TITLE_SUGGESTIONS = [
+  'Ремонт',
+  'Аренда аккумулятора',
+  'Сопутствующие товары',
+  'Продажа',
+  'Закупка байка',
+  'Запчасти',
+  'Обслуживание',
+  'Прочее',
+];
 
 function ContactLinks({ user }: { user: RentUser }) {
   const maxLink = buildMaxLink(user);
@@ -176,6 +222,17 @@ export default function DispatchPage() {
   const [convertTotalPrice, setConvertTotalPrice] = useState('');
   const [convertPriceManual, setConvertPriceManual] = useState(false);
   const [converting, setConverting] = useState(false);
+  const [miscKind, setMiscKind] = useState<'INCOME' | 'EXPENSE'>('INCOME');
+  const [miscTitle, setMiscTitle] = useState('');
+  const [miscAmount, setMiscAmount] = useState('');
+  const [miscMethod, setMiscMethod] = useState('CASH');
+  const [miscBikeId, setMiscBikeId] = useState('');
+  const [miscComment, setMiscComment] = useState('');
+  const [miscSaving, setMiscSaving] = useState(false);
+  const [editingMisc, setEditingMisc] = useState<MiscTransaction | null>(null);
+  const [mileageAction, setMileageAction] = useState<{ type: 'complete' | 'extend'; rent: Rent } | null>(null);
+  const [mileageBike, setMileageBike] = useState<Bike | null>(null);
+  const [mileageBusy, setMileageBusy] = useState(false);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -309,41 +366,79 @@ export default function DispatchPage() {
     }
   };
 
-  const completeRent = async (id: number) => {
+  const completeRent = (rent: Rent) => {
+    setMileageAction({ type: 'complete', rent });
+  };
+
+  const extendRent = (rent: Rent) => {
+    setMileageAction({ type: 'extend', rent });
+  };
+
+  const submitRentMileage = async (mileage: number | null) => {
+    if (!mileageAction) return;
+    const { type, rent } = mileageAction;
+    setMileageBusy(true);
     try {
-      const res = await fetch(`/api/admin/rents/${id}`, {
+      const body =
+        type === 'complete'
+          ? { status: 'COMPLETED' }
+          : { extendDays: 1 };
+      const res = await fetch(`/api/admin/rents/${rent.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'COMPLETED' }),
+        body: JSON.stringify(mileage !== null ? { ...body, mileage } : body),
       });
-      if (res.ok) {
-        setNotice('Аренда завершена, байк освобожден');
-        fetchDashboard(days);
-      } else {
-        const json = await res.json();
-        setError(json.error || 'Не удалось завершить аренду');
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error || 'Не удалось обновить аренду');
+        return;
       }
+      setNotice(
+        type === 'complete'
+          ? 'Аренда завершена, байк освобожден'
+          : 'Аренда продлена на 1 день'
+      );
+      if (json.mileageWarning) {
+        setNotice((prev) => `${prev}. Внимание: внесённый пробег меньше предыдущего`);
+      }
+      setMileageAction(null);
+      fetchDashboard(days);
     } catch {
       setError('Нет связи с сервером');
+    } finally {
+      setMileageBusy(false);
     }
   };
 
-  const extendRent = async (id: number) => {
+  const submitBikeMileage = async (mileage: number | null) => {
+    if (!mileageBike) return;
+    if (mileage === null) {
+      setMileageBike(null);
+      return;
+    }
+    setMileageBusy(true);
     try {
-      const res = await fetch(`/api/admin/rents/${id}`, {
-        method: 'PATCH',
+      const res = await fetch(`/api/admin/bikes/${mileageBike.id}/mileage`, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ extendDays: 1 }),
+        body: JSON.stringify({ mileage }),
       });
-      if (res.ok) {
-        setNotice('Аренда продлена на 1 день');
-        fetchDashboard(days);
-      } else {
-        const json = await res.json();
-        setError(json.error || 'Не удалось продлить аренду');
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error || 'Не удалось сохранить пробег');
+        return;
       }
+      setNotice(
+        json.mileageWarning
+          ? `Пробег ${mileage} км записан. Внимание: он меньше предыдущего`
+          : `Пробег ${mileage} км записан для ${mileageBike.name}`
+      );
+      setMileageBike(null);
+      fetchDashboard(days);
     } catch {
       setError('Нет связи с сервером');
+    } finally {
+      setMileageBusy(false);
     }
   };
 
@@ -362,6 +457,86 @@ export default function DispatchPage() {
       setError('Нет связи с сервером');
     } finally {
       setMarkingOverdue(false);
+    }
+  };
+
+  const resetMiscForm = () => {
+    setEditingMisc(null);
+    setMiscKind('INCOME');
+    setMiscTitle('');
+    setMiscAmount('');
+    setMiscMethod('CASH');
+    setMiscBikeId('');
+    setMiscComment('');
+  };
+
+  const startEditMisc = (tx: MiscTransaction) => {
+    setEditingMisc(tx);
+    setMiscKind(tx.kind === 'EXPENSE' ? 'EXPENSE' : 'INCOME');
+    setMiscTitle(tx.title);
+    setMiscAmount(String(tx.amount));
+    setMiscMethod(tx.method || 'CASH');
+    setMiscBikeId(tx.bikeId ? String(tx.bikeId) : '');
+    setMiscComment(tx.comment || '');
+  };
+
+  const submitMisc = async () => {
+    const amount = Number(miscAmount);
+    if (!miscTitle.trim()) {
+      setError('Укажите предмет операции');
+      return;
+    }
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError('Укажите корректную сумму');
+      return;
+    }
+    setMiscSaving(true);
+    try {
+      const payload = {
+        kind: miscKind,
+        title: miscTitle.trim(),
+        amount,
+        method: miscMethod || null,
+        bikeId: miscBikeId ? Number(miscBikeId) : null,
+        comment: miscComment.trim() || null,
+      };
+      const res = await fetch(
+        editingMisc ? `/api/admin/finance/${editingMisc.id}` : '/api/admin/finance',
+        {
+          method: editingMisc ? 'PATCH' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }
+      );
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error || 'Не удалось сохранить операцию');
+        return;
+      }
+      setNotice(editingMisc ? 'Операция обновлена' : 'Операция добавлена');
+      resetMiscForm();
+      fetchDashboard(days);
+    } catch {
+      setError('Нет связи с сервером');
+    } finally {
+      setMiscSaving(false);
+    }
+  };
+
+  const deleteMisc = async (id: number) => {
+    if (!window.confirm('Удалить эту операцию?')) return;
+    try {
+      const res = await fetch(`/api/admin/finance/${id}`, { method: 'DELETE' });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error || 'Не удалось удалить операцию');
+        return;
+      }
+      if (editingMisc?.id === id) resetMiscForm();
+      setNotice('Операция удалена');
+      fetchDashboard(days);
+    } catch {
+      setError('Нет связи с сервером');
     }
   };
 
@@ -386,8 +561,19 @@ export default function DispatchPage() {
         { label: 'Просроченная выручка', value: data.stats.overdueRevenue, color: 'text-rose-400' },
         { label: 'Средний чек', value: data.stats.averageCheck, color: 'text-slate-200' },
         { label: 'Неудачи / возвраты', value: data.stats.failedRefundedRevenue, color: 'text-slate-400' },
+        { label: `Прочие доходы за ${days} дн.`, value: data.stats.miscIncomePeriod, color: 'text-emerald-300' },
+        { label: `Доход по выкупам за ${days} дн.`, value: data.stats.buyoutIncomePeriod, color: 'text-cyan-300' },
+        { label: `Расходы за ${days} дн.`, value: data.stats.expensesPeriod, color: 'text-rose-300' },
+        { label: `Прибыль за ${days} дн.`, value: data.stats.netProfitPeriod, color: 'text-lime-400' },
       ]
     : [];
+
+  const maxMisc = data && data.revenueByDay.length > 0
+    ? Math.max(
+        ...data.revenueByDay.map((d) => Math.max(d.misc ?? 0, d.expense ?? 0, d.buyout ?? 0)),
+        1
+      )
+    : 1;
 
   const maxRevenue = data && data.revenueByDay.length > 0
     ? Math.max(...data.revenueByDay.map((d) => d.revenue), 1)
@@ -520,6 +706,190 @@ export default function DispatchPage() {
           <LeadForm bikes={data?.freeBikes ?? []} onSuccess={() => fetchDashboard(days)} />
         </section>
 
+        <section className="bg-slate-900/50 border border-slate-800 rounded-xl p-6 mb-8">
+          <h2 className="text-lg font-semibold text-slate-200 mb-4">Прочие операции</h2>
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setMiscKind('INCOME')}
+                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    miscKind === 'INCOME'
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  Доход
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMiscKind('EXPENSE')}
+                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    miscKind === 'EXPENSE'
+                      ? 'bg-rose-600 text-white'
+                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  Расход
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Предмет</label>
+                  <input
+                    type="text"
+                    list="misc-titles"
+                    value={miscTitle}
+                    onChange={(e) => setMiscTitle(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500"
+                    placeholder="Например: ремонт, аренда аккумулятора"
+                  />
+                  <datalist id="misc-titles">
+                    {MISC_TITLE_SUGGESTIONS.map((t) => (
+                      <option key={t} value={t} />
+                    ))}
+                  </datalist>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Сумма, ₽</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={miscAmount}
+                    onChange={(e) => setMiscAmount(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Способ оплаты</label>
+                  <select
+                    value={miscMethod}
+                    onChange={(e) => setMiscMethod(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="CASH">Наличные</option>
+                    <option value="SBP">СБП</option>
+                    <option value="CARD">Карта</option>
+                    <option value="TRANSFER">Перевод</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Байк (необязательно)</label>
+                  <select
+                    value={miscBikeId}
+                    onChange={(e) => setMiscBikeId(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="">— без привязки —</option>
+                    {(data?.bikes ?? []).map((bike) => (
+                      <option key={bike.id} value={bike.id}>
+                        {bike.name}{bike.externalId ? ` (ID: ${bike.externalId})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Комментарий</label>
+                  <input
+                    type="text"
+                    value={miscComment}
+                    onChange={(e) => setMiscComment(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500"
+                    placeholder="Доп. информация"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={submitMisc}
+                  disabled={miscSaving}
+                  className="px-4 py-2.5 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors"
+                >
+                  {miscSaving ? 'Сохраняем...' : editingMisc ? 'Сохранить изменения' : 'Добавить операцию'}
+                </button>
+                {editingMisc && (
+                  <button
+                    type="button"
+                    onClick={resetMiscForm}
+                    className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm transition-colors"
+                  >
+                    Отмена
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold text-slate-300 mb-3">Последние операции</h3>
+              {loading ? (
+                <p className="text-slate-400 text-sm">Загрузка...</p>
+              ) : !data || data.recentMisc.length === 0 ? (
+                <p className="text-slate-400 text-sm">Операций пока нет</p>
+              ) : (
+                <ul className="space-y-2">
+                  {data.recentMisc.map((tx) => (
+                    <li
+                      key={tx.id}
+                      className="border border-slate-800 rounded-lg p-3 bg-slate-950/50 flex items-start justify-between gap-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-slate-100 truncate">
+                          {tx.title}
+                          {tx.bike && (
+                            <span className="text-slate-400 font-normal">
+                              {' '}· {tx.bike.name}{tx.bike.externalId ? ` (ID: ${tx.bike.externalId})` : ''}
+                            </span>
+                          )}
+                        </p>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          {formatDateTime(tx.createdAt)}
+                          {tx.method ? ` · ${METHOD_LABELS[tx.method] || tx.method}` : ''}
+                          {tx.comment ? ` · ${tx.comment}` : ''}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span
+                          className={`text-sm font-semibold ${
+                            tx.kind === 'INCOME' ? 'text-emerald-400' : 'text-rose-400'
+                          }`}
+                        >
+                          {tx.kind === 'INCOME' ? '+' : '−'}{formatMoney(Number(tx.amount))}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => startEditMisc(tx)}
+                          className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs transition-colors"
+                        >
+                          Изм.
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteMisc(tx.id)}
+                          className="px-2 py-1 bg-slate-800 hover:bg-rose-900 text-slate-300 rounded text-xs transition-colors"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </section>
+
+        <BuyoutSection
+          buyouts={data?.buyouts ?? []}
+          bikes={data?.bikes ?? []}
+          onChanged={() => fetchDashboard(days)}
+          onError={setError}
+          onNotice={setNotice}
+        />
+
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
           <section className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
             <div className="flex items-center justify-between mb-4">
@@ -622,13 +992,13 @@ export default function DispatchPage() {
                         <div className="flex gap-2 shrink-0 flex-wrap justify-end items-start">
                           <ContactLinks user={rent.user} />
                           <button
-                            onClick={() => completeRent(rent.id)}
+                            onClick={() => completeRent(rent)}
                             className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs transition-colors"
                           >
                             Завершить
                           </button>
                           <button
-                            onClick={() => extendRent(rent.id)}
+                            onClick={() => extendRent(rent)}
                             className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs transition-colors"
                           >
                             +1 день
@@ -793,7 +1163,23 @@ export default function DispatchPage() {
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 bg-slate-950/50 border border-slate-800 rounded-xl p-4">
-              <h3 className="text-sm font-semibold text-slate-200 mb-4">Выручка по дням</h3>
+              <div className="flex items-center justify-between gap-4 mb-4">
+                <h3 className="text-sm font-semibold text-slate-200">Выручка по дням</h3>
+                <div className="flex gap-3 text-[10px] text-slate-400">
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-amber-500" /> Аренда
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" /> Прочие доходы
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-cyan-500" /> Выкупы
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-rose-500" /> Расходы
+                  </span>
+                </div>
+              </div>
 
               {loading ? (
                 <p className="text-slate-400 text-sm">Загрузка...</p>
@@ -804,11 +1190,41 @@ export default function DispatchPage() {
                   {data?.revenueByDay.map((day) => (
                     <div key={day.date} className="flex items-center gap-3 text-sm">
                       <div className="w-14 shrink-0 text-xs text-slate-400">{formatShortDay(day.date)}</div>
-                      <div className="flex-1 h-3 bg-slate-800 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-amber-500 rounded-full"
-                          style={{ width: `${(day.revenue / maxRevenue) * 100}%` }}
-                        />
+                      <div className="flex-1">
+                        <div className="h-3 bg-slate-800 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-amber-500 rounded-full"
+                            style={{ width: `${(day.revenue / maxRevenue) * 100}%` }}
+                          />
+                        </div>
+                        {((day.misc ?? 0) > 0 || (day.expense ?? 0) > 0 || (day.buyout ?? 0) > 0) && (
+                          <div className="mt-1 space-y-0.5">
+                            {(day.misc ?? 0) > 0 && (
+                              <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-emerald-500 rounded-full"
+                                  style={{ width: `${((day.misc ?? 0) / maxMisc) * 100}%` }}
+                                />
+                              </div>
+                            )}
+                            {(day.buyout ?? 0) > 0 && (
+                              <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-cyan-500 rounded-full"
+                                  style={{ width: `${((day.buyout ?? 0) / maxMisc) * 100}%` }}
+                                />
+                              </div>
+                            )}
+                            {(day.expense ?? 0) > 0 && (
+                              <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-rose-500 rounded-full"
+                                  style={{ width: `${((day.expense ?? 0) / maxMisc) * 100}%` }}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                       <div className="w-24 text-right text-xs text-slate-200 font-medium">
                         {formatMoney(day.revenue)}
@@ -859,8 +1275,22 @@ export default function DispatchPage() {
                     key={bike.id}
                     className="border border-slate-800 rounded-lg p-3 bg-slate-950/50 text-sm"
                   >
-                    <p className="font-medium text-slate-100">{bike.name}{bike.externalId ? ` (ID: ${bike.externalId})` : ''}</p>
-                    <p className="text-slate-400">{Number(bike.pricePerDay)} ₽/сут</p>
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="font-medium text-slate-100">{bike.name}{bike.externalId ? ` (ID: ${bike.externalId})` : ''}</p>
+                        <p className="text-slate-400">{Number(bike.pricePerDay)} ₽/сут</p>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Пробег: {bike.mileage != null ? `${bike.mileage.toLocaleString('ru-RU')} км` : '—'}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setMileageBike(bike)}
+                        className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs transition-colors shrink-0"
+                      >
+                        Пробег
+                      </button>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -880,8 +1310,22 @@ export default function DispatchPage() {
                     key={bike.id}
                     className="border border-slate-800 rounded-lg p-3 bg-slate-950/50 text-sm"
                   >
-                    <p className="font-medium text-slate-100">{bike.name}{bike.externalId ? ` (ID: ${bike.externalId})` : ''}</p>
-                    <p className="text-slate-400">{Number(bike.pricePerDay)} ₽/сут</p>
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="font-medium text-slate-100">{bike.name}{bike.externalId ? ` (ID: ${bike.externalId})` : ''}</p>
+                        <p className="text-slate-400">{Number(bike.pricePerDay)} ₽/сут</p>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Пробег: {bike.mileage != null ? `${bike.mileage.toLocaleString('ru-RU')} км` : '—'}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setMileageBike(bike)}
+                        className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs transition-colors shrink-0"
+                      >
+                        Пробег
+                      </button>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -965,6 +1409,33 @@ export default function DispatchPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {mileageAction && (
+        <MileagePrompt
+          title={
+            mileageAction.type === 'complete'
+              ? `Завершение аренды #${mileageAction.rent.id}`
+              : `Продление аренды #${mileageAction.rent.id}`
+          }
+          subtitle={`${mileageAction.rent.user.name} · ${mileageAction.rent.bike.name}${mileageAction.rent.bike.externalId ? ` (ID: ${mileageAction.rent.bike.externalId})` : ''}`}
+          currentMileage={
+            data?.bikes?.find((b) => b.id === mileageAction.rent.bike.id)?.mileage ?? null
+          }
+          busy={mileageBusy}
+          onSubmit={submitRentMileage}
+          onCancel={() => !mileageBusy && setMileageAction(null)}
+        />
+      )}
+
+      {mileageBike && (
+        <MileagePrompt
+          title={`Пробег: ${mileageBike.name}${mileageBike.externalId ? ` (ID: ${mileageBike.externalId})` : ''}`}
+          currentMileage={mileageBike.mileage ?? null}
+          busy={mileageBusy}
+          onSubmit={submitBikeMileage}
+          onCancel={() => !mileageBusy && setMileageBike(null)}
+        />
       )}
     </div>
   );

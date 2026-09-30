@@ -20,6 +20,9 @@ model Bike {
   pricePerDay  Decimal  @default(0.00) @db.Decimal(10, 2) // Цена за день
   externalId   String?  @db.VarChar(120) // Внешний ID/серийный номер байка
   imageUrl     String? // Ссылка на фото велосипеда
+  purchasePrice Decimal? @db.Decimal(10, 2) // Закупочная цена байка
+  purchaseDate DateTime? // Дата покупки
+  mileage      Int? // Текущий пробег, км
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -27,6 +30,9 @@ model Bike {
   rentalSessions RentalSession[]
   rents          Rent[]
   leads          Lead[]
+  miscTransactions MiscTransaction[]
+  mileageLogs      MileageLog[]
+  buyouts          Buyout[]
 }
 
 // Новая модель Курьера (User)
@@ -141,6 +147,7 @@ model Rent {
   bike           Bike            @relation(fields: [bikeId], references: [id], onDelete: Cascade)
   payment        Payment?
   rentTransactions RentTransaction[]
+  mileageLogs    MileageLog[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -184,6 +191,89 @@ model RentTransaction {
   createdAt DateTime @default(now())
 
   @@index([rentId])
+}
+
+// Модель прочих финансовых операций (доходы/расходы вне аренды)
+model MiscTransaction {
+  id        Int      @id @default(autoincrement())
+  kind      String   // Тип: "INCOME" (доход) | "EXPENSE" (расход)
+  title     String   // Предмет: "Ремонт", "Аренда аккумулятора", "Сопутствующие товары" и т.п.
+  amount    Decimal  @db.Decimal(10, 2)
+  method    String?  // Способ оплаты: CASH, SBP, CARD, TRANSFER
+  bikeId    Int?
+  comment   String?  @db.Text
+
+  // Отношения
+  bike Bike? @relation(fields: [bikeId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([kind])
+  @@index([createdAt])
+  @@index([bikeId])
+}
+
+// Журнал показаний пробега по байкам (вносится вручную)
+model MileageLog {
+  id      Int     @id @default(autoincrement())
+  bikeId  Int
+  rentId  Int? // Аренда, с которой связана запись (если есть)
+  mileage Int // Показание одометра, км
+  note    String?
+
+  // Отношения
+  bike Bike @relation(fields: [bikeId], references: [id], onDelete: Cascade)
+  rent Rent? @relation(fields: [rentId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([bikeId])
+  @@index([rentId])
+}
+
+// Модель аренды под выкуп (рассрочка)
+model Buyout {
+  id          Int       @id @default(autoincrement())
+  title       String    // Предмет выкупа (байк, аккумулятор и т.п.)
+  clientName  String
+  clientPhone String?
+  bikeId      Int?
+  totalPrice  Decimal   @db.Decimal(10, 2) // Полная стоимость выкупа
+  status      String    @default("ACTIVE") // Статусы: "ACTIVE", "COMPLETED", "CANCELLED"
+  startDate   DateTime  @default(now())
+  comment     String?   @db.Text
+
+  // Отношения
+  bike     Bike?           @relation(fields: [bikeId], references: [id], onDelete: SetNull)
+  payments BuyoutPayment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}
+
+// Строка графика платежей по выкупу
+model BuyoutPayment {
+  id       Int      @id @default(autoincrement())
+  buyoutId Int
+  dueDate  DateTime // Плановая дата платежа
+  amount   Decimal  @db.Decimal(10, 2)
+  status   String   @default("PENDING") // Статусы: "PENDING", "PAID"
+  paidAt   DateTime?
+  method   String? // CASH, SBP, CARD, TRANSFER
+  comment  String?  @db.Text
+
+  // Отношения
+  buyout Buyout @relation(fields: [buyoutId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([buyoutId])
+  @@index([dueDate])
+  @@index([status])
 }
 
 // Модель Hero секции главной страницы

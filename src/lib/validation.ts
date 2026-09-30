@@ -12,6 +12,9 @@ export const createBikeSchema = z.object({
   status: bikeStatus.optional(),
   externalId: z.string().max(120).optional().nullable(),
   imageUrl: z.string().url().max(500).optional().nullable(),
+  purchasePrice: z.number().finite().nonnegative().max(10000000).optional().nullable(),
+  purchaseDate: z.coerce.date().optional().nullable(),
+  mileage: z.number().int().nonnegative().optional().nullable(),
 });
 
 export const updateBikeSchema = z.object({
@@ -25,6 +28,9 @@ export const updateBikeSchema = z.object({
   status: bikeStatus.optional(),
   externalId: z.string().max(120).optional().nullable(),
   imageUrl: z.string().url().max(500).optional().nullable(),
+  purchasePrice: z.number().finite().nonnegative().max(10000000).optional().nullable(),
+  purchaseDate: z.coerce.date().optional().nullable(),
+  mileage: z.number().int().nonnegative().optional().nullable(),
 });
 
 export const leadStatus = z.enum(['NEW', 'IN_PROGRESS', 'CONFIRMED', 'REJECTED']);
@@ -56,6 +62,82 @@ export const createLeadManualSchema = z.object({
   totalPrice: z.number().positive().max(10000000).optional().nullable(),
   startDate: z.coerce.date().optional().nullable(),
   endDate: z.coerce.date().optional().nullable(),
+});
+
+export const miscTransactionKind = z.enum(['INCOME', 'EXPENSE']);
+export const paymentMethodEnum = z.enum(['CASH', 'SBP', 'CARD', 'TRANSFER']);
+
+export const createMiscTransactionSchema = z.object({
+  kind: miscTransactionKind,
+  title: z.string().min(1).max(200),
+  amount: z.number().finite().positive().max(10000000),
+  method: paymentMethodEnum.optional().nullable(),
+  bikeId: z.number().int().positive().optional().nullable(),
+  comment: z.string().max(1000).optional().nullable(),
+  createdAt: z.coerce.date().optional().nullable(),
+});
+
+export const updateMiscTransactionSchema = z.object({
+  kind: miscTransactionKind.optional(),
+  title: z.string().min(1).max(200).optional(),
+  amount: z.number().finite().positive().max(10000000).optional(),
+  method: paymentMethodEnum.optional().nullable(),
+  bikeId: z.number().int().positive().optional().nullable(),
+  comment: z.string().max(1000).optional().nullable(),
+  createdAt: z.coerce.date().optional().nullable(),
+});
+
+export const buyoutStatus = z.enum(['ACTIVE', 'COMPLETED', 'CANCELLED']);
+export const buyoutPaymentStatus = z.enum(['PENDING', 'PAID']);
+export const buyoutInterval = z.enum(['WEEKLY', 'MONTHLY']);
+
+export const buyoutPaymentItemSchema = z.object({
+  dueDate: z.coerce.date(),
+  amount: z.number().finite().positive().max(10000000),
+  comment: z.string().max(500).optional().nullable(),
+});
+
+export const buyoutScheduleSchema = z.object({
+  firstDate: z.coerce.date(),
+  count: z.number().int().positive().max(120),
+  interval: buyoutInterval,
+});
+
+export const createBuyoutSchema = z.object({
+  title: z.string().min(1).max(200),
+  clientName: z.string().min(1).max(120),
+  clientPhone: z.string().max(30).optional().nullable(),
+  bikeId: z.number().int().positive().optional().nullable(),
+  totalPrice: z.number().finite().positive().max(10000000),
+  startDate: z.coerce.date().optional().nullable(),
+  comment: z.string().max(1000).optional().nullable(),
+  payments: z.array(buyoutPaymentItemSchema).max(120).optional(),
+  schedule: buyoutScheduleSchema.optional(),
+});
+
+export const updateBuyoutSchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  clientName: z.string().min(1).max(120).optional(),
+  clientPhone: z.string().max(30).optional().nullable(),
+  bikeId: z.number().int().positive().optional().nullable(),
+  totalPrice: z.number().finite().positive().max(10000000).optional(),
+  status: buyoutStatus.optional(),
+  startDate: z.coerce.date().optional().nullable(),
+  comment: z.string().max(1000).optional().nullable(),
+});
+
+export const createBuyoutPaymentSchema = z.object({
+  dueDate: z.coerce.date(),
+  amount: z.number().finite().positive().max(10000000),
+  comment: z.string().max(500).optional().nullable(),
+});
+
+export const updateBuyoutPaymentSchema = z.object({
+  dueDate: z.coerce.date().optional(),
+  amount: z.number().finite().positive().max(10000000).optional(),
+  status: buyoutPaymentStatus.optional(),
+  method: paymentMethodEnum.optional().nullable(),
+  comment: z.string().max(500).optional().nullable(),
 });
 
 export const createOrderSchema = z.object({

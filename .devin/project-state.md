@@ -44,7 +44,7 @@
 
 ### Ключевые модели (`prisma/schema.prisma`)
 
-- `Bike` — `id`, `name`, `speed`, `range`, `motor`, `battery`, `isWaterproof`, `status`, `pricePerDay`, `externalId`, `imageUrl`.
+- `Bike` — `id`, `name`, `speed`, `range`, `motor`, `battery`, `isWaterproof`, `status`, `pricePerDay`, `externalId`, `imageUrl`, `purchasePrice`, `purchaseDate`, `mileage`.
   - Статусы: `FREE`, `RENTED`, `MAINTENANCE`, `BLOCKED`.
 - `User` — `id`, `phone` (unique), `password`, `name`, `balance`, `telegramChatId`, `maxChatId`, `preferredMessenger`, `email`, `emailVerified`, `emailVerificationToken`.
 - `Rent` — `id`, `userId`, `bikeId`, `startDate`, `endDate`, `actualReturnDate`, `totalPrice`, `isActive`, `status`.
@@ -54,6 +54,10 @@
 - `Lead` — `id`, `name`, `phone`, `bikeName`, `status` (`NEW`, `IN_PROGRESS`, `CONFIRMED`, `REJECTED`), `message`, `comment`, `rejectReason`, `rentDays`, `totalPrice`, `startDate`, `endDate`, `bikeId`.
 - `Contact` — `id`, `firstName`, `lastName`, `phone` (unique-ish), `email`, `status`, `source`, `notes`, `lastContactAt`.
 - `RentalSession` — устаревающая модель сессий, пока дублирует логику.
+- `MiscTransaction` — прочие доходы/расходы вне аренды: `kind` (`INCOME`/`EXPENSE`), `title`, `amount`, `method`, `bikeId?`, `comment`.
+- `MileageLog` — журнал пробега: `bikeId`, `rentId?`, `mileage`, `note`, `createdAt`. Текущее значение дублируется в `Bike.mileage`.
+- `Buyout` — аренда под выкуп: `title`, `clientName`, `clientPhone`, `bikeId?`, `totalPrice`, `status` (`ACTIVE`, `COMPLETED`, `CANCELLED`), `startDate`, `comment`.
+- `BuyoutPayment` — строка графика выкупа: `buyoutId`, `dueDate`, `amount`, `status` (`PENDING`, `PAID`), `paidAt`, `method`, `comment`.
 - CMS-модели: `Hero`, `Feature`, `Step`, `Tariff`, `Review`, `FAQ`.
 
 ## 5. Админка
@@ -87,14 +91,16 @@
 
 ### Что отображает
 
-- Операционная и финансовая статистика.
+- Операционная и финансовая статистика (включая прочие доходы, расходы, доход по выкупам, прибыль за период).
 - Форма новой заявки (`LeadForm`).
+- «Прочие операции» — форма доход/расход (предмет, сумма, способ оплаты, привязка к байку) + последние операции с правкой/удалением.
+- «Аренда под выкуп» (`BuyoutSection`) — создание с авто/ручным/пустым графиком платежей, редактирование графика, отметка оплат.
 - Новые заявки с кнопкой «В работу».
-- Активные/просроченные аренды с кнопками «Завершить», «+1 день», ссылки для связи.
+- Активные/просроченные аренды с кнопками «Завершить», «+1 день» (обе через `MileagePrompt` — пробег необязателен), ссылки для связи.
 - Возвращающиеся сегодня/завтра.
 - Таймлайн загруженности на 14 дней.
-- Выручка по дням и топ байков.
-- Свободный транспорт и байки на сервисе.
+- Выручка по дням (аренда + прочие доходы + выкупы + расходы) и топ байков.
+- Свободный транспорт и байки на сервисе (с пробегом и кнопкой «Пробег»).
 
 ### API данных
 
@@ -105,9 +111,12 @@
 
 - `takeLead` — `PATCH /api/admin/leads/:id` → `{ status: 'IN_PROGRESS' }`.
 - `convertRent` — `POST /api/admin/leads/:id/convert` → `{ bikeId, days, totalPrice, startDate, endDate }`. Кнопка «Оформить» открывает модалку с выбором байка, срока и цены.
-- `completeRent` — `PATCH /api/admin/rents/:id` → `{ status: 'COMPLETED' }`.
-- `extendRent` — `PATCH /api/admin/rents/:id` → `{ extendDays: 1 }`.
+- `completeRent` — `PATCH /api/admin/rents/:id` → `{ status: 'COMPLETED', mileage? }`.
+- `extendRent` — `PATCH /api/admin/rents/:id` → `{ extendDays: 1, mileage? }`.
 - `markOverdue` — `POST /api/admin/overdue`.
+- Прочие операции: `GET/POST /api/admin/finance`, `PATCH/DELETE /api/admin/finance/:id`.
+- Пробег: `mileage` в `PATCH /api/admin/rents/:id` (пишет `MileageLog` + `Bike.mileage`, возвращает `mileageWarning` при уменьшении); `POST/GET /api/admin/bikes/:id/mileage` — внесение в любое время и история.
+- Выкупы: `GET/POST /api/admin/buyouts` (авто-график через `schedule{firstDate,count,interval}` или явный `payments[]`); `PATCH/DELETE /api/admin/buyouts/:id`; `POST /api/admin/buyouts/:id/payments`; `PATCH/DELETE /api/admin/buyout-payments/:id` (оплаченные не удаляются).
 
 ## 7. Аренды и заявки
 
@@ -193,6 +202,12 @@
 
 ## 11. Последние изменения (актуально)
 
+- **2026-09-30** — диспетчерская: прочие операции, пробег, выкуп:
+  - `MiscTransaction` — учёт доходов/расходов вне аренды (`/api/admin/finance`), секция «Прочие операции»;
+  - `MileageLog` + `Bike.mileage` — пробег при завершении/продлении/возврате (опционально, `MileagePrompt`) и в любое время (`POST /api/admin/bikes/:id/mileage`); заниженный пробег принимается с `mileageWarning`;
+  - `Buyout` + `BuyoutPayment` — аренда под выкуп с редактируемым графиком платежей (`/api/admin/buyouts`, `/api/admin/buyout-payments/:id`), секция в диспетчерской;
+  - `Bike.purchasePrice`/`purchaseDate` — поля в форме `/admin`, колонка «Пробег» в таблице автопарка;
+  - `GET /api/admin/dashboard` отдаёт `miscIncome*`, `expenses*`, `buyoutIncome*`, `netProfitPeriod`, `revenueByDay[].misc|expense|buyout`, `recentMisc`, `bikes`, `buyouts`.
 - **2025-09-30** — `fix(admin/rents): валидация сумм при продлении/оплате и точные ошибки в UI` (`113ca5e`):
   - проверяем, что `additionalPrice`, `newTotalPrice`, `finalPaymentAmount` — конечные неотрицательные числа;
   - защита от `NaN`/`Infinity`, которые приводили к `prisma.rentTransaction.create()` `ConnectorError`;
@@ -246,6 +261,7 @@ npm run dev
 cd /var/www/elbiko
 # Убедиться, что на диске есть место (df -h)
 git pull origin master
+npx prisma db push   # новые таблицы/поля — изменения аддитивные, данные не затрагиваются
 npx prisma generate
 systemctl stop elbiko
 rm -rf .next

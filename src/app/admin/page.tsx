@@ -14,6 +14,9 @@ interface Bike {
   pricePerDay: string | number;
   externalId: string | null;
   imageUrl: string | null;
+  purchasePrice?: string | number | null;
+  purchaseDate?: string | null;
+  mileage?: number | null;
   _count?: { rents: number };
 }
 
@@ -26,6 +29,9 @@ interface BikeForm {
   externalId: string;
   imageUrl: string;
   isWaterproof: boolean;
+  purchasePrice: string;
+  purchaseDate: string;
+  mileage: string;
 }
 
 const EMPTY_FORM: BikeForm = {
@@ -37,6 +43,9 @@ const EMPTY_FORM: BikeForm = {
   externalId: '',
   imageUrl: '',
   isWaterproof: false,
+  purchasePrice: '',
+  purchaseDate: '',
+  mileage: '',
 };
 
 const STATUS_BADGE: Record<BikeStatus, string> = {
@@ -123,6 +132,9 @@ export default function AdminPage() {
       ...form,
       pricePerDay: Number(form.pricePerDay),
       imageUrl: form.imageUrl || null,
+      purchasePrice: form.purchasePrice.trim() !== '' ? Number(form.purchasePrice) : null,
+      purchaseDate: form.purchaseDate || null,
+      mileage: form.mileage.trim() !== '' ? Number(form.mileage) : null,
       ...(editingId ? { id: editingId } : {}),
     };
 
@@ -161,6 +173,9 @@ export default function AdminPage() {
       externalId: bike.externalId || '',
       imageUrl: bike.imageUrl || '',
       isWaterproof: bike.isWaterproof,
+      purchasePrice: bike.purchasePrice != null ? String(bike.purchasePrice) : '',
+      purchaseDate: bike.purchaseDate ? bike.purchaseDate.split('T')[0] : '',
+      mileage: bike.mileage != null ? String(bike.mileage) : '',
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -218,13 +233,13 @@ export default function AdminPage() {
   if (isLoading) {
     bikeRows.push(
       <tr key="loading" className="border-b border-slate-800">
-        <td colSpan={6} className="p-4 text-center text-slate-400">Загрузка данных...</td>
+        <td colSpan={7} className="p-4 text-center text-slate-400">Загрузка данных...</td>
       </tr>
     );
   } else if (bikes.length === 0) {
     bikeRows.push(
       <tr key="empty" className="border-b border-slate-800">
-        <td colSpan={6} className="p-4 text-center text-slate-400">Велосипеды не найдены</td>
+        <td colSpan={7} className="p-4 text-center text-slate-400">Велосипеды не найдены</td>
       </tr>
     );
   } else {
@@ -240,6 +255,12 @@ export default function AdminPage() {
           </td>
           <td className="p-4 text-slate-300 text-sm">{specsText}</td>
           <td className="p-4 text-slate-200 text-sm whitespace-nowrap">{Number(bike.pricePerDay)} ₽/сут</td>
+          <td className="p-4 text-slate-300 text-sm whitespace-nowrap">
+            {bike.mileage != null ? `${Number(bike.mileage).toLocaleString('ru-RU')} км` : <span className="text-slate-600">—</span>}
+            {bike.purchasePrice != null && (
+              <div className="text-xs text-slate-500">закупка {Number(bike.purchasePrice).toLocaleString('ru-RU')} ₽</div>
+            )}
+          </td>
           <td className="p-4 text-sm font-semibold whitespace-nowrap">
             <span className={badgeClass}>{BIKE_STATUS_LABELS[bike.status] ?? bike.status}</span>
           </td>
@@ -386,6 +407,41 @@ export default function AdminPage() {
               </div>
 
               <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">Цена покупки, ₽ (необязательно)</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={form.purchasePrice}
+                  onChange={(e) => setForm({ ...form, purchasePrice: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  placeholder="За сколько купили"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">Дата покупки (необязательно)</label>
+                <input
+                  type="date"
+                  value={form.purchaseDate}
+                  onChange={(e) => setForm({ ...form, purchaseDate: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">Пробег, км (необязательно)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={form.mileage}
+                  onChange={(e) => setForm({ ...form, mileage: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  placeholder="Текущий пробег"
+                />
+              </div>
+
+              <div>
                 <label className="block text-xs font-medium text-slate-400 mb-1">Ссылка на фото (необязательно)</label>
                 <input
                   type="url"
@@ -438,6 +494,7 @@ export default function AdminPage() {
                   <th className="p-4">ID байка</th>
                   <th className="p-4">Характеристики</th>
                   <th className="p-4">Тариф</th>
+                  <th className="p-4">Пробег</th>
                   <th className="p-4">Статус</th>
                   <th className="p-4 text-right">Действия</th>
                 </tr>

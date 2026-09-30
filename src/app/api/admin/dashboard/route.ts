@@ -58,6 +58,10 @@ export async function GET(request: Request) {
       revenuePeriodPayments,
       failedRefundedAgg,
       rentRevenueByBike,
+      miscPeriodTx,
+      recentMisc,
+      buyoutPaidPeriod,
+      activeBuyouts,
     ] = await Promise.all([
       prisma.bike.findMany({
         orderBy: { name: 'asc' },
@@ -139,6 +143,41 @@ export async function GET(request: Request) {
         where: { status: 'COMPLETED' },
         _sum: { totalPrice: true },
       }),
+      prisma.miscTransaction.findMany({
+        where: {
+          createdAt: { gte: periodStart },
+        },
+        select: {
+          kind: true,
+          amount: true,
+          createdAt: true,
+        },
+      }),
+      prisma.miscTransaction.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+        include: {
+          bike: { select: { id: true, name: true, externalId: true } },
+        },
+      }),
+      prisma.buyoutPayment.findMany({
+        where: {
+          status: 'PAID',
+          paidAt: { gte: periodStart },
+        },
+        select: {
+          amount: true,
+          paidAt: true,
+        },
+      }),
+      prisma.buyout.findMany({
+        where: { status: 'ACTIVE' },
+        include: {
+          payments: { orderBy: { dueDate: 'asc' } },
+          bike: { select: { id: true, name: true, externalId: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
     ]);
 
     const activeRents = activeAndOverdueRents;
@@ -169,26 +208,70 @@ export async function GET(request: Request) {
 
     const revenueToday = Number(revenueTodayAgg._sum.amount ?? 0);
 
-    const byDay = new Map<string, number>();
+    const byDay = new Map<string, { revenue: number; misc: number; expense: number; buyout: number }>();
     for (let i = 0; i < days; i++) {
       const d = new Date(periodStart);
       d.setDate(d.getDate() + i);
       const key = d.toISOString().split('T')[0];
-      byDay.set(key, 0);
+      byDay.set(key, { revenue: 0, misc: 0, expense: 0, buyout: 0 });
     }
     for (const payment of revenuePeriodPayments) {
       const key = payment.updatedAt.toISOString().split('T')[0];
-      if (byDay.has(key)) {
-        byDay.set(key, byDay.get(key)! + Number(payment.amount));
+      const entry = byDay.get(key);
+      if (entry) {
+        entry.revenue += Number(payment.amount);
+      }
+    }
+    for (const tx of miscPeriodTx) {
+      const key = tx.createdAt.toISOString().split('T')[0];
+      const entry = byDay.get(key);
+      if (entry) {
+        if (tx.kind === 'INCOME') entry.misc += Number(tx.amount);
+        else if (tx.kind === 'EXPENSE') entry.expense += Number(tx.amount);
+      }
+    }
+    for (const bp of buyoutPaidPeriod) {
+      if (!bp.paidAt) continue;
+      const key = bp.paidAt.toISOString().split('T')[0];
+      const entry = byDay.get(key);
+      if (entry) {
+        entry.buyout += Number(bp.amount);
       }
     }
     const revenueByDay = Array.from(byDay.entries())
-      .map(([date, revenue]) => ({ date, revenue }))
+      .map(([date, v]) => ({ date, revenue: v.revenue, misc: v.misc, expense: v.expense, buyout: v.buyout }))
       .sort((a, b) => a.date.localeCompare(b.date));
 
     const revenuePeriod = revenueByDay.reduce((sum, d) => sum + d.revenue, 0);
     const averageCheck = Number(completedRentsForAvg._avg.totalPrice ?? 0);
     const failedRefundedRevenue = Number(failedRefundedAgg._sum.amount ?? 0);
+
+    let miscIncomePeriod = 0;
+    let miscIncomeToday = 0;
+    let expensesPeriod = 0;
+    let expensesToday = 0;
+    for (const tx of miscPeriodTx) {
+      const amount = Number(tx.amount);
+      const isToday = tx.createdAt >= today && tx.createdAt < tomorrow;
+      if (tx.kind === 'INCOME') {
+        miscIncomePeriod += amount;
+        if (isToday) miscIncomeToday += amount;
+      } else if (tx.kind === 'EXPENSE') {
+        expensesPeriod += amount;
+        if (isToday) expensesToday += amount;
+      }
+    }
+    let buyoutIncomePeriod = 0;
+    let buyoutIncomeToday = 0;
+    for (const bp of buyoutPaidPeriod) {
+      const amount = Number(bp.amount);
+      buyoutIncomePeriod += amount;
+      if (bp.paidAt && bp.paidAt >= today && bp.paidAt < tomorrow) {
+        buyoutIncomeToday += amount;
+      }
+    }
+
+    const netProfitPeriod = revenuePeriod + miscIncomePeriod + buyoutIncomePeriod - expensesPeriod;
 
     const bikeNameMap = new Map(bikes.map((b) => [b.id, b.name]));
     const topBikes = rentRevenueByBike
@@ -257,6 +340,13 @@ export async function GET(request: Request) {
       overdueRevenue,
       averageCheck,
       failedRefundedRevenue,
+      miscIncomeToday,
+      miscIncomePeriod,
+      expensesToday,
+      expensesPeriod,
+      buyoutIncomeToday,
+      buyoutIncomePeriod,
+      netProfitPeriod,
     };
 
     return NextResponse.json({
@@ -271,6 +361,9 @@ export async function GET(request: Request) {
       revenueByDay,
       topBikes,
       timeline,
+      bikes,
+      recentMisc,
+      buyouts: activeBuyouts,
     });
   } catch (error) {
     console.error('Ошибка API диспетчерской:', error);

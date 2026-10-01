@@ -62,6 +62,7 @@ export async function GET(request: Request) {
       recentMisc,
       buyoutPaidPeriod,
       activeBuyouts,
+      pendingBuyoutAgg,
     ] = await Promise.all([
       prisma.bike.findMany({
         orderBy: { name: 'asc' },
@@ -129,6 +130,7 @@ export async function GET(request: Request) {
         select: {
           amount: true,
           updatedAt: true,
+          paymentMethod: true,
         },
       }),
       prisma.payment.aggregate({
@@ -151,6 +153,7 @@ export async function GET(request: Request) {
           kind: true,
           amount: true,
           createdAt: true,
+          method: true,
         },
       }),
       prisma.miscTransaction.findMany({
@@ -168,6 +171,7 @@ export async function GET(request: Request) {
         select: {
           amount: true,
           paidAt: true,
+          method: true,
         },
       }),
       prisma.buyout.findMany({
@@ -177,6 +181,13 @@ export async function GET(request: Request) {
           bike: { select: { id: true, name: true, externalId: true } },
         },
         orderBy: { createdAt: 'desc' },
+      }),
+      prisma.buyoutPayment.aggregate({
+        _sum: { amount: true },
+        where: {
+          status: 'PENDING',
+          buyout: { status: 'ACTIVE' },
+        },
       }),
     ]);
 
@@ -239,7 +250,14 @@ export async function GET(request: Request) {
       }
     }
     const revenueByDay = Array.from(byDay.entries())
-      .map(([date, v]) => ({ date, revenue: v.revenue, misc: v.misc, expense: v.expense, buyout: v.buyout }))
+      .map(([date, v]) => ({
+        date,
+        revenue: v.revenue,
+        misc: v.misc,
+        expense: v.expense,
+        buyout: v.buyout,
+        total: v.revenue + v.misc + v.buyout,
+      }))
       .sort((a, b) => a.date.localeCompare(b.date));
 
     const revenuePeriod = revenueByDay.reduce((sum, d) => sum + d.revenue, 0);
@@ -272,6 +290,20 @@ export async function GET(request: Request) {
     }
 
     const netProfitPeriod = revenuePeriod + miscIncomePeriod + buyoutIncomePeriod - expensesPeriod;
+    const totalIncomeToday = revenueToday + miscIncomeToday + buyoutIncomeToday;
+    const totalIncomePeriod = revenuePeriod + miscIncomePeriod + buyoutIncomePeriod;
+    const pendingBuyoutTotal = Number(pendingBuyoutAgg._sum.amount ?? 0);
+
+    const incomeByMethod: Record<string, number> = {};
+    const addMethodSum = (method: string | null, amount: number) => {
+      const key = method || 'NONE';
+      incomeByMethod[key] = (incomeByMethod[key] || 0) + amount;
+    };
+    revenuePeriodPayments.forEach((p) => addMethodSum(p.paymentMethod, Number(p.amount)));
+    miscPeriodTx
+      .filter((tx) => tx.kind === 'INCOME')
+      .forEach((tx) => addMethodSum(tx.method, Number(tx.amount)));
+    buyoutPaidPeriod.forEach((bp) => addMethodSum(bp.method, Number(bp.amount)));
 
     const bikeNameMap = new Map(bikes.map((b) => [b.id, b.name]));
     const topBikes = rentRevenueByBike
@@ -347,6 +379,10 @@ export async function GET(request: Request) {
       buyoutIncomeToday,
       buyoutIncomePeriod,
       netProfitPeriod,
+      totalIncomeToday,
+      totalIncomePeriod,
+      pendingBuyoutTotal,
+      incomeByMethod,
     };
 
     return NextResponse.json({

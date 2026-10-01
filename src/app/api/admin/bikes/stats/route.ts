@@ -41,11 +41,19 @@ interface BikeStat {
   id: number;
   name: string;
   externalId: string | null;
+  purchasePrice: number | null;
+  purchaseDate: string | null;
+  mileage: number | null;
   rentDays: number;
   rentCount: number;
   revenue: number;
   avgCheck: number;
   utilization: number;
+  expenses: number;
+  expenseCount: number;
+  profit: number;
+  paybackPct: number | null;
+  paybackNet: number | null;
 }
 
 export async function GET(request: Request) {
@@ -62,9 +70,16 @@ export async function GET(request: Request) {
     const rangeEnd = to;
     const totalDays = periodDays(rangeStart, rangeEnd);
 
-    const [bikes, rents] = await Promise.all([
+    const [bikes, rents, expenseGroups, unassignedAgg, allTimeRentRevenue, allTimeMiscIncome, allTimeMiscExpense] = await Promise.all([
       prisma.bike.findMany({
-        select: { id: true, name: true, externalId: true },
+        select: {
+          id: true,
+          name: true,
+          externalId: true,
+          purchasePrice: true,
+          purchaseDate: true,
+          mileage: true,
+        },
         orderBy: { id: 'desc' },
       }),
       prisma.rent.findMany({
@@ -86,7 +101,52 @@ export async function GET(request: Request) {
           status: true,
         },
       }),
+      prisma.miscTransaction.groupBy({
+        by: ['bikeId'],
+        where: {
+          kind: 'EXPENSE',
+          bikeId: { not: null },
+          createdAt: { gte: rangeStart, lte: rangeEnd },
+        },
+        _sum: { amount: true },
+        _count: { _all: true },
+      }),
+      prisma.miscTransaction.aggregate({
+        where: {
+          kind: 'EXPENSE',
+          bikeId: null,
+          createdAt: { gte: rangeStart, lte: rangeEnd },
+        },
+        _sum: { amount: true },
+        _count: { _all: true },
+      }),
+      prisma.rent.groupBy({
+        by: ['bikeId'],
+        where: { status: { not: 'CANCELLED' } },
+        _sum: { totalPrice: true },
+      }),
+      prisma.miscTransaction.groupBy({
+        by: ['bikeId'],
+        where: { kind: 'INCOME', bikeId: { not: null } },
+        _sum: { amount: true },
+      }),
+      prisma.miscTransaction.groupBy({
+        by: ['bikeId'],
+        where: { kind: 'EXPENSE', bikeId: { not: null } },
+        _sum: { amount: true },
+      }),
     ]);
+
+    const toSumMap = (groups: { bikeId: number | null; _sum: { amount?: unknown; totalPrice?: unknown } }[], field: 'amount' | 'totalPrice') => {
+      const map: Record<number, number> = {};
+      groups.forEach((g) => {
+        if (g.bikeId != null) map[g.bikeId] = Number(g._sum[field] ?? 0);
+      });
+      return map;
+    };
+    const allTimeRevenueMap = toSumMap(allTimeRentRevenue, 'totalPrice');
+    const allTimeMiscIncomeMap = toSumMap(allTimeMiscIncome, 'amount');
+    const allTimeMiscExpenseMap = toSumMap(allTimeMiscExpense, 'amount');
 
     const revenueByBike: Record<number, number> = {};
     const rentDaysByBike: Record<number, number> = {};
@@ -117,22 +177,53 @@ export async function GET(request: Request) {
       }
     });
 
+    const expenseByBike: Record<number, { sum: number; count: number }> = {};
+    expenseGroups.forEach((g) => {
+      if (g.bikeId != null) {
+        expenseByBike[g.bikeId] = {
+          sum: Number(g._sum.amount ?? 0),
+          count: g._count._all,
+        };
+      }
+    });
+
     const bikeStats: BikeStat[] = bikes.map((bike) => {
       const rentDays = rentDaysByBike[bike.id] || 0;
       const rentCount = rentCountByBike[bike.id] || 0;
       const revenue = revenueByBike[bike.id] || 0;
       const avgCheck = rentCount > 0 ? Math.round(revenue / rentCount) : 0;
       const utilization = Math.min(100, Math.round((rentDays / totalDays) * 1000) / 10);
+      const expenses = expenseByBike[bike.id]?.sum || 0;
+      const expenseCount = expenseByBike[bike.id]?.count || 0;
+
+      const purchase = bike.purchasePrice != null ? Number(bike.purchasePrice) : null;
+      const allTimeNet =
+        (allTimeRevenueMap[bike.id] || 0) +
+        (allTimeMiscIncomeMap[bike.id] || 0) -
+        (allTimeMiscExpenseMap[bike.id] || 0);
+      const paybackPct =
+        purchase != null && purchase > 0
+          ? Math.round((allTimeNet / purchase) * 1000) / 10
+          : null;
+      const paybackNet = purchase != null ? allTimeNet - purchase : null;
 
       return {
         id: bike.id,
         name: bike.name,
         externalId: bike.externalId,
+        purchasePrice: bike.purchasePrice != null ? Number(bike.purchasePrice) : null,
+        purchaseDate: bike.purchaseDate ? bike.purchaseDate.toISOString() : null,
+        mileage: bike.mileage,
         rentDays,
         rentCount,
         revenue,
         avgCheck,
         utilization,
+        expenses,
+        expenseCount,
+        profit: revenue - expenses,
+        paybackPct,
+        paybackNet,
       };
     });
 
@@ -146,6 +237,11 @@ export async function GET(request: Request) {
       utilization: bikeStats.length
         ? Math.round((bikeStats.reduce((sum, b) => sum + b.utilization, 0) / bikeStats.length) * 10) / 10
         : 0,
+      expenses: bikeStats.reduce((sum, b) => sum + b.expenses, 0),
+      expenseCount: bikeStats.reduce((sum, b) => sum + b.expenseCount, 0),
+      profit: bikeStats.reduce((sum, b) => sum + b.profit, 0),
+      unassignedExpenses: Number(unassignedAgg._sum.amount ?? 0),
+      unassignedCount: unassignedAgg._count._all,
     };
 
     return NextResponse.json({

@@ -33,6 +33,10 @@ interface Stats {
   buyoutIncomeToday: number;
   buyoutIncomePeriod: number;
   netProfitPeriod: number;
+  totalIncomeToday: number;
+  totalIncomePeriod: number;
+  pendingBuyoutTotal: number;
+  incomeByMethod: Record<string, number>;
 }
 
 interface Bike {
@@ -90,6 +94,7 @@ interface RevenueDay {
   misc?: number;
   expense?: number;
   buyout?: number;
+  total?: number;
 }
 
 interface MiscTransaction {
@@ -555,8 +560,9 @@ export default function DispatchPage() {
 
   const financialStats: { label: string; value: number; color: string }[] = data
     ? [
-        { label: 'Выручка сегодня', value: data.stats.revenueToday, color: 'text-emerald-400' },
-        { label: `Выручка за ${days} дн.`, value: data.stats.revenuePeriod, color: 'text-amber-400' },
+        { label: 'Выручка всего сегодня', value: data.stats.totalIncomeToday, color: 'text-emerald-400' },
+        { label: `Выручка всего за ${days} дн.`, value: data.stats.totalIncomePeriod, color: 'text-amber-400' },
+        { label: `Аренда за ${days} дн.`, value: data.stats.revenuePeriod, color: 'text-sky-400' },
         { label: 'Ожидаемая выручка', value: data.stats.expectedRevenue, color: 'text-cyan-400' },
         { label: 'Просроченная выручка', value: data.stats.overdueRevenue, color: 'text-rose-400' },
         { label: 'Средний чек', value: data.stats.averageCheck, color: 'text-slate-200' },
@@ -565,18 +571,12 @@ export default function DispatchPage() {
         { label: `Доход по выкупам за ${days} дн.`, value: data.stats.buyoutIncomePeriod, color: 'text-cyan-300' },
         { label: `Расходы за ${days} дн.`, value: data.stats.expensesPeriod, color: 'text-rose-300' },
         { label: `Прибыль за ${days} дн.`, value: data.stats.netProfitPeriod, color: 'text-lime-400' },
+        { label: 'Осталось по выкупам', value: data.stats.pendingBuyoutTotal, color: 'text-violet-400' },
       ]
     : [];
 
-  const maxMisc = data && data.revenueByDay.length > 0
-    ? Math.max(
-        ...data.revenueByDay.map((d) => Math.max(d.misc ?? 0, d.expense ?? 0, d.buyout ?? 0)),
-        1
-      )
-    : 1;
-
   const maxRevenue = data && data.revenueByDay.length > 0
-    ? Math.max(...data.revenueByDay.map((d) => d.revenue), 1)
+    ? Math.max(...data.revenueByDay.map((d) => Math.max(d.total ?? 0, d.expense ?? 0)), 1)
     : 1;
 
   const query = searchQuery.toLowerCase().trim();
@@ -1161,13 +1161,39 @@ export default function DispatchPage() {
                 ))}
           </div>
 
+          {data && Object.keys(data.stats.incomeByMethod).length > 0 && (
+            <div className="mb-8 bg-slate-950/50 border border-slate-800 rounded-xl p-4">
+              <h3 className="text-sm font-semibold text-slate-200 mb-3">Доходы по способам оплаты за {days} дн.</h3>
+              <div className="flex flex-wrap gap-3">
+                {['CASH', 'SBP', 'CARD', 'TRANSFER', 'NONE']
+                  .filter((m) => (data.stats.incomeByMethod[m] ?? 0) > 0)
+                  .map((m) => (
+                    <div
+                      key={m}
+                      className="flex items-center gap-2 bg-slate-900/70 border border-slate-800 rounded-lg px-4 py-2"
+                    >
+                      <span className="text-xs text-slate-400">
+                        {m === 'NONE' ? 'Без указания' : (METHOD_LABELS[m] ?? m)}
+                      </span>
+                      <span className="text-sm font-bold text-emerald-400">
+                        {formatMoney(data.stats.incomeByMethod[m])}
+                      </span>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 bg-slate-950/50 border border-slate-800 rounded-xl p-4">
               <div className="flex items-center justify-between gap-4 mb-4">
                 <h3 className="text-sm font-semibold text-slate-200">Выручка по дням</h3>
                 <div className="flex gap-3 text-[10px] text-slate-400">
                   <span className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-amber-500" /> Аренда
+                    <span className="w-2 h-2 rounded-full bg-amber-500" /> Всего
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-sky-500" /> Аренда
                   </span>
                   <span className="flex items-center gap-1">
                     <span className="w-2 h-2 rounded-full bg-emerald-500" /> Прочие доходы
@@ -1194,16 +1220,24 @@ export default function DispatchPage() {
                         <div className="h-3 bg-slate-800 rounded-full overflow-hidden">
                           <div
                             className="h-full bg-amber-500 rounded-full"
-                            style={{ width: `${(day.revenue / maxRevenue) * 100}%` }}
+                            style={{ width: `${((day.total ?? 0) / maxRevenue) * 100}%` }}
                           />
                         </div>
-                        {((day.misc ?? 0) > 0 || (day.expense ?? 0) > 0 || (day.buyout ?? 0) > 0) && (
+                        {((day.revenue ?? 0) > 0 || (day.misc ?? 0) > 0 || (day.expense ?? 0) > 0 || (day.buyout ?? 0) > 0) && (
                           <div className="mt-1 space-y-0.5">
+                            {(day.revenue ?? 0) > 0 && (
+                              <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-sky-500 rounded-full"
+                                  style={{ width: `${((day.revenue ?? 0) / maxRevenue) * 100}%` }}
+                                />
+                              </div>
+                            )}
                             {(day.misc ?? 0) > 0 && (
                               <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
                                 <div
                                   className="h-full bg-emerald-500 rounded-full"
-                                  style={{ width: `${((day.misc ?? 0) / maxMisc) * 100}%` }}
+                                  style={{ width: `${((day.misc ?? 0) / maxRevenue) * 100}%` }}
                                 />
                               </div>
                             )}
@@ -1211,7 +1245,7 @@ export default function DispatchPage() {
                               <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
                                 <div
                                   className="h-full bg-cyan-500 rounded-full"
-                                  style={{ width: `${((day.buyout ?? 0) / maxMisc) * 100}%` }}
+                                  style={{ width: `${((day.buyout ?? 0) / maxRevenue) * 100}%` }}
                                 />
                               </div>
                             )}
@@ -1219,7 +1253,7 @@ export default function DispatchPage() {
                               <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
                                 <div
                                   className="h-full bg-rose-500 rounded-full"
-                                  style={{ width: `${((day.expense ?? 0) / maxMisc) * 100}%` }}
+                                  style={{ width: `${((day.expense ?? 0) / maxRevenue) * 100}%` }}
                                 />
                               </div>
                             )}
@@ -1227,7 +1261,7 @@ export default function DispatchPage() {
                         )}
                       </div>
                       <div className="w-24 text-right text-xs text-slate-200 font-medium">
-                        {formatMoney(day.revenue)}
+                        {formatMoney(day.total ?? 0)}
                       </div>
                     </div>
                   ))}

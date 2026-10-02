@@ -23,6 +23,8 @@ model Bike {
   purchasePrice Decimal? @db.Decimal(10, 2) // Закупочная цена байка
   purchaseDate DateTime? // Дата покупки
   mileage      Int? // Текущий пробег, км
+  serviceIntervalKm  Int? // Интервал ТО, км
+  lastServiceMileage Int? // Пробег на момент последнего ТО, км
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -200,6 +202,7 @@ model MiscTransaction {
   title     String   // Предмет: "Ремонт", "Аренда аккумулятора", "Сопутствующие товары" и т.п.
   amount    Decimal  @db.Decimal(10, 2)
   method    String?  // Способ оплаты: CASH, SBP, CARD, TRANSFER
+  category  String?  // Категория: REPAIR, SERVICE, BATTERY, BATTERY_RENT, ACCESSORIES, GOODS, OTHER
   bikeId    Int?
   comment   String?  @db.Text
 

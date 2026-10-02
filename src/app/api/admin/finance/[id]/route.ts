@@ -43,6 +43,7 @@ export async function PATCH(
     if (fields.title !== undefined) updateData.title = fields.title.trim();
     if (fields.amount !== undefined) updateData.amount = fields.amount;
     if (fields.method !== undefined) updateData.method = fields.method;
+    if (fields.category !== undefined) updateData.category = fields.category;
     if (fields.comment !== undefined) updateData.comment = fields.comment?.trim() || null;
     if (fields.createdAt !== undefined && fields.createdAt !== null) {
       updateData.createdAt = fields.createdAt;

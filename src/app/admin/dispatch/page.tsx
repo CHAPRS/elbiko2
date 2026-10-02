@@ -37,6 +37,7 @@ interface Stats {
   totalIncomePeriod: number;
   pendingBuyoutTotal: number;
   incomeByMethod: Record<string, number>;
+  expenseByCategory: Record<string, number>;
 }
 
 interface Bike {
@@ -46,6 +47,8 @@ interface Bike {
   status: string;
   pricePerDay: number;
   mileage?: number | null;
+  serviceIntervalKm?: number | null;
+  lastServiceMileage?: number | null;
 }
 
 interface Lead {
@@ -103,6 +106,7 @@ interface MiscTransaction {
   title: string;
   amount: number;
   method?: string | null;
+  category?: string | null;
   bikeId?: number | null;
   bike?: { id: number; name: string; externalId?: string | null } | null;
   comment?: string | null;
@@ -136,6 +140,7 @@ interface DashboardData {
   bikes: Bike[];
   recentMisc: MiscTransaction[];
   buyouts: Buyout[];
+  archivedBuyouts?: Buyout[];
 }
 
 function formatDate(date: string): string {
@@ -175,6 +180,19 @@ const METHOD_LABELS: Record<string, string> = {
   CARD: 'Карта',
   TRANSFER: 'Перевод',
 };
+
+const CATEGORY_LABELS: Record<string, string> = {
+  REPAIR: 'Ремонт',
+  SERVICE: 'ТО',
+  BATTERY: 'Аккумулятор',
+  BATTERY_RENT: 'Аренда аккумулятора',
+  ACCESSORIES: 'Аксессуары',
+  GOODS: 'Сопутствующие товары',
+  OTHER: 'Прочее',
+  NONE: 'Без категории',
+};
+
+const CATEGORY_ORDER = ['REPAIR', 'SERVICE', 'BATTERY', 'BATTERY_RENT', 'ACCESSORIES', 'GOODS', 'OTHER', 'NONE'];
 
 const MISC_TITLE_SUGGESTIONS = [
   'Ремонт',
@@ -231,6 +249,7 @@ export default function DispatchPage() {
   const [miscTitle, setMiscTitle] = useState('');
   const [miscAmount, setMiscAmount] = useState('');
   const [miscMethod, setMiscMethod] = useState('CASH');
+  const [miscCategory, setMiscCategory] = useState('');
   const [miscBikeId, setMiscBikeId] = useState('');
   const [miscComment, setMiscComment] = useState('');
   const [miscSaving, setMiscSaving] = useState(false);
@@ -447,6 +466,39 @@ export default function DispatchPage() {
     }
   };
 
+  const markServiceDone = async (bike: Bike) => {
+    if (bike.mileage == null) {
+      setError('Сначала укажите текущий пробег байка');
+      return;
+    }
+    try {
+      const res = await fetch('/api/admin/bikes', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: bike.id, lastServiceMileage: bike.mileage }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error || 'Не удалось отметить ТО');
+        return;
+      }
+      setNotice(`ТО проведено: ${bike.name} на ${bike.mileage.toLocaleString('ru-RU')} км`);
+      fetchDashboard(days);
+    } catch {
+      setError('Нет связи с сервером');
+    }
+  };
+
+  const serviceInfo = (bike: Bike): { text: string; overdue: boolean } | null => {
+    if (bike.serviceIntervalKm == null || bike.serviceIntervalKm <= 0) return null;
+    if (bike.mileage == null) return { text: 'Пробег не указан', overdue: false };
+    const sinceLast = bike.mileage - (bike.lastServiceMileage ?? 0);
+    const remaining = bike.serviceIntervalKm - sinceLast;
+    return remaining <= 0
+      ? { text: `ТО просрочено на ${Math.abs(remaining).toLocaleString('ru-RU')} км`, overdue: true }
+      : { text: `до ТО ${remaining.toLocaleString('ru-RU')} км`, overdue: false };
+  };
+
   const markOverdue = async () => {
     setMarkingOverdue(true);
     try {
@@ -471,6 +523,7 @@ export default function DispatchPage() {
     setMiscTitle('');
     setMiscAmount('');
     setMiscMethod('CASH');
+    setMiscCategory('');
     setMiscBikeId('');
     setMiscComment('');
   };
@@ -481,6 +534,7 @@ export default function DispatchPage() {
     setMiscTitle(tx.title);
     setMiscAmount(String(tx.amount));
     setMiscMethod(tx.method || 'CASH');
+    setMiscCategory(tx.category || '');
     setMiscBikeId(tx.bikeId ? String(tx.bikeId) : '');
     setMiscComment(tx.comment || '');
   };
@@ -502,6 +556,7 @@ export default function DispatchPage() {
         title: miscTitle.trim(),
         amount,
         method: miscMethod || null,
+        category: miscCategory || null,
         bikeId: miscBikeId ? Number(miscBikeId) : null,
         comment: miscComment.trim() || null,
       };
@@ -595,6 +650,63 @@ export default function DispatchPage() {
   const filteredActiveRents = data?.activeRents.filter((rent) =>
     matchesSearch(rent.user.name, rent.user.phone, rent.bike.name)
   ) ?? [];
+
+  const nowTs = Date.now();
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  type Debtor = {
+    key: string;
+    kind: 'Аренда' | 'Выкуп';
+    name: string;
+    phone?: string | null;
+    target: string;
+    amount: number;
+    dueDate: string;
+    daysOverdue: number;
+  };
+  const debtors: Debtor[] = [];
+
+  (data?.activeRents ?? [])
+    .filter((rent) =>
+      new Date(rent.endDate).getTime() < nowTs &&
+      matchesSearch(rent.user.name, rent.user.phone, rent.bike.name)
+    )
+    .forEach((rent) => {
+      debtors.push({
+        key: `rent-${rent.id}`,
+        kind: 'Аренда',
+        name: rent.user.name,
+        phone: rent.user.phone,
+        target: rent.bike.name + (rent.bike.externalId ? ` (ID: ${rent.bike.externalId})` : ''),
+        amount: Number(rent.totalPrice) || 0,
+        dueDate: rent.endDate,
+        daysOverdue: Math.floor((nowTs - new Date(rent.endDate).getTime()) / DAY_MS),
+      });
+    });
+
+  (data?.buyouts ?? [])
+    .filter((b) => matchesSearch(b.clientName, b.clientPhone, b.title))
+    .forEach((b) => {
+      const overduePayments = b.payments.filter(
+        (p) => p.status === 'PENDING' && new Date(p.dueDate).getTime() < nowTs
+      );
+      if (overduePayments.length === 0) return;
+      const earliest = overduePayments.reduce((min, p) =>
+        new Date(p.dueDate) < new Date(min) ? p.dueDate : min,
+      overduePayments[0].dueDate);
+      debtors.push({
+        key: `buyout-${b.id}`,
+        kind: 'Выкуп',
+        name: b.clientName,
+        phone: b.clientPhone,
+        target: b.title,
+        amount: overduePayments.reduce((s, p) => s + Number(p.amount), 0),
+        dueDate: earliest,
+        daysOverdue: Math.floor((nowTs - new Date(earliest).getTime()) / DAY_MS),
+      });
+    });
+
+  debtors.sort((a, b) => b.daysOverdue - a.daysOverdue);
+  const totalDebt = debtors.reduce((sum, d) => sum + d.amount, 0);
 
   const filteredReturningToday = data?.returningToday.filter((rent) =>
     matchesSearch(rent.user.name, rent.user.phone, rent.bike.name)
@@ -776,6 +888,23 @@ export default function DispatchPage() {
                   </select>
                 </div>
                 <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Категория</label>
+                  <select
+                    value={miscCategory}
+                    onChange={(e) => setMiscCategory(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="">— без категории —</option>
+                    <option value="REPAIR">Ремонт</option>
+                    <option value="SERVICE">ТО</option>
+                    <option value="BATTERY">Аккумулятор</option>
+                    <option value="BATTERY_RENT">Аренда аккумулятора</option>
+                    <option value="ACCESSORIES">Аксессуары</option>
+                    <option value="GOODS">Сопутствующие товары</option>
+                    <option value="OTHER">Прочее</option>
+                  </select>
+                </div>
+                <div>
                   <label className="block text-xs font-medium text-slate-400 mb-1">Байк (необязательно)</label>
                   <select
                     value={miscBikeId}
@@ -847,6 +976,7 @@ export default function DispatchPage() {
                         </p>
                         <p className="text-xs text-slate-500 mt-0.5">
                           {formatDateTime(tx.createdAt)}
+                          {tx.category ? ` · ${CATEGORY_LABELS[tx.category] || tx.category}` : ''}
                           {tx.method ? ` · ${METHOD_LABELS[tx.method] || tx.method}` : ''}
                           {tx.comment ? ` · ${tx.comment}` : ''}
                         </p>
@@ -884,6 +1014,7 @@ export default function DispatchPage() {
 
         <BuyoutSection
           buyouts={data?.buyouts ?? []}
+          archivedBuyouts={data?.archivedBuyouts ?? []}
           bikes={data?.bikes ?? []}
           onChanged={() => fetchDashboard(days)}
           onError={setError}
@@ -1012,6 +1143,69 @@ export default function DispatchPage() {
             )}
           </section>
         </div>
+
+        <section className={`border rounded-xl p-6 mb-8 ${
+          debtors.length > 0
+            ? 'bg-rose-950/20 border-rose-900/60'
+            : 'bg-slate-900/50 border-slate-800'
+        }`}>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-slate-200">Должники</h2>
+            {debtors.length > 0 && (
+              <span className="text-sm font-semibold text-rose-400">
+                Итого долг: {formatMoney(totalDebt)}
+              </span>
+            )}
+          </div>
+
+          {loading ? (
+            <p className="text-slate-400 text-sm">Загрузка...</p>
+          ) : debtors.length === 0 ? (
+            <p className="text-slate-400 text-sm">Просроченных долгов нет</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="text-xs text-slate-500 uppercase border-b border-slate-800">
+                    <th className="pb-2 pr-4 font-medium">Тип</th>
+                    <th className="pb-2 pr-4 font-medium">Клиент</th>
+                    <th className="pb-2 pr-4 font-medium">Предмет</th>
+                    <th className="pb-2 pr-4 font-medium">Срок был</th>
+                    <th className="pb-2 pr-4 font-medium">Просрочено</th>
+                    <th className="pb-2 font-medium text-right">Долг</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {debtors.map((d) => (
+                    <tr key={d.key} className="border-b border-slate-800/60 last:border-0">
+                      <td className="py-2.5 pr-4">
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                          d.kind === 'Аренда'
+                            ? 'bg-amber-500/15 text-amber-400'
+                            : 'bg-cyan-500/15 text-cyan-400'
+                        }`}>
+                          {d.kind}
+                        </span>
+                      </td>
+                      <td className="py-2.5 pr-4">
+                        <span className="text-slate-100 font-medium">{d.name}</span>
+                        {d.phone && <span className="block text-xs text-slate-400">{d.phone}</span>}
+                      </td>
+                      <td className="py-2.5 pr-4 text-slate-300">{d.target}</td>
+                      <td className="py-2.5 pr-4 text-slate-400 whitespace-nowrap">{formatDate(d.dueDate)}</td>
+                      <td className="py-2.5 pr-4 text-rose-400 font-medium whitespace-nowrap">
+                        {d.daysOverdue} дн.
+                      </td>
+                      <td className="py-2.5 text-right text-rose-300 font-semibold whitespace-nowrap">
+                        {formatMoney(d.amount)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
           <section className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
@@ -1161,26 +1355,50 @@ export default function DispatchPage() {
                 ))}
           </div>
 
-          {data && Object.keys(data.stats.incomeByMethod).length > 0 && (
-            <div className="mb-8 bg-slate-950/50 border border-slate-800 rounded-xl p-4">
-              <h3 className="text-sm font-semibold text-slate-200 mb-3">Доходы по способам оплаты за {days} дн.</h3>
-              <div className="flex flex-wrap gap-3">
-                {['CASH', 'SBP', 'CARD', 'TRANSFER', 'NONE']
-                  .filter((m) => (data.stats.incomeByMethod[m] ?? 0) > 0)
-                  .map((m) => (
-                    <div
-                      key={m}
-                      className="flex items-center gap-2 bg-slate-900/70 border border-slate-800 rounded-lg px-4 py-2"
-                    >
-                      <span className="text-xs text-slate-400">
-                        {m === 'NONE' ? 'Без указания' : (METHOD_LABELS[m] ?? m)}
-                      </span>
-                      <span className="text-sm font-bold text-emerald-400">
-                        {formatMoney(data.stats.incomeByMethod[m])}
-                      </span>
-                    </div>
-                  ))}
-              </div>
+          {data && (Object.keys(data.stats.incomeByMethod).length > 0 || Object.keys(data.stats.expenseByCategory ?? {}).length > 0) && (
+            <div className="mb-8 bg-slate-950/50 border border-slate-800 rounded-xl p-4 space-y-4">
+              {Object.keys(data.stats.incomeByMethod).length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-200 mb-3">Доходы по способам оплаты за {days} дн.</h3>
+                  <div className="flex flex-wrap gap-3">
+                    {['CASH', 'SBP', 'CARD', 'TRANSFER', 'NONE']
+                      .filter((m) => (data.stats.incomeByMethod[m] ?? 0) > 0)
+                      .map((m) => (
+                        <div
+                          key={m}
+                          className="flex items-center gap-2 bg-slate-900/70 border border-slate-800 rounded-lg px-4 py-2"
+                        >
+                          <span className="text-xs text-slate-400">
+                            {m === 'NONE' ? 'Без указания' : (METHOD_LABELS[m] ?? m)}
+                          </span>
+                          <span className="text-sm font-bold text-emerald-400">
+                            {formatMoney(data.stats.incomeByMethod[m])}
+                          </span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+              {Object.keys(data.stats.expenseByCategory ?? {}).length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-200 mb-3">Расходы по категориям за {days} дн.</h3>
+                  <div className="flex flex-wrap gap-3">
+                    {CATEGORY_ORDER
+                      .filter((c) => (data.stats.expenseByCategory[c] ?? 0) > 0)
+                      .map((c) => (
+                        <div
+                          key={c}
+                          className="flex items-center gap-2 bg-slate-900/70 border border-slate-800 rounded-lg px-4 py-2"
+                        >
+                          <span className="text-xs text-slate-400">{CATEGORY_LABELS[c] ?? c}</span>
+                          <span className="text-sm font-bold text-rose-400">
+                            {formatMoney(data.stats.expenseByCategory[c])}
+                          </span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -1304,29 +1522,48 @@ export default function DispatchPage() {
               <p className="text-slate-400 text-sm">Нет свободных байков</p>
             ) : (
               <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {filteredFreeBikes.map((bike) => (
-                  <li
-                    key={bike.id}
-                    className="border border-slate-800 rounded-lg p-3 bg-slate-950/50 text-sm"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className="font-medium text-slate-100">{bike.name}{bike.externalId ? ` (ID: ${bike.externalId})` : ''}</p>
-                        <p className="text-slate-400">{Number(bike.pricePerDay)} ₽/сут</p>
-                        <p className="text-xs text-slate-500 mt-0.5">
-                          Пробег: {bike.mileage != null ? `${bike.mileage.toLocaleString('ru-RU')} км` : '—'}
-                        </p>
+                {filteredFreeBikes.map((bike) => {
+                  const svc = serviceInfo(bike);
+                  return (
+                    <li
+                      key={bike.id}
+                      className="border border-slate-800 rounded-lg p-3 bg-slate-950/50 text-sm"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="font-medium text-slate-100">{bike.name}{bike.externalId ? ` (ID: ${bike.externalId})` : ''}</p>
+                          <p className="text-slate-400">{Number(bike.pricePerDay)} ₽/сут</p>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            Пробег: {bike.mileage != null ? `${bike.mileage.toLocaleString('ru-RU')} км` : '—'}
+                          </p>
+                          {svc && (
+                            <p className={`text-xs mt-0.5 ${svc.overdue ? 'text-rose-400 font-medium' : 'text-slate-500'}`}>
+                              {svc.text}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex flex-col gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setMileageBike(bike)}
+                            className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs transition-colors"
+                          >
+                            Пробег
+                          </button>
+                          {bike.serviceIntervalKm != null && bike.serviceIntervalKm > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => markServiceDone(bike)}
+                              className="px-2 py-1 bg-slate-800 hover:bg-emerald-800 text-slate-300 rounded text-xs transition-colors"
+                            >
+                              ТО проведено
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setMileageBike(bike)}
-                        className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs transition-colors shrink-0"
-                      >
-                        Пробег
-                      </button>
-                    </div>
-                  </li>
-                ))}
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </section>
@@ -1339,29 +1576,48 @@ export default function DispatchPage() {
               <p className="text-slate-400 text-sm">Нет байков на сервисе</p>
             ) : (
               <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {filteredMaintenanceBikes.map((bike) => (
-                  <li
-                    key={bike.id}
-                    className="border border-slate-800 rounded-lg p-3 bg-slate-950/50 text-sm"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className="font-medium text-slate-100">{bike.name}{bike.externalId ? ` (ID: ${bike.externalId})` : ''}</p>
-                        <p className="text-slate-400">{Number(bike.pricePerDay)} ₽/сут</p>
-                        <p className="text-xs text-slate-500 mt-0.5">
-                          Пробег: {bike.mileage != null ? `${bike.mileage.toLocaleString('ru-RU')} км` : '—'}
-                        </p>
+                {filteredMaintenanceBikes.map((bike) => {
+                  const svc = serviceInfo(bike);
+                  return (
+                    <li
+                      key={bike.id}
+                      className="border border-slate-800 rounded-lg p-3 bg-slate-950/50 text-sm"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="font-medium text-slate-100">{bike.name}{bike.externalId ? ` (ID: ${bike.externalId})` : ''}</p>
+                          <p className="text-slate-400">{Number(bike.pricePerDay)} ₽/сут</p>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            Пробег: {bike.mileage != null ? `${bike.mileage.toLocaleString('ru-RU')} км` : '—'}
+                          </p>
+                          {svc && (
+                            <p className={`text-xs mt-0.5 ${svc.overdue ? 'text-rose-400 font-medium' : 'text-slate-500'}`}>
+                              {svc.text}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex flex-col gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setMileageBike(bike)}
+                            className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs transition-colors"
+                          >
+                            Пробег
+                          </button>
+                          {bike.serviceIntervalKm != null && bike.serviceIntervalKm > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => markServiceDone(bike)}
+                              className="px-2 py-1 bg-slate-800 hover:bg-emerald-800 text-slate-300 rounded text-xs transition-colors"
+                            >
+                              ТО проведено
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setMileageBike(bike)}
-                        className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs transition-colors shrink-0"
-                      >
-                        Пробег
-                      </button>
-                    </div>
-                  </li>
-                ))}
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </section>

@@ -17,6 +17,8 @@ interface Bike {
   purchasePrice?: string | number | null;
   purchaseDate?: string | null;
   mileage?: number | null;
+  serviceIntervalKm?: number | null;
+  lastServiceMileage?: number | null;
   _count?: { rents: number };
 }
 
@@ -32,6 +34,7 @@ interface BikeForm {
   purchasePrice: string;
   purchaseDate: string;
   mileage: string;
+  serviceIntervalKm: string;
 }
 
 const EMPTY_FORM: BikeForm = {
@@ -46,6 +49,7 @@ const EMPTY_FORM: BikeForm = {
   purchasePrice: '',
   purchaseDate: '',
   mileage: '',
+  serviceIntervalKm: '',
 };
 
 const STATUS_BADGE: Record<BikeStatus, string> = {
@@ -135,6 +139,7 @@ export default function AdminPage() {
       purchasePrice: form.purchasePrice.trim() !== '' ? Number(form.purchasePrice) : null,
       purchaseDate: form.purchaseDate || null,
       mileage: form.mileage.trim() !== '' ? Number(form.mileage) : null,
+      serviceIntervalKm: form.serviceIntervalKm.trim() !== '' ? Number(form.serviceIntervalKm) : null,
       ...(editingId ? { id: editingId } : {}),
     };
 
@@ -176,6 +181,7 @@ export default function AdminPage() {
       purchasePrice: bike.purchasePrice != null ? String(bike.purchasePrice) : '',
       purchaseDate: bike.purchaseDate ? bike.purchaseDate.split('T')[0] : '',
       mileage: bike.mileage != null ? String(bike.mileage) : '',
+      serviceIntervalKm: bike.serviceIntervalKm != null ? String(bike.serviceIntervalKm) : '',
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -260,6 +266,12 @@ export default function AdminPage() {
             {bike.purchasePrice != null && (
               <div className="text-xs text-slate-500">закупка {Number(bike.purchasePrice).toLocaleString('ru-RU')} ₽</div>
             )}
+            {bike.serviceIntervalKm != null && bike.serviceIntervalKm > 0 && bike.mileage != null && (() => {
+              const remaining = bike.serviceIntervalKm - (bike.mileage - (bike.lastServiceMileage ?? 0));
+              return remaining <= 0
+                ? <div className="text-xs text-rose-400 font-medium">ТО просрочено на {Math.abs(remaining).toLocaleString('ru-RU')} км</div>
+                : <div className="text-xs text-slate-500">до ТО {remaining.toLocaleString('ru-RU')} км</div>;
+            })()}
           </td>
           <td className="p-4 text-sm font-semibold whitespace-nowrap">
             <span className={badgeClass}>{BIKE_STATUS_LABELS[bike.status] ?? bike.status}</span>
@@ -438,6 +450,19 @@ export default function AdminPage() {
                   onChange={(e) => setForm({ ...form, mileage: e.target.value })}
                   className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
                   placeholder="Текущий пробег"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">Интервал ТО, км (необязательно)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={form.serviceIntervalKm}
+                  onChange={(e) => setForm({ ...form, serviceIntervalKm: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  placeholder="Например, 2000"
                 />
               </div>
 

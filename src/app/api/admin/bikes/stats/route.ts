@@ -70,7 +70,7 @@ export async function GET(request: Request) {
     const rangeEnd = to;
     const totalDays = periodDays(rangeStart, rangeEnd);
 
-    const [bikes, rents, expenseGroups, unassignedAgg, allTimeRentRevenue, allTimeMiscIncome, allTimeMiscExpense] = await Promise.all([
+    const [bikes, rents, expenseGroups, unassignedAgg, allTimeRentRevenue, allTimeMiscIncome, allTimeMiscExpense, expenseCategoryGroups] = await Promise.all([
       prisma.bike.findMany({
         select: {
           id: true,
@@ -134,6 +134,15 @@ export async function GET(request: Request) {
         by: ['bikeId'],
         where: { kind: 'EXPENSE', bikeId: { not: null } },
         _sum: { amount: true },
+      }),
+      prisma.miscTransaction.groupBy({
+        by: ['category'],
+        where: {
+          kind: 'EXPENSE',
+          createdAt: { gte: rangeStart, lte: rangeEnd },
+        },
+        _sum: { amount: true },
+        _count: { _all: true },
       }),
     ]);
 
@@ -250,6 +259,13 @@ export async function GET(request: Request) {
       totalDays,
       bikes: bikeStats,
       totals,
+      expenseByCategory: expenseCategoryGroups
+        .map((g) => ({
+          category: g.category || 'NONE',
+          sum: Number(g._sum.amount ?? 0),
+          count: g._count._all,
+        }))
+        .sort((a, b) => b.sum - a.sum),
     });
   } catch (error) {
     console.error('Ошибка при подсчёте статистики:', error);

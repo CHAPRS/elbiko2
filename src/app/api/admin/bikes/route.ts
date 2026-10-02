@@ -93,6 +93,8 @@ export async function PATCH(request: Request) {
     if (fields.purchasePrice !== undefined) updateData.purchasePrice = fields.purchasePrice;
     if (fields.purchaseDate !== undefined) updateData.purchaseDate = fields.purchaseDate;
     if (fields.mileage !== undefined) updateData.mileage = fields.mileage;
+    if (fields.serviceIntervalKm !== undefined) updateData.serviceIntervalKm = fields.serviceIntervalKm;
+    if (fields.lastServiceMileage !== undefined) updateData.lastServiceMileage = fields.lastServiceMileage;
 
     if (fields.status !== undefined) {
       // Нельзя вручную освободить или отправить на сервис байк с активной/просроченной арендой

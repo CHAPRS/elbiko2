@@ -26,8 +26,15 @@ interface ExpenseItem {
   title: string;
   amount: number;
   method?: string | null;
+  category?: string | null;
   comment?: string | null;
   createdAt: string;
+}
+
+interface CategorySum {
+  category: string;
+  sum: number;
+  count: number;
 }
 
 interface StatsData {
@@ -47,6 +54,7 @@ interface StatsData {
     unassignedExpenses: number;
     unassignedCount: number;
   };
+  expenseByCategory?: CategorySum[];
 }
 
 const METHOD_LABELS: Record<string, string> = {
@@ -54,6 +62,17 @@ const METHOD_LABELS: Record<string, string> = {
   SBP: 'СБП',
   CARD: 'Карта',
   TRANSFER: 'Перевод',
+};
+
+const CATEGORY_LABELS: Record<string, string> = {
+  REPAIR: 'Ремонт',
+  SERVICE: 'ТО',
+  BATTERY: 'Аккумулятор',
+  BATTERY_RENT: 'Аренда аккумулятора',
+  ACCESSORIES: 'Аксессуары',
+  GOODS: 'Сопутствующие товары',
+  OTHER: 'Прочее',
+  NONE: 'Без категории',
 };
 
 function toInputDate(d: Date): string {
@@ -169,6 +188,7 @@ export default function BikeStatsPage() {
               <tr className="text-xs text-slate-500 uppercase">
                 <th className="text-left py-1 pr-4 font-medium">Дата</th>
                 <th className="text-left py-1 pr-4 font-medium">Предмет</th>
+                <th className="text-left py-1 pr-4 font-medium">Категория</th>
                 <th className="text-left py-1 pr-4 font-medium">Способ</th>
                 <th className="text-right py-1 pr-4 font-medium">Сумма</th>
                 <th className="text-left py-1 font-medium">Комментарий</th>
@@ -179,6 +199,7 @@ export default function BikeStatsPage() {
                 <tr key={item.id} className="border-t border-slate-800/60">
                   <td className="py-1.5 pr-4 text-slate-400 whitespace-nowrap">{formatDate(item.createdAt)}</td>
                   <td className="py-1.5 pr-4 text-slate-200">{item.title}</td>
+                  <td className="py-1.5 pr-4 text-slate-400">{item.category ? (CATEGORY_LABELS[item.category] ?? item.category) : '—'}</td>
                   <td className="py-1.5 pr-4 text-slate-400">{item.method ? (METHOD_LABELS[item.method] ?? item.method) : '—'}</td>
                   <td className="py-1.5 pr-4 text-right text-rose-300 font-medium">{formatMoney(Number(item.amount))}</td>
                   <td className="py-1.5 text-slate-400">{item.comment || '—'}</td>
@@ -274,6 +295,26 @@ export default function BikeStatsPage() {
                 <div className="text-lg font-bold text-violet-400">{data.totals.utilization}%</div>
               </div>
             </div>
+
+            {data.expenseByCategory && data.expenseByCategory.length > 0 && (
+              <div className="mb-6 bg-slate-900/50 border border-slate-800 p-4 rounded-xl">
+                <div className="text-xs text-slate-400 mb-3">Расходы по категориям за период</div>
+                <div className="flex flex-wrap gap-3">
+                  {data.expenseByCategory.map((c) => (
+                    <div
+                      key={c.category}
+                      className="flex items-center gap-2 bg-slate-950/60 border border-slate-800 rounded-lg px-4 py-2"
+                    >
+                      <span className="text-xs text-slate-400">
+                        {CATEGORY_LABELS[c.category] ?? c.category}
+                        <span className="text-slate-600"> ({c.count})</span>
+                      </span>
+                      <span className="text-sm font-bold text-rose-400">{formatMoney(c.sum)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="bg-slate-900/50 border border-slate-800 backdrop-blur-md rounded-xl overflow-hidden">
               <table className="w-full text-left">

@@ -79,7 +79,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { kind, title, amount, method, bikeId, comment, createdAt } = parsed.data;
+    const { kind, title, amount, method, category, bikeId, comment, createdAt } = parsed.data;
 
     if (bikeId) {
       const bike = await prisma.bike.findUnique({ where: { id: bikeId } });
@@ -97,6 +97,7 @@ export async function POST(request: Request) {
         title: title.trim(),
         amount,
         method: method || null,
+        category: category || null,
         bikeId: bikeId || null,
         comment: comment?.trim() || null,
         ...(createdAt ? { createdAt } : {}),

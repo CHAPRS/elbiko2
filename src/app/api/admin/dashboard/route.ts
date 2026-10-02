@@ -15,6 +15,14 @@ function endOfDay(date: Date): Date {
   return d;
 }
 
+// Ключ дня по локальной дате сервера (не UTC) — иначе «сегодня» сдвигается на графике
+function localDayKey(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -63,6 +71,7 @@ export async function GET(request: Request) {
       buyoutPaidPeriod,
       activeBuyouts,
       pendingBuyoutAgg,
+      archivedBuyouts,
     ] = await Promise.all([
       prisma.bike.findMany({
         orderBy: { name: 'asc' },
@@ -154,6 +163,7 @@ export async function GET(request: Request) {
           amount: true,
           createdAt: true,
           method: true,
+          category: true,
         },
       }),
       prisma.miscTransaction.findMany({
@@ -189,6 +199,15 @@ export async function GET(request: Request) {
           buyout: { status: 'ACTIVE' },
         },
       }),
+      prisma.buyout.findMany({
+        where: { status: { in: ['COMPLETED', 'CANCELLED'] } },
+        include: {
+          payments: { orderBy: { dueDate: 'asc' } },
+          bike: { select: { id: true, name: true, externalId: true } },
+        },
+        orderBy: { updatedAt: 'desc' },
+        take: 30,
+      }),
     ]);
 
     const activeRents = activeAndOverdueRents;
@@ -223,18 +242,18 @@ export async function GET(request: Request) {
     for (let i = 0; i < days; i++) {
       const d = new Date(periodStart);
       d.setDate(d.getDate() + i);
-      const key = d.toISOString().split('T')[0];
+      const key = localDayKey(d);
       byDay.set(key, { revenue: 0, misc: 0, expense: 0, buyout: 0 });
     }
     for (const payment of revenuePeriodPayments) {
-      const key = payment.updatedAt.toISOString().split('T')[0];
+      const key = localDayKey(payment.updatedAt);
       const entry = byDay.get(key);
       if (entry) {
         entry.revenue += Number(payment.amount);
       }
     }
     for (const tx of miscPeriodTx) {
-      const key = tx.createdAt.toISOString().split('T')[0];
+      const key = localDayKey(tx.createdAt);
       const entry = byDay.get(key);
       if (entry) {
         if (tx.kind === 'INCOME') entry.misc += Number(tx.amount);
@@ -243,7 +262,7 @@ export async function GET(request: Request) {
     }
     for (const bp of buyoutPaidPeriod) {
       if (!bp.paidAt) continue;
-      const key = bp.paidAt.toISOString().split('T')[0];
+      const key = localDayKey(bp.paidAt);
       const entry = byDay.get(key);
       if (entry) {
         entry.buyout += Number(bp.amount);
@@ -268,6 +287,7 @@ export async function GET(request: Request) {
     let miscIncomeToday = 0;
     let expensesPeriod = 0;
     let expensesToday = 0;
+    const expenseByCategory: Record<string, number> = {};
     for (const tx of miscPeriodTx) {
       const amount = Number(tx.amount);
       const isToday = tx.createdAt >= today && tx.createdAt < tomorrow;
@@ -277,6 +297,8 @@ export async function GET(request: Request) {
       } else if (tx.kind === 'EXPENSE') {
         expensesPeriod += amount;
         if (isToday) expensesToday += amount;
+        const cat = tx.category || 'NONE';
+        expenseByCategory[cat] = (expenseByCategory[cat] || 0) + amount;
       }
     }
     let buyoutIncomePeriod = 0;
@@ -346,7 +368,7 @@ export async function GET(request: Request) {
       const freeCount = Math.max(0, rentableFleet - occupied);
 
       timeline.push({
-        date: day.toISOString().split('T')[0],
+        date: localDayKey(day),
         dayOfWeek: day.toLocaleDateString('ru-RU', { weekday: 'short' }),
         freeCount,
         returning,
@@ -383,6 +405,7 @@ export async function GET(request: Request) {
       totalIncomePeriod,
       pendingBuyoutTotal,
       incomeByMethod,
+      expenseByCategory,
     };
 
     return NextResponse.json({
@@ -400,6 +423,7 @@ export async function GET(request: Request) {
       bikes,
       recentMisc,
       buyouts: activeBuyouts,
+      archivedBuyouts,
     });
   } catch (error) {
     console.error('Ошибка API диспетчерской:', error);

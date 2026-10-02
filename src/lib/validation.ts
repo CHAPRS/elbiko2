@@ -15,6 +15,8 @@ export const createBikeSchema = z.object({
   purchasePrice: z.number().finite().nonnegative().max(10000000).optional().nullable(),
   purchaseDate: z.coerce.date().optional().nullable(),
   mileage: z.number().int().nonnegative().optional().nullable(),
+  serviceIntervalKm: z.number().int().nonnegative().optional().nullable(),
+  lastServiceMileage: z.number().int().nonnegative().optional().nullable(),
 });
 
 export const updateBikeSchema = z.object({
@@ -31,6 +33,8 @@ export const updateBikeSchema = z.object({
   purchasePrice: z.number().finite().nonnegative().max(10000000).optional().nullable(),
   purchaseDate: z.coerce.date().optional().nullable(),
   mileage: z.number().int().nonnegative().optional().nullable(),
+  serviceIntervalKm: z.number().int().nonnegative().optional().nullable(),
+  lastServiceMileage: z.number().int().nonnegative().optional().nullable(),
 });
 
 export const leadStatus = z.enum(['NEW', 'IN_PROGRESS', 'CONFIRMED', 'REJECTED']);
@@ -66,12 +70,22 @@ export const createLeadManualSchema = z.object({
 
 export const miscTransactionKind = z.enum(['INCOME', 'EXPENSE']);
 export const paymentMethodEnum = z.enum(['CASH', 'SBP', 'CARD', 'TRANSFER']);
+export const miscCategory = z.enum([
+  'REPAIR',
+  'SERVICE',
+  'BATTERY',
+  'BATTERY_RENT',
+  'ACCESSORIES',
+  'GOODS',
+  'OTHER',
+]);
 
 export const createMiscTransactionSchema = z.object({
   kind: miscTransactionKind,
   title: z.string().min(1).max(200),
   amount: z.number().finite().positive().max(10000000),
   method: paymentMethodEnum.optional().nullable(),
+  category: miscCategory.optional().nullable(),
   bikeId: z.number().int().positive().optional().nullable(),
   comment: z.string().max(1000).optional().nullable(),
   createdAt: z.coerce.date().optional().nullable(),
@@ -82,6 +96,7 @@ export const updateMiscTransactionSchema = z.object({
   title: z.string().min(1).max(200).optional(),
   amount: z.number().finite().positive().max(10000000).optional(),
   method: paymentMethodEnum.optional().nullable(),
+  category: miscCategory.optional().nullable(),
   bikeId: z.number().int().positive().optional().nullable(),
   comment: z.string().max(1000).optional().nullable(),
   createdAt: z.coerce.date().optional().nullable(),

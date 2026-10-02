@@ -34,6 +34,7 @@ export interface Buyout {
 
 interface BuyoutSectionProps {
   buyouts: Buyout[];
+  archivedBuyouts?: Buyout[];
   bikes: BikeOption[];
   onChanged: () => void;
   onError: (msg: string) => void;
@@ -71,7 +72,7 @@ function toInputDate(d: Date | string): string {
   return new Date(date.getTime() - offset).toISOString().split('T')[0];
 }
 
-export function BuyoutSection({ buyouts, bikes, onChanged, onError, onNotice }: BuyoutSectionProps) {
+export function BuyoutSection({ buyouts, archivedBuyouts = [], bikes, onChanged, onError, onNotice }: BuyoutSectionProps) {
   const [showCreate, setShowCreate] = useState(false);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
@@ -531,6 +532,66 @@ export function BuyoutSection({ buyouts, bikes, onChanged, onError, onNotice }: 
             );
           })}
         </ul>
+      )}
+
+      {archivedBuyouts.length > 0 && (
+        <details className="mt-4 border border-slate-800 rounded-lg bg-slate-950/40">
+          <summary className="px-4 py-3 text-sm font-medium text-slate-300 cursor-pointer hover:text-slate-100 transition-colors">
+            Архив ({archivedBuyouts.length})
+          </summary>
+          <ul className="px-4 pb-4 space-y-2">
+            {archivedBuyouts.map((b) => {
+              const total = Number(b.totalPrice);
+              const paidSum = b.payments
+                .filter((p) => p.status === 'PAID')
+                .reduce((s, p) => s + Number(p.amount), 0);
+              return (
+                <li
+                  key={b.id}
+                  className="border border-slate-800 rounded-lg p-3 bg-slate-950/50 flex items-start justify-between gap-4"
+                >
+                  <div className="min-w-0">
+                    <p className="font-medium text-slate-300">
+                      {b.title}
+                      {b.bike && (
+                        <span className="text-slate-500 font-normal">
+                          {' '}· {b.bike.name}{b.bike.externalId ? ` (ID: ${b.bike.externalId})` : ''}
+                        </span>
+                      )}
+                    </p>
+                    <p className="text-sm text-slate-500">
+                      {b.clientName}{b.clientPhone ? ` · ${b.clientPhone}` : ''}
+                    </p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Оплачено {fmtMoney(paidSum)} из {fmtMoney(total)}
+                    </p>
+                  </div>
+                  <div className="flex gap-2 shrink-0 items-start">
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${
+                      b.status === 'COMPLETED'
+                        ? 'bg-emerald-500/15 text-emerald-400'
+                        : 'bg-slate-700/40 text-slate-400'
+                    }`}>
+                      {STATUS_LABELS[b.status] ?? b.status}
+                    </span>
+                    <select
+                      value={b.status}
+                      onChange={(e) =>
+                        patchBuyout(b.id, { status: e.target.value }, 'Статус выкупа обновлён')
+                      }
+                      className="bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-xs text-white"
+                      title="Изменить статус (например, вернуть в активные)"
+                    >
+                      {Object.entries(STATUS_LABELS).map(([v, l]) => (
+                        <option key={v} value={v}>{l}</option>
+                      ))}
+                    </select>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </details>
       )}
 
       {showCreate && (

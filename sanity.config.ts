@@ -1,30 +1,36 @@
 'use client'
 
 /**
- * This configuration is used to for the Sanity Studio that’s mounted on the `\src\app\studio\[[...tool]]\page.tsx` route
+ * This configuration is used for the Sanity Studio that’s mounted on the `\src\app\studio\[[...tool]]\page.tsx` route
  */
 
-import {visionTool} from '@sanity/vision'
-import {defineConfig} from 'sanity'
-import {structureTool} from 'sanity/structure'
+import { visionTool } from '@sanity/vision'
+import { defineConfig } from 'sanity'
+import { structureTool } from 'sanity/structure'
+import { SchemaTypeDefinition } from 'sanity';
 
-// Go to https://www.sanity.io/docs/api-versioning to learn how API versioning works
-import {apiVersion, dataset, projectId} from './src/sanity/env'
-import {schema} from './src/sanity/schemaTypes'
-import {structure} from './src/sanity/structure'
+
+// Импортируем версию API и схемы
+import { apiVersion } from './src/sanity/env'
+import { schema } from './src/sanity/schemaTypes'
+import { structure } from './src/sanity/structure'
 
 export default defineConfig({
   basePath: '/studio',
-  projectId,
-  dataset,
-  // Исправлено: передаем массив схем внутрь объекта types
-  schema: {
-    types: schema,
-  },
+  
+  // Вставьте сюда ваши реальные данные из аккаунта sanity.io/manage или файла .env
+  projectId: '9qjrff3g', 
+  dataset: 'production', 
+
+schema: {
+  types: (Array.isArray(schema) ? schema : (schema as any).types || []) as any,
+},
+
+
+
+
   plugins: [
-    structureTool({structure}),
-    // Vision is for querying with GROQ from inside the Studio
-    // https://www.sanity.io/docs/the-vision-plugin
-    visionTool({defaultApiVersion: apiVersion}),
+    structureTool({ structure }),
+    visionTool({ defaultApiVersion: apiVersion }),
   ],
 })

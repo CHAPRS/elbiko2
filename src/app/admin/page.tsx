@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import Link from 'next/link';
 import { BIKE_STATUSES, BIKE_STATUS_LABELS, BikeStatus } from '@/lib/bikeStatus';
 
 interface Bike {
@@ -13,7 +12,13 @@ interface Bike {
   motor: string;
   isWaterproof: boolean;
   pricePerDay: string | number;
+  externalId: string | null;
   imageUrl: string | null;
+  purchasePrice?: string | number | null;
+  purchaseDate?: string | null;
+  mileage?: number | null;
+  serviceIntervalKm?: number | null;
+  lastServiceMileage?: number | null;
   _count?: { rents: number };
 }
 
@@ -23,8 +28,13 @@ interface BikeForm {
   range: string;
   motor: string;
   pricePerDay: string;
+  externalId: string;
   imageUrl: string;
   isWaterproof: boolean;
+  purchasePrice: string;
+  purchaseDate: string;
+  mileage: string;
+  serviceIntervalKm: string;
 }
 
 const EMPTY_FORM: BikeForm = {
@@ -33,8 +43,13 @@ const EMPTY_FORM: BikeForm = {
   range: '',
   motor: '',
   pricePerDay: '500',
+  externalId: '',
   imageUrl: '',
   isWaterproof: false,
+  purchasePrice: '',
+  purchaseDate: '',
+  mileage: '',
+  serviceIntervalKm: '',
 };
 
 const STATUS_BADGE: Record<BikeStatus, string> = {
@@ -50,6 +65,7 @@ export default function AdminPage() {
   const [form, setForm] = useState<BikeForm>(EMPTY_FORM);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isReconciling, setIsReconciling] = useState(false);
 
   const fetchBikes = useCallback(async () => {
     try {
@@ -80,6 +96,32 @@ export default function AdminPage() {
     setEditingId(null);
   };
 
+  const handleReconcile = async () => {
+    setIsReconciling(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/admin/bikes/reconcile', { method: 'POST' });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || 'Не удалось сверить статусы');
+        return;
+      }
+
+      await fetchBikes();
+      setError(
+        data.fixed > 0
+          ? `Сверка выполнена: обновлено ${data.fixed} байков. В аренде ${data.rentedBikeCount}.`
+          : `Сверка выполнена: расхождений не найдено. В аренде ${data.rentedBikeCount}.`
+      );
+    } catch (err) {
+      console.error('Ошибка сверки статусов:', err);
+      setError('Нет связи с сервером');
+    } finally {
+      setIsReconciling(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -94,6 +136,10 @@ export default function AdminPage() {
       ...form,
       pricePerDay: Number(form.pricePerDay),
       imageUrl: form.imageUrl || null,
+      purchasePrice: form.purchasePrice.trim() !== '' ? Number(form.purchasePrice) : null,
+      purchaseDate: form.purchaseDate || null,
+      mileage: form.mileage.trim() !== '' ? Number(form.mileage) : null,
+      serviceIntervalKm: form.serviceIntervalKm.trim() !== '' ? Number(form.serviceIntervalKm) : null,
       ...(editingId ? { id: editingId } : {}),
     };
 
@@ -129,8 +175,13 @@ export default function AdminPage() {
       range: bike.range,
       motor: bike.motor,
       pricePerDay: String(bike.pricePerDay),
+      externalId: bike.externalId || '',
       imageUrl: bike.imageUrl || '',
       isWaterproof: bike.isWaterproof,
+      purchasePrice: bike.purchasePrice != null ? String(bike.purchasePrice) : '',
+      purchaseDate: bike.purchaseDate ? bike.purchaseDate.split('T')[0] : '',
+      mileage: bike.mileage != null ? String(bike.mileage) : '',
+      serviceIntervalKm: bike.serviceIntervalKm != null ? String(bike.serviceIntervalKm) : '',
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -188,13 +239,13 @@ export default function AdminPage() {
   if (isLoading) {
     bikeRows.push(
       <tr key="loading" className="border-b border-slate-800">
-        <td colSpan={5} className="p-4 text-center text-slate-400">Загрузка данных...</td>
+        <td colSpan={7} className="p-4 text-center text-slate-400">Загрузка данных...</td>
       </tr>
     );
   } else if (bikes.length === 0) {
     bikeRows.push(
       <tr key="empty" className="border-b border-slate-800">
-        <td colSpan={5} className="p-4 text-center text-slate-400">Велосипеды не найдены</td>
+        <td colSpan={7} className="p-4 text-center text-slate-400">Велосипеды не найдены</td>
       </tr>
     );
   } else {
@@ -205,8 +256,23 @@ export default function AdminPage() {
       bikeRows.push(
         <tr key={bike.id} className="border-b border-slate-800 hover:bg-slate-900/50 transition-colors align-top">
           <td className="p-4 font-medium text-white">{bike.name}</td>
+          <td className="p-4 text-slate-400 text-sm whitespace-nowrap">
+            {bike.externalId || <span className="text-slate-600">—</span>}
+          </td>
           <td className="p-4 text-slate-300 text-sm">{specsText}</td>
           <td className="p-4 text-slate-200 text-sm whitespace-nowrap">{Number(bike.pricePerDay)} ₽/сут</td>
+          <td className="p-4 text-slate-300 text-sm whitespace-nowrap">
+            {bike.mileage != null ? `${Number(bike.mileage).toLocaleString('ru-RU')} км` : <span className="text-slate-600">—</span>}
+            {bike.purchasePrice != null && (
+              <div className="text-xs text-slate-500">закупка {Number(bike.purchasePrice).toLocaleString('ru-RU')} ₽</div>
+            )}
+            {bike.serviceIntervalKm != null && bike.serviceIntervalKm > 0 && bike.mileage != null && (() => {
+              const remaining = bike.serviceIntervalKm - (bike.mileage - (bike.lastServiceMileage ?? 0));
+              return remaining <= 0
+                ? <div className="text-xs text-rose-400 font-medium">ТО просрочено на {Math.abs(remaining).toLocaleString('ru-RU')} км</div>
+                : <div className="text-xs text-slate-500">до ТО {remaining.toLocaleString('ru-RU')} км</div>;
+            })()}
+          </td>
           <td className="p-4 text-sm font-semibold whitespace-nowrap">
             <span className={badgeClass}>{BIKE_STATUS_LABELS[bike.status] ?? bike.status}</span>
           </td>
@@ -248,29 +314,17 @@ export default function AdminPage() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-6 font-sans">
       <div className="max-w-6xl mx-auto">
-        <h1 className="text-3xl font-bold bg-gradient-to-r from-amber-500 to-orange-500 bg-clip-text text-transparent mb-8">
-          Панель администратора Elbiko
-        </h1>
-
-        <div className="mb-8 flex gap-4 flex-wrap">
-          <Link
-            href="/admin"
-            className="px-4 py-2 bg-amber-500 text-slate-950 rounded-lg font-medium hover:bg-amber-400 transition-colors"
+        <div className="flex items-start justify-between mb-8">
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-amber-500 to-orange-500 bg-clip-text text-transparent">
+            Панель администратора Elbiko
+          </h1>
+          <button
+            onClick={handleReconcile}
+            disabled={isReconciling}
+            className="px-3 py-2 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 text-white rounded-lg text-sm transition-colors"
           >
-            🚲 Велосипеды
-          </Link>
-          <Link
-            href="/admin/leads"
-            className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg font-medium hover:bg-slate-700 transition-colors"
-          >
-            📋 Заявки
-          </Link>
-          <Link
-            href="/admin/rents"
-            className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg font-medium hover:bg-slate-700 transition-colors"
-          >
-            📊 Аренды
-          </Link>
+            {isReconciling ? 'Сверка...' : 'Сверить статусы'}
+          </button>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
@@ -354,6 +408,65 @@ export default function AdminPage() {
               </div>
 
               <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">ID байка (внешний/серийный)</label>
+                <input
+                  type="text"
+                  value={form.externalId}
+                  onChange={(e) => setForm({ ...form, externalId: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  placeholder="Например, SN-2024-001"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">Цена покупки, ₽ (необязательно)</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={form.purchasePrice}
+                  onChange={(e) => setForm({ ...form, purchasePrice: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  placeholder="За сколько купили"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">Дата покупки (необязательно)</label>
+                <input
+                  type="date"
+                  value={form.purchaseDate}
+                  onChange={(e) => setForm({ ...form, purchaseDate: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">Пробег, км (необязательно)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={form.mileage}
+                  onChange={(e) => setForm({ ...form, mileage: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  placeholder="Текущий пробег"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">Интервал ТО, км (необязательно)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={form.serviceIntervalKm}
+                  onChange={(e) => setForm({ ...form, serviceIntervalKm: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  placeholder="Например, 2000"
+                />
+              </div>
+
+              <div>
                 <label className="block text-xs font-medium text-slate-400 mb-1">Ссылка на фото (необязательно)</label>
                 <input
                   type="url"
@@ -403,8 +516,10 @@ export default function AdminPage() {
               <thead>
                 <tr className="border-b border-slate-800 text-slate-400 text-xs uppercase tracking-wider">
                   <th className="p-4">Модель</th>
+                  <th className="p-4">ID байка</th>
                   <th className="p-4">Характеристики</th>
                   <th className="p-4">Тариф</th>
+                  <th className="p-4">Пробег</th>
                   <th className="p-4">Статус</th>
                   <th className="p-4 text-right">Действия</th>
                 </tr>

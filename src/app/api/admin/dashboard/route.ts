@@ -140,6 +140,7 @@ export async function GET(request: Request) {
           amount: true,
           updatedAt: true,
           paymentMethod: true,
+          rent: { select: { user: { select: { name: true, phone: true } } } },
         },
       }),
       prisma.payment.aggregate({
@@ -336,6 +337,20 @@ export async function GET(request: Request) {
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 5);
 
+    const clientAgg = new Map<string, { name: string; phone: string | null; revenue: number; count: number }>();
+    revenuePeriodPayments.forEach((p) => {
+      const user = p.rent?.user;
+      if (!user) return;
+      const key = user.phone || user.name;
+      const entry = clientAgg.get(key) || { name: user.name, phone: user.phone, revenue: 0, count: 0 };
+      entry.revenue += Number(p.amount);
+      entry.count += 1;
+      clientAgg.set(key, entry);
+    });
+    const topClients = Array.from(clientAgg.values())
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 5);
+
     const timelineDays = 14;
     const timeline: {
       date: string;
@@ -419,6 +434,7 @@ export async function GET(request: Request) {
       maintenanceBikes,
       revenueByDay,
       topBikes,
+      topClients,
       timeline,
       bikes,
       recentMisc,

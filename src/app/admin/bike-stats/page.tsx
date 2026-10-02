@@ -17,6 +17,8 @@ interface BikeStat {
   expenses: number;
   expenseCount: number;
   profit: number;
+  repairCount: number;
+  repairSum: number;
   paybackPct: number | null;
   paybackNet: number | null;
 }
@@ -351,15 +353,22 @@ export default function BikeStatsPage() {
                           <td className="p-4 text-emerald-400 font-medium">{formatMoney(bike.revenue)}</td>
                           <td className="p-4">
                             {bike.expenseCount > 0 ? (
-                              <button
-                                onClick={() => toggleExpenses(bike.id)}
-                                className="text-rose-400 font-medium hover:text-rose-300 underline decoration-dotted underline-offset-4 transition-colors"
-                                title="Показать детализацию расходов"
-                              >
-                                {formatMoney(bike.expenses)}
-                                <span className="text-xs text-slate-500 ml-1">({bike.expenseCount})</span>
-                                <span className="ml-1 text-xs">{expandedId === bike.id ? '▲' : '▼'}</span>
-                              </button>
+                              <>
+                                <button
+                                  onClick={() => toggleExpenses(bike.id)}
+                                  className="text-rose-400 font-medium hover:text-rose-300 underline decoration-dotted underline-offset-4 transition-colors"
+                                  title="Показать детализацию расходов"
+                                >
+                                  {formatMoney(bike.expenses)}
+                                  <span className="text-xs text-slate-500 ml-1">({bike.expenseCount})</span>
+                                  <span className="ml-1 text-xs">{expandedId === bike.id ? '▲' : '▼'}</span>
+                                </button>
+                                {bike.repairCount > 0 && (
+                                  <span className="block text-xs text-rose-300/80 mt-0.5">
+                                    ремонтов: {bike.repairCount} на {formatMoney(bike.repairSum)}
+                                  </span>
+                                )}
+                              </>
                             ) : (
                               <span className="text-slate-500">—</span>
                             )}

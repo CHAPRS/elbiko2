@@ -52,6 +52,8 @@ interface BikeStat {
   expenses: number;
   expenseCount: number;
   profit: number;
+  repairCount: number;
+  repairSum: number;
   paybackPct: number | null;
   paybackNet: number | null;
 }
@@ -70,7 +72,7 @@ export async function GET(request: Request) {
     const rangeEnd = to;
     const totalDays = periodDays(rangeStart, rangeEnd);
 
-    const [bikes, rents, expenseGroups, unassignedAgg, allTimeRentRevenue, allTimeMiscIncome, allTimeMiscExpense, expenseCategoryGroups] = await Promise.all([
+    const [bikes, rents, expenseGroups, unassignedAgg, allTimeRentRevenue, allTimeMiscIncome, allTimeMiscExpense, expenseCategoryGroups, repairGroups] = await Promise.all([
       prisma.bike.findMany({
         select: {
           id: true,
@@ -144,7 +146,25 @@ export async function GET(request: Request) {
         _sum: { amount: true },
         _count: { _all: true },
       }),
+      prisma.miscTransaction.groupBy({
+        by: ['bikeId'],
+        where: {
+          kind: 'EXPENSE',
+          category: 'REPAIR',
+          bikeId: { not: null },
+          createdAt: { gte: rangeStart, lte: rangeEnd },
+        },
+        _sum: { amount: true },
+        _count: { _all: true },
+      }),
     ]);
+
+    const repairByBike: Record<number, { sum: number; count: number }> = {};
+    repairGroups.forEach((g) => {
+      if (g.bikeId != null) {
+        repairByBike[g.bikeId] = { sum: Number(g._sum.amount ?? 0), count: g._count._all };
+      }
+    });
 
     const toSumMap = (groups: { bikeId: number | null; _sum: { amount?: unknown; totalPrice?: unknown } }[], field: 'amount' | 'totalPrice') => {
       const map: Record<number, number> = {};
@@ -231,6 +251,8 @@ export async function GET(request: Request) {
         expenses,
         expenseCount,
         profit: revenue - expenses,
+        repairCount: repairByBike[bike.id]?.count || 0,
+        repairSum: repairByBike[bike.id]?.sum || 0,
         paybackPct,
         paybackNet,
       };

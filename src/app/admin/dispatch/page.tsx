@@ -118,6 +118,13 @@ interface TopBike {
   revenue: number;
 }
 
+interface TopClient {
+  name: string;
+  phone: string | null;
+  revenue: number;
+  count: number;
+}
+
 interface TimelineDay {
   date: string;
   dayOfWeek: string;
@@ -136,6 +143,7 @@ interface DashboardData {
   maintenanceBikes: Bike[];
   revenueByDay: RevenueDay[];
   topBikes: TopBike[];
+  topClients?: TopClient[];
   timeline: TimelineDay[];
   bikes: Bike[];
   recentMisc: MiscTransaction[];
@@ -708,6 +716,22 @@ export default function DispatchPage() {
   debtors.sort((a, b) => b.daysOverdue - a.daysOverdue);
   const totalDebt = debtors.reduce((sum, d) => sum + d.amount, 0);
 
+  const upcomingBuyoutPayments = (data?.buyouts ?? [])
+    .flatMap((b) =>
+      b.payments
+        .filter((p) => p.status === 'PENDING' && new Date(p.dueDate).getTime() < nowTs + 7 * DAY_MS)
+        .map((p) => ({
+          key: `bp-${p.id}`,
+          client: b.clientName,
+          phone: b.clientPhone,
+          title: b.title,
+          dueDate: p.dueDate,
+          amount: Number(p.amount),
+          overdue: new Date(p.dueDate).getTime() < nowTs,
+        }))
+    )
+    .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+
   const filteredReturningToday = data?.returningToday.filter((rent) =>
     matchesSearch(rent.user.name, rent.user.phone, rent.bike.name)
   ) ?? [];
@@ -1011,6 +1035,34 @@ export default function DispatchPage() {
             </div>
           </div>
         </section>
+
+        {upcomingBuyoutPayments.length > 0 && (
+          <section className="bg-slate-900/50 border border-cyan-900/60 rounded-xl p-6 mb-8">
+            <h2 className="text-lg font-semibold text-slate-200 mb-4">Платежи по выкупам на ближайшие 7 дней</h2>
+            <ul className="space-y-2">
+              {upcomingBuyoutPayments.map((p) => (
+                <li
+                  key={p.key}
+                  className={`border rounded-lg p-3 flex items-center justify-between gap-4 text-sm ${
+                    p.overdue ? 'bg-rose-950/20 border-rose-900' : 'bg-slate-950/50 border-slate-800'
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <span className="font-medium text-slate-100">{p.client}</span>
+                    {p.phone && <span className="text-slate-400"> · {p.phone}</span>}
+                    <span className="block text-xs text-slate-500 mt-0.5">
+                      {p.title} · {formatDate(p.dueDate)}
+                      {p.overdue && <span className="text-rose-400 font-medium"> (просрочен)</span>}
+                    </span>
+                  </div>
+                  <span className={`font-semibold whitespace-nowrap ${p.overdue ? 'text-rose-300' : 'text-cyan-300'}`}>
+                    {formatMoney(p.amount)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         <BuyoutSection
           buyouts={data?.buyouts ?? []}
@@ -1505,6 +1557,36 @@ export default function DispatchPage() {
                         <span className="text-slate-200">{bike.name}</span>
                       </div>
                       <span className="font-medium text-amber-500">{formatMoney(bike.revenue)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div className="bg-slate-950/50 border border-slate-800 rounded-xl p-4">
+              <h3 className="text-sm font-semibold text-slate-200 mb-4">Топ клиентов за {days} дн.</h3>
+
+              {loading ? (
+                <p className="text-slate-400 text-sm">Загрузка...</p>
+              ) : !data || !data.topClients || data.topClients.length === 0 ? (
+                <p className="text-slate-400 text-sm">Нет оплат за период</p>
+              ) : (
+                <ul className="space-y-3">
+                  {data.topClients.map((client, index) => (
+                    <li key={`${client.phone ?? client.name}-${index}`} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="w-5 h-5 rounded bg-slate-800 text-slate-400 text-xs flex items-center justify-center shrink-0">
+                          {index + 1}
+                        </span>
+                        <div className="min-w-0">
+                          <span className="text-slate-200 block truncate">{client.name}</span>
+                          {client.phone && <span className="text-xs text-slate-500">{client.phone}</span>}
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className="font-medium text-emerald-400 block">{formatMoney(client.revenue)}</span>
+                        <span className="text-xs text-slate-500">{client.count} плат.</span>
+                      </div>
                     </li>
                   ))}
                 </ul>

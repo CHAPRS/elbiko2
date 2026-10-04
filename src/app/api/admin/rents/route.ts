@@ -35,13 +35,30 @@ export async function GET(request: Request) {
           },
         },
         payment: true,
+        rentTransactions: { select: { type: true, amount: true } },
       },
       orderBy: {
         createdAt: 'desc',
       },
     });
 
-    return NextResponse.json(rents);
+    // paidTotal — внесённая сумма из денежного журнала (PAYMENT − REFUND), debt — остаток
+    const result = rents.map((r) => {
+      const paid = r.rentTransactions.reduce(
+        (sum, t) =>
+          sum +
+          (t.type === 'PAYMENT' ? Number(t.amount) : t.type === 'REFUND' ? -Number(t.amount) : 0),
+        0
+      );
+      const { rentTransactions, ...rest } = r;
+      return {
+        ...rest,
+        paidTotal: Math.max(0, Math.round(paid * 100) / 100),
+        debt: Math.max(0, Math.round((Number(r.totalPrice) - paid) * 100) / 100),
+      };
+    });
+
+    return NextResponse.json(result);
   } catch (error) {
     console.error('Ошибка при получении аренд:', error);
     return NextResponse.json(

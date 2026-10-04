@@ -143,6 +143,7 @@ model Rent {
   isActive         Boolean   @default(true)
   status           String    @default("ACTIVE") // Статусы: "ACTIVE", "RETURNED", "COMPLETED", "CANCELLED", "OVERDUE"
   comment          String?   @db.Text // Комментарий менеджера
+  debtDueDate      DateTime? // Планируемая дата погашения остатка долга (при частичной оплате)
 
   // Отношения
   user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)

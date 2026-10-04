@@ -87,6 +87,9 @@ interface Rent {
   endDate: string;
   totalPrice: number;
   status: string;
+  paidTotal?: number;
+  debt?: number;
+  debtDueDate?: string | null;
   user: RentUser;
   bike: RentBike;
 }
@@ -265,6 +268,11 @@ export default function DispatchPage() {
   const [mileageAction, setMileageAction] = useState<{ type: 'complete' | 'extend'; rent: Rent } | null>(null);
   const [mileageBike, setMileageBike] = useState<Bike | null>(null);
   const [mileageBusy, setMileageBusy] = useState(false);
+  const [payRent, setPayRent] = useState<Rent | null>(null);
+  const [payAmount, setPayAmount] = useState('');
+  const [payMethod, setPayMethod] = useState('CASH');
+  const [payDue, setPayDue] = useState('');
+  const [payBusy, setPayBusy] = useState(false);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -404,6 +412,58 @@ export default function DispatchPage() {
 
   const extendRent = (rent: Rent) => {
     setMileageAction({ type: 'extend', rent });
+  };
+
+  const toInputDate = (dateString: string) => {
+    const d = new Date(dateString);
+    const offset = d.getTimezoneOffset() * 60000;
+    return new Date(d.getTime() - offset).toISOString().split('T')[0];
+  };
+
+  const openPay = (rent: Rent) => {
+    setPayRent(rent);
+    setPayAmount(String(rent.debt ?? ''));
+    setPayMethod('CASH');
+    setPayDue(rent.debtDueDate ? toInputDate(rent.debtDueDate) : '');
+    setError(null);
+    setNotice(null);
+  };
+
+  const submitPay = async () => {
+    if (!payRent) return;
+    const amount = Number(payAmount);
+    if (!amount || amount <= 0) {
+      setError('Укажите корректную сумму оплаты');
+      return;
+    }
+    setPayBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/rents/${payRent.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          paidAmount: amount,
+          paidMethod: payMethod,
+          debtDueDate: payDue || undefined,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error || 'Не удалось внести оплату');
+        return;
+      }
+      let msg = `Оплата ${amount.toLocaleString('ru-RU')} ₽ внесена по аренде #${payRent.id}`;
+      if (json.debt > 0) msg += `, остаток долга ${Number(json.debt).toLocaleString('ru-RU')} ₽`;
+      if (json.overpaid) msg += ' (сумма превышала долг)';
+      setNotice(msg);
+      setPayRent(null);
+      fetchDashboard(days);
+    } catch {
+      setError('Нет связи с сервером');
+    } finally {
+      setPayBusy(false);
+    }
   };
 
   const submitRentMileage = async (mileage: number | null) => {
@@ -663,13 +723,14 @@ export default function DispatchPage() {
   const DAY_MS = 24 * 60 * 60 * 1000;
   type Debtor = {
     key: string;
-    kind: 'Аренда' | 'Выкуп';
+    kind: 'Аренда' | 'Выкуп' | 'Доплата';
     name: string;
     phone?: string | null;
     target: string;
     amount: number;
     dueDate: string;
     daysOverdue: number;
+    notOverdue?: boolean;
   };
   const debtors: Debtor[] = [];
 
@@ -685,9 +746,33 @@ export default function DispatchPage() {
         name: rent.user.name,
         phone: rent.user.phone,
         target: rent.bike.name + (rent.bike.externalId ? ` (ID: ${rent.bike.externalId})` : ''),
-        amount: Number(rent.totalPrice) || 0,
+        amount: (rent.debt ?? 0) > 0 ? Number(rent.debt) : Number(rent.totalPrice) || 0,
         dueDate: rent.endDate,
         daysOverdue: Math.floor((nowTs - new Date(rent.endDate).getTime()) / DAY_MS),
+      });
+    });
+
+  // «Доплата»: частично оплаченные аренды с остатком долга (ещё не просроченные)
+  (data?.activeRents ?? [])
+    .filter((rent) =>
+      (rent.debt ?? 0) > 0 &&
+      ((rent.paidTotal ?? 0) > 0 || Boolean(rent.debtDueDate)) &&
+      new Date(rent.endDate).getTime() >= nowTs &&
+      matchesSearch(rent.user.name, rent.user.phone, rent.bike.name)
+    )
+    .forEach((rent) => {
+      const dueTs = rent.debtDueDate ? new Date(rent.debtDueDate).getTime() : null;
+      const overdue = dueTs !== null && dueTs < nowTs;
+      debtors.push({
+        key: `debt-${rent.id}`,
+        kind: 'Доплата',
+        name: rent.user.name,
+        phone: rent.user.phone,
+        target: rent.bike.name + (rent.bike.externalId ? ` (ID: ${rent.bike.externalId})` : ''),
+        amount: Number(rent.debt),
+        dueDate: rent.debtDueDate || rent.endDate,
+        daysOverdue: overdue ? Math.floor((nowTs - dueTs!) / DAY_MS) : 0,
+        notOverdue: !overdue,
       });
     });
 
@@ -1171,9 +1256,28 @@ export default function DispatchPage() {
                               <span className="ml-2 text-rose-400 font-medium">(просрочена)</span>
                             )}
                           </p>
+                          {(rent.debt ?? 0) > 0 && (
+                            <p className="text-xs mt-0.5 text-rose-400 font-medium">
+                              Долг {formatMoney(Number(rent.debt))}
+                              {rent.debtDueDate ? ` до ${formatDate(rent.debtDueDate)}` : ''}
+                              {(rent.paidTotal ?? 0) > 0 && (
+                                <span className="text-slate-500 font-normal">
+                                  {' '}· внесено {formatMoney(Number(rent.paidTotal))}
+                                </span>
+                              )}
+                            </p>
+                          )}
                         </div>
                         <div className="flex gap-2 shrink-0 flex-wrap justify-end items-start">
                           <ContactLinks user={rent.user} />
+                          {(rent.debt ?? 0) > 0 && (
+                            <button
+                              onClick={() => openPay(rent)}
+                              className="px-2.5 py-1.5 bg-violet-600 hover:bg-violet-500 text-white rounded text-xs transition-colors"
+                            >
+                              + Оплата
+                            </button>
+                          )}
                           <button
                             onClick={() => completeRent(rent)}
                             className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs transition-colors"
@@ -1234,7 +1338,9 @@ export default function DispatchPage() {
                         <span className={`px-2 py-0.5 rounded text-xs font-medium ${
                           d.kind === 'Аренда'
                             ? 'bg-amber-500/15 text-amber-400'
-                            : 'bg-cyan-500/15 text-cyan-400'
+                            : d.kind === 'Доплата'
+                              ? 'bg-violet-500/15 text-violet-400'
+                              : 'bg-cyan-500/15 text-cyan-400'
                         }`}>
                           {d.kind}
                         </span>
@@ -1246,7 +1352,7 @@ export default function DispatchPage() {
                       <td className="py-2.5 pr-4 text-slate-300">{d.target}</td>
                       <td className="py-2.5 pr-4 text-slate-400 whitespace-nowrap">{formatDate(d.dueDate)}</td>
                       <td className="py-2.5 pr-4 text-rose-400 font-medium whitespace-nowrap">
-                        {d.daysOverdue} дн.
+                        {d.notOverdue ? '—' : `${d.daysOverdue} дн.`}
                       </td>
                       <td className="py-2.5 text-right text-rose-300 font-semibold whitespace-nowrap">
                         {formatMoney(d.amount)}
@@ -1808,6 +1914,86 @@ export default function DispatchPage() {
           onSubmit={submitBikeMileage}
           onCancel={() => !mileageBusy && setMileageBike(null)}
         />
+      )}
+
+      {payRent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
+            <h2 className="mb-4 text-lg font-semibold text-slate-100">
+              Внесение оплаты — аренда #{payRent.id}
+            </h2>
+            <p className="mb-4 text-sm text-slate-400">
+              {payRent.user.name} · {payRent.user.phone}
+              <br />
+              {payRent.bike.name}{payRent.bike.externalId ? ` (ID: ${payRent.bike.externalId})` : ''}
+            </p>
+            <p className="mb-4 text-sm">
+              <span className="text-slate-400">Внесено {formatMoney(Number(payRent.paidTotal ?? 0))} из {formatMoney(Number(payRent.totalPrice))} · </span>
+              <span className="text-rose-400 font-medium">долг {formatMoney(Number(payRent.debt ?? 0))}</span>
+            </p>
+
+            <div className="mb-4">
+              <label className="mb-1 block text-xs font-medium text-slate-400">Сумма, ₽</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={payAmount}
+                onChange={(e) => setPayAmount(e.target.value)}
+                className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+              />
+              {Number(payAmount) > 0 && Number(payAmount) < Number(payRent.debt ?? 0) && (
+                <p className="mt-1 text-xs text-violet-400">
+                  Останется долг: {formatMoney(Number(payRent.debt ?? 0) - Number(payAmount))}
+                </p>
+              )}
+            </div>
+
+            <div className="mb-4 grid grid-cols-2 gap-4">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-400">Способ оплаты</label>
+                <select
+                  value={payMethod}
+                  onChange={(e) => setPayMethod(e.target.value)}
+                  className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+                >
+                  <option value="CASH">Наличные</option>
+                  <option value="SBP">СБП</option>
+                  <option value="CARD">Карта</option>
+                  <option value="TRANSFER">Перевод</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-400">
+                  Погасить до (если останется долг)
+                </label>
+                <input
+                  type="date"
+                  value={payDue}
+                  onChange={(e) => setPayDue(e.target.value)}
+                  className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-white focus:outline-none focus:border-cyan-500 [color-scheme:dark]"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => !payBusy && setPayRent(null)}
+                disabled={payBusy}
+                className="rounded-lg bg-slate-800 px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 disabled:opacity-50 transition-colors"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={submitPay}
+                disabled={payBusy}
+                className="rounded-lg bg-violet-600 px-4 py-2 text-sm text-white hover:bg-violet-500 disabled:opacity-50 transition-colors"
+              >
+                {payBusy ? 'Сохранение...' : 'Внести'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

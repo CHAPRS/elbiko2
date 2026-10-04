@@ -23,6 +23,9 @@ export async function PATCH(
       paymentMethod,
       mileage,
       mileageNote,
+      paidAmount,
+      paidMethod,
+      debtDueDate,
     } = body;
 
     const rent = await prisma.rent.findUnique({
@@ -53,9 +56,46 @@ export async function PATCH(
     const mileageWarning =
       mileageValue !== null && previousMileage !== null && mileageValue < previousMileage;
 
+    // «Получено сейчас»: полная или частичная оплата (при продлении или отдельно)
+    let cashReceived: number | null = null;
+    if (paidAmount !== undefined && paidAmount !== null && paidAmount !== '') {
+      const parsed = Number(paidAmount);
+      if (!Number.isFinite(parsed) || parsed <= 0) {
+        return NextResponse.json(
+          { error: 'Некорректная сумма оплаты' },
+          { status: 400 }
+        );
+      }
+      cashReceived = Math.round(parsed * 100) / 100;
+    }
+
+    // Планируемая дата погашения долга (null/'' — снять)
+    let debtDueDateProvided = false;
+    let parsedDebtDueDate: Date | null = null;
+    if (debtDueDate !== undefined) {
+      debtDueDateProvided = true;
+      if (debtDueDate === null || debtDueDate === '') {
+        parsedDebtDueDate = null;
+      } else {
+        const d = new Date(debtDueDate);
+        if (isNaN(d.getTime())) {
+          return NextResponse.json(
+            { error: 'Некорректная дата погашения долга' },
+            { status: 400 }
+          );
+        }
+        parsedDebtDueDate = d;
+      }
+    }
+
+    let overpaid = false;
+    let paidTotalOut = 0;
+    let debtOut = 0;
+
     const updatedRentId = await prisma.$transaction(
       async (tx) => {
       let updateData: any = {};
+      let extensionCharge = 0;
 
       // Обновление статуса
       if (status) {
@@ -118,6 +158,7 @@ export async function PATCH(
         if (!Number.isFinite(additionalPrice) || additionalPrice < 0) {
           throw new Error('Стоимость продления не может быть отрицательной или некорректной');
         }
+        extensionCharge = additionalPrice;
 
         const currentEndDate = new Date(rent.endDate);
         const newEndDate = new Date(currentEndDate);
@@ -191,25 +232,43 @@ export async function PATCH(
         updateData.bikeId = newBikeId;
       }
 
-      const updated = await tx.rent.update({
-        where: { id },
-        data: updateData,
-      });
+      // Итоговая стоимость аренды после всех правок этого запроса
+      const effectiveTotal =
+        updateData.totalPrice !== undefined && updateData.totalPrice !== null && updateData.totalPrice !== ''
+          ? Number(updateData.totalPrice)
+          : Number(rent.totalPrice ?? 0);
 
-      // Фиксируем пробег на байке, который был в этой аренде
-      if (mileageValue !== null) {
-        await tx.mileageLog.create({
+      // Сколько уже внесено по аренде (PAYMENT минус REFUND) — денежный журнал
+      const [paidAgg, refundAgg] = await Promise.all([
+        tx.rentTransaction.aggregate({
+          where: { rentId: id, type: 'PAYMENT' },
+          _sum: { amount: true },
+        }),
+        tx.rentTransaction.aggregate({
+          where: { rentId: id, type: 'REFUND' },
+          _sum: { amount: true },
+        }),
+      ]);
+      let paidSoFar =
+        Number(paidAgg._sum.amount ?? 0) - Number(refundAgg._sum.amount ?? 0);
+
+      // Полученные сейчас деньги: полная/частичная оплата или погашение долга
+      if (cashReceived !== null) {
+        const due = Math.max(0, effectiveTotal - paidSoFar);
+        if (cashReceived > due + 0.001) overpaid = true;
+
+        await tx.rentTransaction.create({
           data: {
-            bikeId: rent.bikeId,
             rentId: id,
-            mileage: mileageValue,
-            note: typeof mileageNote === 'string' && mileageNote.trim() ? mileageNote.trim() : null,
+            type: 'PAYMENT',
+            amount: cashReceived,
+            method: paidMethod ?? null,
+            comment: extensionCharge > 0
+              ? `Оплата при продлении${cashReceived < extensionCharge ? ' (частичная)' : ''}`
+              : 'Внесение оплаты',
           },
         });
-        await tx.bike.update({
-          where: { id: rent.bikeId },
-          data: { mileage: mileageValue },
-        });
+        paidSoFar += cashReceived;
       }
 
       // Обновляем/создаём платёж по аренде
@@ -255,19 +314,82 @@ export async function PATCH(
           });
         }
 
-        if (paymentStatus === 'COMPLETED' || paymentStatus === 'REFUNDED') {
+        if (paymentStatus === 'COMPLETED') {
+          // Фиксируем только неоплаченный остаток — иначе при частичных оплатах был бы двойной счёт
+          const remainder = Math.round(Math.max(0, effectiveTotal - paidSoFar) * 100) / 100;
+          if (remainder > 0) {
+            await tx.rentTransaction.create({
+              data: {
+                rentId: id,
+                type: 'PAYMENT',
+                amount: remainder,
+                method: paymentMethod,
+                comment: paymentMethod ? `Оплата: ${paymentMethod}` : null,
+              },
+            });
+            paidSoFar += remainder;
+          }
+        } else if (paymentStatus === 'REFUNDED') {
           await tx.rentTransaction.create({
             data: {
               rentId: id,
-              type: paymentStatus === 'COMPLETED' ? 'PAYMENT' : 'REFUND',
+              type: 'REFUND',
               amount: finalPaymentAmount,
               method: paymentMethod,
-              comment: paymentMethod
-                ? `${paymentStatus === 'COMPLETED' ? 'Оплата' : 'Возврат'}: ${paymentMethod}`
-                : null,
+              comment: paymentMethod ? `Возврат: ${paymentMethod}` : null,
             },
           });
+          paidSoFar -= finalPaymentAmount;
         }
+      }
+
+      // Если частичными взносами аренда покрыта полностью — закрываем ожидающий платёж
+      if (
+        !paymentStatus &&
+        rent.payment &&
+        rent.payment.status === 'PENDING' &&
+        effectiveTotal > 0 &&
+        paidSoFar >= effectiveTotal - 0.001
+      ) {
+        await tx.payment.update({
+          where: { id: rent.payment.id },
+          data: {
+            status: 'COMPLETED',
+            paymentMethod: paidMethod ?? rent.payment.paymentMethod,
+            paidAt: new Date(),
+          },
+        });
+      }
+
+      // Долг = начислено − внесено; дата погашения сбрасывается при нулевом долге
+      const newDebt = Math.round(Math.max(0, effectiveTotal - paidSoFar) * 100) / 100;
+      if (debtDueDateProvided) {
+        updateData.debtDueDate = newDebt > 0 ? parsedDebtDueDate : null;
+      } else if (newDebt <= 0) {
+        updateData.debtDueDate = null;
+      }
+      paidTotalOut = Math.max(0, Math.round(paidSoFar * 100) / 100);
+      debtOut = newDebt;
+
+      const updated = await tx.rent.update({
+        where: { id },
+        data: updateData,
+      });
+
+      // Фиксируем пробег на байке, который был в этой аренде
+      if (mileageValue !== null) {
+        await tx.mileageLog.create({
+          data: {
+            bikeId: rent.bikeId,
+            rentId: id,
+            mileage: mileageValue,
+            note: typeof mileageNote === 'string' && mileageNote.trim() ? mileageNote.trim() : null,
+          },
+        });
+        await tx.bike.update({
+          where: { id: rent.bikeId },
+          data: { mileage: mileageValue },
+        });
       }
 
       return updated.id;
@@ -297,7 +419,13 @@ export async function PATCH(
       },
     });
 
-    return NextResponse.json({ ...updatedRent, mileageWarning });
+    return NextResponse.json({
+      ...updatedRent,
+      mileageWarning,
+      overpaid,
+      paidTotal: paidTotalOut,
+      debt: debtOut,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Ошибка при обновлении аренды';
     console.error('Ошибка при обновлении аренды:', error);

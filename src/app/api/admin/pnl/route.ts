@@ -48,10 +48,11 @@ export async function GET(request: Request) {
       ? { gte: rangeStart, lt: rangeEnd }
       : { gte: rangeStart };
 
-    const [payments, miscTx, buyoutPayments] = await Promise.all([
-      prisma.payment.findMany({
-        where: { status: 'COMPLETED', updatedAt: period },
-        select: { amount: true, updatedAt: true },
+    const [rentTx, miscTx, buyoutPayments] = await Promise.all([
+      // Денежный журнал аренд: реальные поступления/возвраты по дате операции
+      prisma.rentTransaction.findMany({
+        where: { type: { in: ['PAYMENT', 'REFUND'] }, createdAt: period },
+        select: { type: true, amount: true, createdAt: true },
       }),
       prisma.miscTransaction.findMany({
         where: { createdAt: period },
@@ -85,10 +86,10 @@ export async function GET(request: Request) {
       return r;
     };
 
-    payments.forEach((p) => {
-      const r = row(p.updatedAt);
-      r.rent += Number(p.amount);
-      r.paymentsCount += 1;
+    rentTx.forEach((t) => {
+      const r = row(t.createdAt);
+      r.rent += t.type === 'PAYMENT' ? Number(t.amount) : -Number(t.amount);
+      if (t.type === 'PAYMENT') r.paymentsCount += 1;
     });
     miscTx.forEach((tx) => {
       const r = row(tx.createdAt);

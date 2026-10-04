@@ -12,6 +12,9 @@ interface Rent {
   isActive: boolean;
   status: string;
   comment?: string | null;
+  paidTotal?: number;
+  debt?: number;
+  debtDueDate?: string | null;
   user: {
     id: number;
     name: string;
@@ -53,7 +56,16 @@ export default function RentsPage() {
   const [extendPrice, setExtendPrice] = useState<string>('');
   const [extendPriceManuallySet, setExtendPriceManuallySet] = useState(false);
   const [extendMileage, setExtendMileage] = useState('');
+  const [extendPayMode, setExtendPayMode] = useState<'FULL' | 'PARTIAL' | 'LATER'>('LATER');
+  const [extendPaidAmount, setExtendPaidAmount] = useState('');
+  const [extendPaidMethod, setExtendPaidMethod] = useState('CASH');
+  const [extendDebtDue, setExtendDebtDue] = useState('');
   const [isExtending, setIsExtending] = useState(false);
+  const [payRent, setPayRent] = useState<Rent | null>(null);
+  const [payAmount, setPayAmount] = useState('');
+  const [payMethod, setPayMethod] = useState('CASH');
+  const [payDue, setPayDue] = useState('');
+  const [payBusy, setPayBusy] = useState(false);
   const [pendingStatus, setPendingStatus] = useState<{ rent: Rent; status: string } | null>(null);
   const [statusSaving, setStatusSaving] = useState(false);
   const [paymentMethods, setPaymentMethods] = useState<Record<number, string>>({});
@@ -156,6 +168,10 @@ export default function RentsPage() {
     setExtendDays(String(days));
     setExtendBikeId(String(rent.bike.id));
     setExtendPriceManuallySet(false);
+    setExtendPayMode('LATER');
+    setExtendPaidAmount('');
+    setExtendPaidMethod('CASH');
+    setExtendDebtDue('');
     setError(null);
     setNotice(null);
 
@@ -171,6 +187,10 @@ export default function RentsPage() {
     setExtendPrice('');
     setExtendPriceManuallySet(false);
     setExtendMileage('');
+    setExtendPayMode('LATER');
+    setExtendPaidAmount('');
+    setExtendPaidMethod('CASH');
+    setExtendDebtDue('');
     setError(null);
   };
 
@@ -182,6 +202,28 @@ export default function RentsPage() {
       return;
     }
     const priceVal = extendPrice.trim() === '' ? undefined : Number(extendPrice);
+    const bikeForPrice = bikes.find((b) => String(b.id) === extendBikeId);
+    const effectivePrice = priceVal ?? (bikeForPrice ? Number(bikeForPrice.pricePerDay) * days : 0);
+
+    let paidAmountVal: number | undefined;
+    let debtDueDateVal: string | undefined;
+    if (extendPayMode === 'FULL') {
+      paidAmountVal = effectivePrice;
+    } else if (extendPayMode === 'PARTIAL') {
+      const amount = Number(extendPaidAmount);
+      if (!amount || amount <= 0) {
+        setError('Укажите внесённую сумму');
+        return;
+      }
+      if (amount < effectivePrice && !extendDebtDue) {
+        setError('Укажите планируемую дату погашения остатка');
+        return;
+      }
+      paidAmountVal = amount;
+      debtDueDateVal = extendDebtDue || undefined;
+    } else {
+      debtDueDateVal = extendDebtDue || undefined;
+    }
 
     setIsExtending(true);
     setError(null);
@@ -196,6 +238,9 @@ export default function RentsPage() {
           extendBikeId: extendBikeId ? Number(extendBikeId) : undefined,
           extendPrice: priceVal,
           mileage: extendMileage.trim() !== '' ? Number(extendMileage) : undefined,
+          paidAmount: paidAmountVal,
+          paidMethod: paidAmountVal !== undefined ? extendPaidMethod : undefined,
+          debtDueDate: debtDueDateVal,
         }),
       });
       const data = await res.json();
@@ -205,7 +250,12 @@ export default function RentsPage() {
         return;
       }
 
-      setNotice(`Аренда №${extendRentId} продлена на ${days} дн.`);
+      let msg = `Аренда №${extendRentId} продлена на ${days} дн.`;
+      if (data.debt > 0) {
+        msg += `, остаток к оплате ${Number(data.debt).toLocaleString('ru-RU')} ₽`;
+      }
+      if (data.overpaid) msg += ' (сумма превышала долг)';
+      setNotice(msg);
       closeExtendModal();
       fetchRents();
     } catch (err) {
@@ -213,6 +263,52 @@ export default function RentsPage() {
       setError('Нет связи с сервером');
     } finally {
       setIsExtending(false);
+    }
+  };
+
+  const openPay = (rent: Rent) => {
+    setPayRent(rent);
+    setPayAmount(String(rent.debt ?? ''));
+    setPayMethod('CASH');
+    setPayDue(rent.debtDueDate ? toInputDate(rent.debtDueDate) : '');
+    setError(null);
+    setNotice(null);
+  };
+
+  const submitPay = async () => {
+    if (!payRent) return;
+    const amount = Number(payAmount);
+    if (!amount || amount <= 0) {
+      setError('Укажите корректную сумму оплаты');
+      return;
+    }
+    setPayBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/rents/${payRent.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          paidAmount: amount,
+          paidMethod: payMethod,
+          debtDueDate: payDue || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Не удалось внести оплату');
+        return;
+      }
+      let msg = `Оплата ${amount.toLocaleString('ru-RU')} ₽ внесена по аренде #${payRent.id}`;
+      if (data.debt > 0) msg += `, остаток долга ${Number(data.debt).toLocaleString('ru-RU')} ₽`;
+      if (data.overpaid) msg += ' (сумма превышала долг)';
+      setNotice(msg);
+      setPayRent(null);
+      fetchRents();
+    } catch {
+      setError('Нет связи с сервером');
+    } finally {
+      setPayBusy(false);
     }
   };
 
@@ -361,7 +457,17 @@ export default function RentsPage() {
           </td>
           <td className="p-4 text-slate-300">{formatDate(rent.startDate)}</td>
           <td className="p-4 text-slate-300">{formatDate(rent.endDate)}</td>
-          <td className="p-4 text-emerald-400 font-medium">{rent.totalPrice.toLocaleString()} ₽</td>
+          <td className="p-4">
+            <span className="text-emerald-400 font-medium">{rent.totalPrice.toLocaleString()} ₽</span>
+            {(rent.debt ?? 0) > 0 ? (
+              <span className="block text-xs text-rose-400">
+                долг {Number(rent.debt).toLocaleString('ru-RU')} ₽
+                {rent.debtDueDate ? ` до ${formatDate(rent.debtDueDate)}` : ''}
+              </span>
+            ) : (rent.paidTotal ?? 0) > 0 ? (
+              <span className="block text-xs text-slate-500">оплачено</span>
+            ) : null}
+          </td>
           <td className="p-4 text-sm">
             <span className={`px-2 py-1 rounded text-xs ${getStatusBadge(rent.status)}`}>
               {getStatusLabel(rent.status)}
@@ -392,6 +498,14 @@ export default function RentsPage() {
                 className="px-2 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-xs transition-colors"
               >
                 Продлить
+              </button>
+            )}
+            {(rent.debt ?? 0) > 0 && (
+              <button
+                onClick={() => openPay(rent)}
+                className="px-2 py-1 bg-violet-600 hover:bg-violet-500 text-white rounded text-xs transition-colors"
+              >
+                + Оплата
               </button>
             )}
             {(!rent.payment || rent.payment.status !== 'COMPLETED') && (
@@ -682,6 +796,85 @@ export default function RentsPage() {
                 </p>
               </div>
 
+              {/* Оплата продления */}
+              <div className="mb-4 rounded-lg border border-slate-800 bg-slate-950/50 p-3">
+                <label className="mb-2 block text-xs font-medium text-slate-400">
+                  Оплата продления
+                </label>
+                <div className="mb-3 flex flex-wrap gap-2">
+                  {([
+                    { value: 'LATER', label: 'Оплатит позже' },
+                    { value: 'FULL', label: 'Полностью' },
+                    { value: 'PARTIAL', label: 'Частично' },
+                  ] as const).map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setExtendPayMode(opt.value)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                        extendPayMode === opt.value
+                          ? 'bg-violet-600 text-white'
+                          : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+
+                {extendPayMode !== 'LATER' && (
+                  <div className="grid grid-cols-2 gap-3 mb-3">
+                    <div>
+                      <label className="mb-1 block text-xs text-slate-500">Внесено, ₽</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={extendPayMode === 'FULL' ? (extendPrice || '') : extendPaidAmount}
+                        onChange={(e) => setExtendPaidAmount(e.target.value)}
+                        disabled={extendPayMode === 'FULL'}
+                        className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-white focus:outline-none focus:border-cyan-500 disabled:opacity-60"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs text-slate-500">Способ оплаты</label>
+                      <select
+                        value={extendPaidMethod}
+                        onChange={(e) => setExtendPaidMethod(e.target.value)}
+                        className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+                      >
+                        <option value="CASH">Наличные</option>
+                        <option value="SBP">СБП</option>
+                        <option value="CARD">Карта</option>
+                        <option value="TRANSFER">Перевод</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+                {extendPayMode === 'PARTIAL' &&
+                  Number(extendPaidAmount) > 0 &&
+                  Number(extendPaidAmount) < (Number(extendPrice) || 0) && (
+                    <p className="mb-3 text-xs text-violet-400">
+                      Останется долг: {((Number(extendPrice) || 0) - Number(extendPaidAmount)).toLocaleString('ru-RU')} ₽
+                    </p>
+                  )}
+
+                {(extendPayMode === 'PARTIAL' || extendPayMode === 'LATER') && (
+                  <div>
+                    <label className="mb-1 block text-xs text-slate-500">
+                      Планируемая дата погашения{extendPayMode === 'PARTIAL' ? ' *' : ' (необязательно)'}
+                    </label>
+                    <input
+                      type="date"
+                      value={extendDebtDue}
+                      onChange={(e) => setExtendDebtDue(e.target.value)}
+                      className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-white focus:outline-none focus:border-cyan-500 [color-scheme:dark]"
+                    />
+                  </div>
+                )}
+              </div>
+
               <div className="mb-4">
                 <label className="mb-1 block text-xs font-medium text-slate-400">
                   Пробег, км (необязательно)
@@ -716,6 +909,90 @@ export default function RentsPage() {
                   className="rounded-lg bg-cyan-600 px-4 py-2 text-sm text-white hover:bg-cyan-500 disabled:opacity-50 transition-colors"
                 >
                   {isExtending ? 'Сохранение...' : 'Продлить'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {payRent && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+            <div className="w-full max-w-md rounded-xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
+              <h2 className="mb-4 text-lg font-semibold text-slate-100">
+                Внесение оплаты — аренда #{payRent.id}
+              </h2>
+              <p className="mb-4 text-sm text-slate-400">
+                {payRent.user.name} · {payRent.user.phone}
+                <br />
+                {payRent.bike.name}{payRent.bike.externalId ? ` (ID: ${payRent.bike.externalId})` : ''}
+              </p>
+              <p className="mb-4 text-sm">
+                <span className="text-slate-400">
+                  Внесено {Number(payRent.paidTotal ?? 0).toLocaleString('ru-RU')} ₽ из {Number(payRent.totalPrice).toLocaleString('ru-RU')} ₽ ·{' '}
+                </span>
+                <span className="text-rose-400 font-medium">
+                  долг {Number(payRent.debt ?? 0).toLocaleString('ru-RU')} ₽
+                </span>
+              </p>
+
+              <div className="mb-4">
+                <label className="mb-1 block text-xs font-medium text-slate-400">Сумма, ₽</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={payAmount}
+                  onChange={(e) => setPayAmount(e.target.value)}
+                  className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+                />
+                {Number(payAmount) > 0 && Number(payAmount) < Number(payRent.debt ?? 0) && (
+                  <p className="mt-1 text-xs text-violet-400">
+                    Останется долг: {(Number(payRent.debt ?? 0) - Number(payAmount)).toLocaleString('ru-RU')} ₽
+                  </p>
+                )}
+              </div>
+
+              <div className="mb-4 grid grid-cols-2 gap-4">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-400">Способ оплаты</label>
+                  <select
+                    value={payMethod}
+                    onChange={(e) => setPayMethod(e.target.value)}
+                    className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+                  >
+                    <option value="CASH">Наличные</option>
+                    <option value="SBP">СБП</option>
+                    <option value="CARD">Карта</option>
+                    <option value="TRANSFER">Перевод</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-400">
+                    Погасить до (если останется долг)
+                  </label>
+                  <input
+                    type="date"
+                    value={payDue}
+                    onChange={(e) => setPayDue(e.target.value)}
+                    className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-white focus:outline-none focus:border-cyan-500 [color-scheme:dark]"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => !payBusy && setPayRent(null)}
+                  disabled={payBusy}
+                  className="rounded-lg bg-slate-800 px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 disabled:opacity-50 transition-colors"
+                >
+                  Отмена
+                </button>
+                <button
+                  onClick={submitPay}
+                  disabled={payBusy}
+                  className="rounded-lg bg-violet-600 px-4 py-2 text-sm text-white hover:bg-violet-500 disabled:opacity-50 transition-colors"
+                >
+                  {payBusy ? 'Сохранение...' : 'Внести'}
                 </button>
               </div>
             </div>

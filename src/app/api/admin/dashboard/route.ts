@@ -62,8 +62,7 @@ export async function GET(request: Request) {
       returningToday,
       returningTomorrow,
       completedRentsForAvg,
-      revenueTodayAgg,
-      revenuePeriodPayments,
+      rentTxPeriod,
       failedRefundedAgg,
       rentRevenueByBike,
       miscPeriodTx,
@@ -95,6 +94,7 @@ export async function GET(request: Request) {
           user: userSelect,
           bike: bikeSelect,
           payment: true,
+          rentTransactions: { select: { type: true, amount: true } },
         },
         orderBy: { endDate: 'asc' },
       }),
@@ -124,22 +124,17 @@ export async function GET(request: Request) {
         where: { status: 'COMPLETED' },
         _avg: { totalPrice: true },
       }),
-      prisma.payment.aggregate({
-        _sum: { amount: true },
+      // Денежный журнал аренд за период: PAYMENT — поступления, REFUND — возвраты
+      prisma.rentTransaction.findMany({
         where: {
-          status: 'COMPLETED',
-          updatedAt: { gte: today, lt: tomorrow },
-        },
-      }),
-      prisma.payment.findMany({
-        where: {
-          status: 'COMPLETED',
-          updatedAt: { gte: periodStart },
+          type: { in: ['PAYMENT', 'REFUND'] },
+          createdAt: { gte: periodStart },
         },
         select: {
+          type: true,
           amount: true,
-          updatedAt: true,
-          paymentMethod: true,
+          createdAt: true,
+          method: true,
           rent: { select: { user: { select: { name: true, phone: true } } } },
         },
       }),
@@ -211,7 +206,21 @@ export async function GET(request: Request) {
       }),
     ]);
 
-    const activeRents = activeAndOverdueRents;
+    // Оплачено/долг по каждой аренде — из денежного журнала (PAYMENT − REFUND)
+    const activeRents = activeAndOverdueRents.map((r) => {
+      const paid = r.rentTransactions.reduce(
+        (sum, t) =>
+          sum +
+          (t.type === 'PAYMENT' ? Number(t.amount) : t.type === 'REFUND' ? -Number(t.amount) : 0),
+        0
+      );
+      const { rentTransactions, ...rest } = r;
+      return {
+        ...rest,
+        paidTotal: Math.max(0, Math.round(paid * 100) / 100),
+        debt: Math.max(0, Math.round((Number(r.totalPrice) - paid) * 100) / 100),
+      };
+    });
     const rentedBikeIds = new Set(activeAndOverdueRents.map((r) => r.bikeId));
     const rentedBikes = rentedBikeIds.size;
     const freeBikes = bikes.filter(
@@ -237,7 +246,14 @@ export async function GET(request: Request) {
       0
     );
 
-    const revenueToday = Number(revenueTodayAgg._sum.amount ?? 0);
+    const revenueToday = rentTxPeriod.reduce(
+      (sum, t) =>
+        t.createdAt >= today && t.createdAt < tomorrow
+          ? sum + (t.type === 'PAYMENT' ? Number(t.amount) : -Number(t.amount))
+          : sum,
+      0
+    );
+    const rentDebt = activeRents.reduce((sum, r) => sum + r.debt, 0);
 
     const byDay = new Map<string, { revenue: number; misc: number; expense: number; buyout: number }>();
     for (let i = 0; i < days; i++) {
@@ -246,11 +262,11 @@ export async function GET(request: Request) {
       const key = localDayKey(d);
       byDay.set(key, { revenue: 0, misc: 0, expense: 0, buyout: 0 });
     }
-    for (const payment of revenuePeriodPayments) {
-      const key = localDayKey(payment.updatedAt);
+    for (const t of rentTxPeriod) {
+      const key = localDayKey(t.createdAt);
       const entry = byDay.get(key);
       if (entry) {
-        entry.revenue += Number(payment.amount);
+        entry.revenue += t.type === 'PAYMENT' ? Number(t.amount) : -Number(t.amount);
       }
     }
     for (const tx of miscPeriodTx) {
@@ -322,7 +338,9 @@ export async function GET(request: Request) {
       const key = method || 'NONE';
       incomeByMethod[key] = (incomeByMethod[key] || 0) + amount;
     };
-    revenuePeriodPayments.forEach((p) => addMethodSum(p.paymentMethod, Number(p.amount)));
+    rentTxPeriod.forEach((t) =>
+      addMethodSum(t.method, t.type === 'PAYMENT' ? Number(t.amount) : -Number(t.amount))
+    );
     miscPeriodTx
       .filter((tx) => tx.kind === 'INCOME')
       .forEach((tx) => addMethodSum(tx.method, Number(tx.amount)));
@@ -338,12 +356,12 @@ export async function GET(request: Request) {
       .slice(0, 5);
 
     const clientAgg = new Map<string, { name: string; phone: string | null; revenue: number; count: number }>();
-    revenuePeriodPayments.forEach((p) => {
-      const user = p.rent?.user;
+    rentTxPeriod.forEach((t) => {
+      const user = t.rent?.user;
       if (!user) return;
       const key = user.phone || user.name;
       const entry = clientAgg.get(key) || { name: user.name, phone: user.phone, revenue: 0, count: 0 };
-      entry.revenue += Number(p.amount);
+      entry.revenue += t.type === 'PAYMENT' ? Number(t.amount) : -Number(t.amount);
       entry.count += 1;
       clientAgg.set(key, entry);
     });
@@ -407,6 +425,7 @@ export async function GET(request: Request) {
       revenuePeriod,
       expectedRevenue,
       overdueRevenue,
+      rentDebt,
       averageCheck,
       failedRefundedRevenue,
       miscIncomeToday,

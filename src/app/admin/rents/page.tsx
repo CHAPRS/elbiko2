@@ -459,7 +459,7 @@ export default function RentsPage() {
           <td className="p-4 text-slate-300">{formatDate(rent.endDate)}</td>
           <td className="p-4">
             <span className="text-emerald-400 font-medium">{rent.totalPrice.toLocaleString()} ₽</span>
-            {(rent.debt ?? 0) > 0 ? (
+            {(rent.debt ?? 0) > 0 && ((rent.paidTotal ?? 0) > 0 || Boolean(rent.debtDueDate)) ? (
               <span className="block text-xs text-rose-400">
                 долг {Number(rent.debt).toLocaleString('ru-RU')} ₽
                 {rent.debtDueDate ? ` до ${formatDate(rent.debtDueDate)}` : ''}
@@ -500,7 +500,7 @@ export default function RentsPage() {
                 Продлить
               </button>
             )}
-            {(rent.debt ?? 0) > 0 && (
+            {(rent.debt ?? 0) > 0 && ((rent.paidTotal ?? 0) > 0 || Boolean(rent.debtDueDate)) && (
               <button
                 onClick={() => openPay(rent)}
                 className="px-2 py-1 bg-violet-600 hover:bg-violet-500 text-white rounded text-xs transition-colors"

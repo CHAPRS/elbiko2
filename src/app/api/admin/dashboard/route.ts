@@ -257,7 +257,12 @@ export async function GET(request: Request) {
           : sum,
       0
     );
-    const rentDebt = activeRents.reduce((sum, r) => sum + r.debt, 0);
+    // Долг по арендам = только реальный: была частичная оплата или назначен срок погашения.
+    // Полностью неотмеченная оплата (PENDING) долгом не считается — как раньше.
+    const rentDebt = activeRents.reduce(
+      (sum, r) => sum + (r.paidTotal > 0 || r.debtDueDate ? r.debt : 0),
+      0
+    );
 
     const byDay = new Map<string, { revenue: number; misc: number; expense: number; buyout: number }>();
     for (let i = 0; i < days; i++) {

@@ -39,6 +39,22 @@ interface CategorySum {
   count: number;
 }
 
+interface PnlMonth {
+  month: string;
+  rent: number;
+  misc: number;
+  buyout: number;
+  income: number;
+  expenses: number;
+  profit: number;
+  paymentsCount: number;
+}
+
+interface PnlData {
+  months: PnlMonth[];
+  totals: Omit<PnlMonth, 'month'>;
+}
+
 interface StatsData {
   from: string;
   to: string;
@@ -121,6 +137,11 @@ export default function BikeStatsPage() {
   const [expandedId, setExpandedId] = useState<number | 'unassigned' | null>(null);
   const [expenseDetails, setExpenseDetails] = useState<ExpenseItem[]>([]);
   const [detailsLoading, setDetailsLoading] = useState(false);
+  const [pnlMonths, setPnlMonths] = useState('12');
+  const [pnlFrom, setPnlFrom] = useState('');
+  const [pnlTo, setPnlTo] = useState('');
+  const [pnl, setPnl] = useState<PnlData | null>(null);
+  const [pnlLoading, setPnlLoading] = useState(false);
 
   const fetchStats = async () => {
     setIsLoading(true);
@@ -140,12 +161,61 @@ export default function BikeStatsPage() {
     fetchStats();
   }, [from, to]);
 
+  const fetchPnl = async () => {
+    setPnlLoading(true);
+    try {
+      const query = pnlMonths === 'custom'
+        ? (pnlFrom && pnlTo ? `from=${pnlFrom}&to=${pnlTo}` : null)
+        : `months=${pnlMonths}`;
+      if (!query) {
+        setPnl(null);
+        return;
+      }
+      const res = await fetch(`/api/admin/pnl?${query}`);
+      const json = await res.json();
+      if (res.ok) setPnl(json);
+    } catch (err) {
+      console.error('Ошибка загрузки P&L:', err);
+    } finally {
+      setPnlLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPnl();
+  }, [pnlMonths, pnlFrom, pnlTo]);
+
+  const handlePnlPeriodChange = (value: string) => {
+    setPnlMonths(value);
+    if (value === 'custom') {
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const to = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
+      const fromD = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+      setPnlTo((v) => v || to);
+      setPnlFrom((v) => v || `${fromD.getFullYear()}-${pad(fromD.getMonth() + 1)}`);
+    } else {
+      setPnlFrom('');
+      setPnlTo('');
+    }
+  };
+
   const applyPreset = (fromDate: Date, toDate: Date) => {
     setFrom(toInputDate(fromDate));
     setTo(toInputDate(toDate));
   };
 
   const formatMoney = (n: number) => `${n.toLocaleString('ru-RU')} ₽`;
+
+const MONTH_NAMES = [
+  'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+  'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь',
+];
+
+const monthLabel = (m: string) => {
+  const [y, mm] = m.split('-').map(Number);
+  return `${MONTH_NAMES[(mm ?? 1) - 1]} ${y}`;
+};
 
   const formatDate = (iso: string) =>
     new Date(iso).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -481,6 +551,101 @@ export default function BikeStatsPage() {
             </div>
           </>
         )}
+
+        {/* Помесячный отчёт P&L */}
+        <div className="mt-8">
+          <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+            <h2 className="text-xl font-bold text-white">Помесячный отчёт (P&amp;L)</h2>
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={pnlMonths}
+                onChange={(e) => handlePnlPeriodChange(e.target.value)}
+                className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-lime-400"
+              >
+                <option value="6">Последние 6 мес.</option>
+                <option value="12">Последние 12 мес.</option>
+                <option value="24">Последние 24 мес.</option>
+                <option value="0">Всё время</option>
+                <option value="custom">Произвольный период</option>
+              </select>
+              {pnlMonths === 'custom' && (
+                <>
+                  <input
+                    type="month"
+                    value={pnlFrom}
+                    onChange={(e) => setPnlFrom(e.target.value)}
+                    className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-lime-400 [color-scheme:dark]"
+                  />
+                  <span className="text-slate-500">—</span>
+                  <input
+                    type="month"
+                    value={pnlTo}
+                    onChange={(e) => setPnlTo(e.target.value)}
+                    className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-lime-400 [color-scheme:dark]"
+                  />
+                </>
+              )}
+            </div>
+          </div>
+
+          {pnlLoading ? (
+            <p className="text-slate-400">Загрузка...</p>
+          ) : pnl && (
+            <div className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-slate-900 border-b border-slate-800">
+                    <tr className="text-left text-sm text-slate-400">
+                      <th className="p-4">Месяц</th>
+                      <th className="p-4">Аренда</th>
+                      <th className="p-4">Прочие доходы</th>
+                      <th className="p-4">Выкупы</th>
+                      <th className="p-4">Итого доход</th>
+                      <th className="p-4">Расходы</th>
+                      <th className="p-4">Прибыль</th>
+                      <th className="p-4">Платежей</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800">
+                    {pnl.months.map((m) => (
+                      <tr key={m.month} className="hover:bg-slate-800/30">
+                        <td className="p-4 text-white">
+                          {monthLabel(m.month)}
+                          {m.month === `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}` && (
+                            <span className="ml-2 text-xs bg-lime-400/20 text-lime-400 px-2 py-0.5 rounded-full">текущий</span>
+                          )}
+                        </td>
+                        <td className="p-4 text-slate-300">{formatMoney(m.rent)}</td>
+                        <td className="p-4 text-slate-300">{formatMoney(m.misc)}</td>
+                        <td className="p-4 text-slate-300">{formatMoney(m.buyout)}</td>
+                        <td className="p-4 text-emerald-400 font-medium">{formatMoney(m.income)}</td>
+                        <td className="p-4 text-rose-400">{formatMoney(m.expenses)}</td>
+                        <td className={`p-4 font-medium ${m.profit >= 0 ? 'text-lime-400' : 'text-rose-400'}`}>
+                          {formatMoney(m.profit)}
+                        </td>
+                        <td className="p-4 text-slate-400">{m.paymentsCount}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-slate-900/80 font-semibold">
+                      <td className="p-4 text-slate-200">Итого</td>
+                      <td className="p-4 text-slate-300">{formatMoney(pnl.totals.rent)}</td>
+                      <td className="p-4 text-slate-300">{formatMoney(pnl.totals.misc)}</td>
+                      <td className="p-4 text-slate-300">{formatMoney(pnl.totals.buyout)}</td>
+                      <td className="p-4 text-emerald-400">{formatMoney(pnl.totals.income)}</td>
+                      <td className="p-4 text-rose-400">{formatMoney(pnl.totals.expenses)}</td>
+                      <td className={`p-4 ${pnl.totals.profit >= 0 ? 'text-lime-400' : 'text-rose-400'}`}>
+                        {formatMoney(pnl.totals.profit)}
+                      </td>
+                      <td className="p-4 text-slate-400">{pnl.totals.paymentsCount}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

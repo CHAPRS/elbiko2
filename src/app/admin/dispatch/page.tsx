@@ -36,6 +36,8 @@ interface Stats {
   totalIncomeToday: number;
   totalIncomePeriod: number;
   pendingBuyoutTotal: number;
+  partsPositions: number;
+  partsValue: number;
   incomeByMethod: Record<string, number>;
   expenseByCategory: Record<string, number>;
 }
@@ -199,11 +201,12 @@ const CATEGORY_LABELS: Record<string, string> = {
   BATTERY_RENT: 'Аренда аккумулятора',
   ACCESSORIES: 'Аксессуары',
   GOODS: 'Сопутствующие товары',
+  PARTS: 'Запчасти',
   OTHER: 'Прочее',
   NONE: 'Без категории',
 };
 
-const CATEGORY_ORDER = ['REPAIR', 'SERVICE', 'BATTERY', 'BATTERY_RENT', 'ACCESSORIES', 'GOODS', 'OTHER', 'NONE'];
+const CATEGORY_ORDER = ['REPAIR', 'SERVICE', 'BATTERY', 'BATTERY_RENT', 'ACCESSORIES', 'GOODS', 'PARTS', 'OTHER', 'NONE'];
 
 const MISC_TITLE_SUGGESTIONS = [
   'Ремонт',
@@ -695,6 +698,7 @@ export default function DispatchPage() {
         { label: `Расходы за ${days} дн.`, value: data.stats.expensesPeriod, color: 'text-rose-300' },
         { label: `Прибыль за ${days} дн.`, value: data.stats.netProfitPeriod, color: 'text-lime-400' },
         { label: 'Осталось по выкупам', value: data.stats.pendingBuyoutTotal, color: 'text-violet-400' },
+        { label: `Склад: ${data.stats.partsPositions} поз.`, value: data.stats.partsValue, color: 'text-orange-300' },
       ]
     : [];
 
@@ -1010,6 +1014,7 @@ export default function DispatchPage() {
                     <option value="BATTERY_RENT">Аренда аккумулятора</option>
                     <option value="ACCESSORIES">Аксессуары</option>
                     <option value="GOODS">Сопутствующие товары</option>
+                    <option value="PARTS">Запчасти</option>
                     <option value="OTHER">Прочее</option>
                   </select>
                 </div>

@@ -71,6 +71,7 @@ export async function GET(request: Request) {
       activeBuyouts,
       pendingBuyoutAgg,
       archivedBuyouts,
+      partsStock,
     ] = await Promise.all([
       prisma.bike.findMany({
         orderBy: { name: 'asc' },
@@ -204,6 +205,9 @@ export async function GET(request: Request) {
         orderBy: { updatedAt: 'desc' },
         take: 30,
       }),
+      prisma.part.findMany({
+        select: { stockQty: true, lastPrice: true },
+      }),
     ]);
 
     // Оплачено/долг по каждой аренде — из денежного журнала (PAYMENT − REFUND)
@@ -333,6 +337,11 @@ export async function GET(request: Request) {
     const totalIncomePeriod = revenuePeriod + miscIncomePeriod + buyoutIncomePeriod;
     const pendingBuyoutTotal = Number(pendingBuyoutAgg._sum.amount ?? 0);
 
+    const partsPositions = partsStock.length;
+    const partsValue = Math.round(
+      partsStock.reduce((sum, p) => sum + Number(p.stockQty) * Number(p.lastPrice ?? 0), 0) * 100
+    ) / 100;
+
     const incomeByMethod: Record<string, number> = {};
     const addMethodSum = (method: string | null, amount: number) => {
       const key = method || 'NONE';
@@ -438,6 +447,8 @@ export async function GET(request: Request) {
       totalIncomeToday,
       totalIncomePeriod,
       pendingBuyoutTotal,
+      partsPositions,
+      partsValue,
       incomeByMethod,
       expenseByCategory,
     };

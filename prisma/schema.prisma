@@ -35,6 +35,7 @@ model Bike {
   miscTransactions MiscTransaction[]
   mileageLogs      MileageLog[]
   buyouts          Buyout[]
+  partTransactions PartTransaction[]
 }
 
 // Новая модель Курьера (User)
@@ -390,4 +391,43 @@ model FAQ {
   updatedAt DateTime @updatedAt
 
   @@index([order])
+}
+
+// Склад: номенклатура запчастей
+model Part {
+  id        Int      @id @default(autoincrement())
+  name      String   // Название: "Покрышка 20x4.0"
+  sku       String?  // Артикул
+  category  String?  // Категория (текстовое поле)
+  unit      String   @default("шт") // Единица измерения
+  stockQty  Decimal  @default(0) @db.Decimal(10, 2) // Текущий остаток
+  minQty    Decimal? @db.Decimal(10, 2) // Минимальный остаток (пока не используется в UI)
+  lastPrice Decimal? @db.Decimal(10, 2) // Цена последней закупки
+  comment   String?  @db.Text
+
+  transactions PartTransaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Склад: журнал движения запчастей
+model PartTransaction {
+  id                Int      @id @default(autoincrement())
+  partId            Int
+  kind              String   // IN (приход), OUT (списание/установка), ADJUST (корректировка, qty со знаком)
+  qty               Decimal  @db.Decimal(10, 2)
+  price             Decimal? @db.Decimal(10, 2) // Цена за единицу (закупка/списание)
+  bikeId            Int? // Байк, на который установлена запчасть (для OUT)
+  miscTransactionId Int? // Связанная финансовая операция (расход при OUT)
+  comment           String?  @db.Text
+
+  part Part  @relation(fields: [partId], references: [id], onDelete: Cascade)
+  bike Bike? @relation(fields: [bikeId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([partId])
+  @@index([bikeId])
+  @@index([kind])
 }

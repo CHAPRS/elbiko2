@@ -89,6 +89,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   BATTERY_RENT: 'Аренда аккумулятора',
   ACCESSORIES: 'Аксессуары',
   GOODS: 'Сопутствующие товары',
+  PARTS: 'Запчасти',
   OTHER: 'Прочее',
   NONE: 'Без категории',
 };

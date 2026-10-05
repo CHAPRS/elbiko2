@@ -1,10 +1,30 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { CONTACTS, SHOW_REPAIR_SECTION } from '@/app/constants';
 
 export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [contactMenuOpen, setContactMenuOpen] = useState(false);
+  const contactMenuRef = useRef<HTMLDivElement>(null);
+
+  // Закрываем меню «Связаться» по клику вне него и по Escape
+  useEffect(() => {
+    if (!contactMenuOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (contactMenuRef.current && !contactMenuRef.current.contains(e.target as Node)) {
+        setContactMenuOpen(false);
+      }
+    };
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setContactMenuOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [contactMenuOpen]);
 
   // Блокируем скролл при открытом мобильном меню
   useEffect(() => {
@@ -72,7 +92,7 @@ export default function Header() {
             </a>
 
           {/* Contact button with dropdown */}
-          <div className="relative hidden md:block">
+          <div className="relative hidden md:block" ref={contactMenuRef}>
             <button
               onClick={() => setContactMenuOpen(!contactMenuOpen)}
               className="text-xs bg-slate-900 border border-slate-800 text-slate-300 hover:border-emerald-500/50 px-4 min-h-11 rounded-xl transition-all flex items-center gap-2"

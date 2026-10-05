@@ -297,13 +297,49 @@ export default function HomePage() {
               </ul>
             </div>
             
-            {/* Документы */}
+            {/* Мы в соцсетях */}
             <div>
-              <h3 className="text-white font-bold mb-4">Документы</h3>
-              <ul className="space-y-2 text-sm text-slate-400">
-                <li><a href="#" className="hover:text-emerald-400 transition-colors">Политика конфиденциальности</a></li>
-                <li><a href="#" className="hover:text-emerald-400 transition-colors">Правила эксплуатации</a></li>
-                <li><a href="#" className="hover:text-emerald-400 transition-colors">Договор оферты</a></li>
+              <h3 className="text-white font-bold mb-4">Мы в соцсетях</h3>
+              <ul className="space-y-3 text-sm">
+                <li>
+                  <a
+                    href={CONTACTS.telegramChannel}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-slate-400 hover:text-emerald-400 transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.18-.357.295-.6.295-.002 0-.003 0-.005 0l.213-3.054 5.56-5.022c.24-.213-.054-.334-.373-.121l-6.869 4.326-2.96-.924c-.64-.203-.658-.64.135-.954l11.566-4.458c.538-.196 1.006.128.832.941z"/>
+                    </svg>
+                    Telegram-канал
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href={CONTACTS.telegramBot}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-slate-400 hover:text-emerald-400 transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.18-.357.295-.6.295-.002 0-.003 0-.005 0l.213-3.054 5.56-5.022c.24-.213-.054-.334-.373-.121l-6.869 4.326-2.96-.924c-.64-.203-.658-.64.135-.954l11.566-4.458c.538-.196 1.006.128.832.941z"/>
+                    </svg>
+                    Telegram-бот
+                  </a>
+                </li>
+                {CONTACTS.maxUrl && (
+                  <li>
+                    <a
+                      href={CONTACTS.maxUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 text-slate-400 hover:text-emerald-400 transition-colors"
+                    >
+                      <span className="w-4 h-4 flex items-center justify-center text-xs bg-purple-500/20 text-purple-400 rounded">MAX</span>
+                      MAX
+                    </a>
+                  </li>
+                )}
               </ul>
             </div>
           </div>

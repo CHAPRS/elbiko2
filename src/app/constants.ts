@@ -20,6 +20,7 @@ export const CONTACTS = {
   // Telegram
   telegramBot: 'https://t.me/my_own_elbiko_bot',
   telegramManager: 'https://t.me/ElBaiko',
+  telegramChannel: 'https://t.me/ElBaiko56',
 
   // MAX (публичная ссылка профиля)
   maxPhone: '+79867753030',

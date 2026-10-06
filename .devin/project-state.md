@@ -1,6 +1,6 @@
 # Elbiko — срез проекта для продолжения работы
 
-> Обновлено: 2026-10-05. Последний коммит `2ad8a0e` — всё запушено в `origin/master`.
+> Обновлено: 2026-10-05. Последний коммит `437d367` — запушен и задеплоен на прод.
 
 ## 1. Общее
 
@@ -26,6 +26,7 @@
 
 - `next.config.mjs` — отключён `poweredByHeader`, image remotePatterns, security headers.
 - `src/middleware.ts` — CORS для `/api`; `admin_session` для `/api/admin` и `/admin`; `courier_session` для `/dashboard`; редиректы `/login`.
+- `src/app/constants.ts` — `CONTACTS` (единый источник контактов): `phone`, `telegramManager` (`t.me/ElBaiko`), `telegramChannel` (`t.me/ElBaiko56`), `telegramBot`, `maxUrl`.
 
 ### Сессии
 
@@ -129,25 +130,30 @@
 - `7a2f1b7` — частичная оплата продления, долг, `RentTransaction`-журнал, backfill-скрипт.
 - `141f655` — склад запчастей (`Part`/`PartTransaction`, вариант B).
 - `2ad8a0e` — фикс: долг показывается только при частичной оплате/сроке погашения.
+- `bd9bbc4` — docs: актуализация project-state.md.
+- `7217bd1` — ссылка на Telegram-канал: иконка в шапке, пункты меню «Связаться», колонка «Мы в соцсетях» в футере (вместо «Документы»).
+- `437d367` — фикс: меню «Связаться» закрывается по клику вне и Escape.
 
 ## 8. Продакшен — состояние
 
 - Схема на проде синхронизирована (`db push` → `in sync`): `Part`, `PartTransaction`, `Rent.debtDueDate`, `MiscTransaction.category`, `Bike.serviceIntervalKm`, `Bike.lastServiceMileage`.
 - Backfill на проде: «создано 0, пропущено 12 из 12» — журнал полный.
-- Был инцидент «disk is full» (`/dev/vda2` 9.8G) — решён очисткой. Диск ограничен!
-- Последний деплой: проверить, что билд после фикса `2ad8a0e` задеплоен (коммит запушен; команды ниже).
+- **Диск `/dev/vda2` 9.8G — критически мал, был инцидент «disk is full».** Карта расхода (2026-10-05): swap-файлы `/swapfile`+`/swap2`+`/swapfile2` = 2.5G (не трогать, RAM ограничена), `/usr` 3.3G, `node_modules` 1.4G, `.next` ~636M (из них `cache/webpack` ~466M — мусор для рантайма), `/var/lib/apt` ~391M, `/var/log/journal` ~137M (поставлен лимит `SystemMaxUse=50M`), `.git` ~118M.
+- Безопасная чистка: `rm -rf /var/www/elbiko/.next/cache`, `journalctl --vacuum-size=30M`, `apt clean` + `rm -rf /var/lib/apt/lists/*` + `apt autoremove --purge` (когда apt не залочен unattended-upgrades), `git gc --prune=now`.
+- Деплой до `437d367` выполнен 2026-10-05: на проде TG-канал в шапке/футере + фиксы `2ad8a0e` и `437d367`. Проверено: `ElBaiko56` в HTML, `/admin` → 307, `/api/bikes` → 200.
 
 ### Деплой
 
 ```bash
 cd /var/www/elbiko
-df -h                                  # сначала проверить место!
+df -h                                  # сначала проверить место! нужно ~700M-1G свободно
 mysqldump -u root <база> > /var/backups/elbiko_$(date +%Y%m%d).sql
 git pull origin master
 npx prisma db push                     # только если схема менялась
 npx prisma generate
 systemctl stop elbiko && rm -rf .next
 NODE_OPTIONS=--max-old-space-size=1536 npx next build
+rm -rf .next/cache                     # ~460M webpack-кэша, рантайму не нужен
 systemctl start elbiko
 systemctl status elbiko -n 20
 ```

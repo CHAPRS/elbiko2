@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import { LEAD_STATUSES, isLeadStatus } from '@/lib/leadStatus';
+import { updateLeadSchema, idParamSchema } from '@/lib/validation';
 
 // GET - Карточка одной заявки
 export async function GET(
@@ -9,8 +9,13 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    const parsed = idParamSchema.safeParse(params);
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Некорректный ID' }, { status: 400 });
+    }
+
     const lead = await prisma.lead.findUnique({
-      where: { id: Number(params.id) },
+      where: { id: parsed.data.id },
       include: { bike: true },
     });
 
@@ -34,9 +39,23 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    const id = Number(params.id);
+    const parsedParams = idParamSchema.safeParse(params);
+    if (!parsedParams.success) {
+      return NextResponse.json({ error: 'Некорректный ID' }, { status: 400 });
+    }
+
+    const id = parsedParams.data.id;
     const body = await request.json();
-    const { status, comment, rejectReason, bikeId } = body;
+    const parsed = updateLeadSchema.safeParse(body);
+
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Некорректные данные', details: parsed.error.format() },
+        { status: 400 }
+      );
+    }
+
+    const { status, comment, rejectReason, bikeId } = parsed.data;
 
     if (status === undefined && comment === undefined && rejectReason === undefined && bikeId === undefined) {
       return NextResponse.json(
@@ -48,13 +67,6 @@ export async function PATCH(
     const data: Prisma.LeadUpdateInput = {};
 
     if (status !== undefined) {
-      if (!isLeadStatus(status)) {
-        return NextResponse.json(
-          { error: `Статус должен быть одним из: ${LEAD_STATUSES.join(', ')}` },
-          { status: 400 }
-        );
-      }
-
       if (status === 'REJECTED' && !rejectReason) {
         return NextResponse.json(
           { error: 'Для отклонения заявки укажите причину' },
@@ -66,11 +78,11 @@ export async function PATCH(
       data.processedAt = status === 'NEW' ? null : new Date();
     }
 
-    if (comment !== undefined) data.comment = comment ? String(comment) : null;
-    if (rejectReason !== undefined) data.rejectReason = rejectReason ? String(rejectReason) : null;
+    if (comment !== undefined) data.comment = comment;
+    if (rejectReason !== undefined) data.rejectReason = rejectReason;
 
     if (bikeId !== undefined) {
-      data.bike = bikeId ? { connect: { id: Number(bikeId) } } : { disconnect: true };
+      data.bike = bikeId ? { connect: { id: bikeId } } : { disconnect: true };
     }
 
     const lead = await prisma.lead.update({
@@ -98,8 +110,13 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
+    const parsed = idParamSchema.safeParse(params);
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Некорректный ID' }, { status: 400 });
+    }
+
     await prisma.lead.delete({
-      where: { id: Number(params.id) },
+      where: { id: parsed.data.id },
     });
 
     return NextResponse.json({ success: true });

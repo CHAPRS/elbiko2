@@ -1,0 +1,31 @@
+export function normalizeImageUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  // Если передано только имя файла — считаем, что оно лежит в /images/
+  if (!url.startsWith('/') && !url.startsWith('http')) {
+    url = `/images/${url}`;
+  }
+  // Заменяем старые расширения .jpg/.jpeg/.png на .webp,
+  // если изображение лежит в /images/
+  if (url.startsWith('/images/')) {
+    return url.replace(/\.(jpg|jpeg|png)(\?.*)?$/i, '.webp$2');
+  }
+  return url;
+}
+
+export const tariffFallbackImages = [
+  '/images/tariff-basic.webp',
+  '/images/tariff-earning.webp',
+  '/images/tariff-partner.webp',
+];
+
+const defaultBikeImages: Record<string, string> = {
+  u6: '/images/wenbox-u6.webp',
+  u1: '/images/wenbox-u1-pro.webp',
+};
+
+export function resolveDefaultBikeImage(name?: string | null): string {
+  const n = (name || '').toLowerCase();
+  if (n.includes('u6') || n.includes('wenbox u6')) return defaultBikeImages.u6;
+  if (n.includes('u1') || n.includes('wenbox')) return defaultBikeImages.u1;
+  return defaultBikeImages.u1;
+}

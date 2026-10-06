@@ -14,10 +14,17 @@ model Bike {
   speed        String // Строковый стандарт из техпаспорта v3.3
   range        String // Строковый стандарт из техпаспорта v3.3
   motor        String // Строковый стандарт из техпаспорта v3.3
+  battery      String? // Ёмкость аккумулятора (например: 30 Ah)
   isWaterproof Boolean // Булевый стандарт из техпаспорта v3.3
   status       String   @default("FREE") // Статусы: "FREE", "RENTED", "MAINTENANCE"
   pricePerDay  Decimal  @default(0.00) @db.Decimal(10, 2) // Цена за день
+  externalId   String?  @db.VarChar(120) // Внешний ID/серийный номер байка
   imageUrl     String? // Ссылка на фото велосипеда
+  purchasePrice Decimal? @db.Decimal(10, 2) // Закупочная цена байка
+  purchaseDate DateTime? // Дата покупки
+  mileage      Int? // Текущий пробег, км
+  serviceIntervalKm  Int? // Интервал ТО, км
+  lastServiceMileage Int? // Пробег на момент последнего ТО, км
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -25,6 +32,10 @@ model Bike {
   rentalSessions RentalSession[]
   rents          Rent[]
   leads          Lead[]
+  miscTransactions MiscTransaction[]
+  mileageLogs      MileageLog[]
+  buyouts          Buyout[]
+  partTransactions PartTransaction[]
 }
 
 // Новая модель Курьера (User)
@@ -34,9 +45,18 @@ model User {
   password       String   @default("") // Временно добавили дефолт для прохождения миграции
   name           String   @default("Курьер") // Временно добавили дефолт для существующих строк
   balance        Decimal  @default(0.00) @db.Decimal(10, 2)
-  telegramChatId String? // Chat ID курьера для уведомлений бота
-  createdAt      DateTime @default(now())
+  telegramChatId     String? // Chat ID курьера для уведомлений бота
+  maxChatId          String? // Идентификатор/телефон курьера в MAX
+  preferredMessenger String   @default("MAX") // "MAX" | "TELEGRAM"
+  createdAt          DateTime @default(now())
   updatedAt      DateTime @updatedAt
+  passwordResetCode        String?
+  passwordResetCodeExpiresAt DateTime?
+
+  email                      String?  @unique
+  emailVerified              Boolean  @default(false)
+  emailVerificationToken     String?  @unique
+  emailVerificationTokenExpiresAt DateTime?
 
   rentalSessions RentalSession[]
   rents          Rent[]
@@ -66,45 +86,72 @@ model RentalSession {
   @@index([bikeId])
 }
 
-// Модель Заявки (Lead)
+// Оптимизированная модель Заявки (Lead)
 model Lead {
   id           Int       @id @default(autoincrement())
   name         String
   phone        String
   bikeName     String?
-  status       String    @default("NEW") // Статусы: "NEW", "IN_PROGRESS", "CONFIRMED", "REJECTED"
-  message      String?   @db.Text // Дополнительное сообщение от клиента
-  comment      String?   @db.Text // Внутренний комментарий администратора
-  rejectReason String?   @db.Text // Причина отклонения заявки
-  processedAt  DateTime? // Момент последнего изменения статуса
-  rentId       Int? // Аренда, созданная из заявки
-  bikeId       Int? // Связь с велосипедом (если выбран конкретный)
-
-  // Отношения
-  bike Bike? @relation(fields: [bikeId], references: [id], onDelete: SetNull)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  status       String    @default("NEW")
+  message      String?   @db.Text
+  comment      String?   @db.Text
+  rejectReason String?   @db.Text
+  rentDays     Int?
+  totalPrice   Decimal?  @db.Decimal(10, 2)
+  startDate    DateTime?
+  endDate      DateTime?
+  processedAt  DateTime?
+  rentId       Int?
+  bikeId       Int?
+  bike         Bike?     @relation(fields: [bikeId], references: [id], onDelete: SetNull)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   @@index([status])
   @@index([phone])
+  @@index([createdAt])
+}
+
+// Модель контактов и клиентов
+model Contact {
+  id            Int      @id @default(autoincrement())
+  firstName     String?
+  lastName      String?
+  phone         String?  @unique
+  email         String?
+  status        String   @default("INQUIRY") // INQUIRY, CUSTOMER, REPEAT, BLOCKED
+  source        String?  // SITE, ADMIN, RENT, LEAD
+  notes         String?  @db.Text
+  lastContactAt DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([lastName])
+  @@index([firstName])
+  @@index([phone])
+  @@index([status])
 }
 
 // Модель Аренды (Rent)
 model Rent {
-  id         Int      @id @default(autoincrement())
-  userId     Int
-  bikeId     Int
-  startDate  DateTime @default(now())
-  endDate    DateTime
-  totalPrice Decimal  @db.Decimal(10, 2)
-  isActive   Boolean  @default(true)
-  status     String   @default("ACTIVE") // Статусы: "ACTIVE", "COMPLETED", "CANCELLED", "OVERDUE"
+  id               Int       @id @default(autoincrement())
+  userId           Int
+  bikeId           Int
+  startDate        DateTime  @default(now())
+  endDate          DateTime
+  actualReturnDate DateTime? // Фактическая дата возврата
+  totalPrice       Decimal   @db.Decimal(10, 2)
+  isActive         Boolean   @default(true)
+  status           String    @default("ACTIVE") // Статусы: "ACTIVE", "RETURNED", "COMPLETED", "CANCELLED", "OVERDUE"
+  comment          String?   @db.Text // Комментарий менеджера
+  debtDueDate      DateTime? // Планируемая дата погашения остатка долга (при частичной оплате)
 
   // Отношения
-  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  bike    Bike     @relation(fields: [bikeId], references: [id], onDelete: Cascade)
-  payment Payment?
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bike           Bike            @relation(fields: [bikeId], references: [id], onDelete: Cascade)
+  payment        Payment?
+  rentTransactions RentTransaction[]
+  mileageLogs    MileageLog[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -116,12 +163,14 @@ model Rent {
 
 // Модель Платежа (Payment)
 model Payment {
-  id         Int     @id @default(autoincrement())
-  rentId     Int     @unique
-  amount     Decimal @db.Decimal(10, 2)
-  status     String  @default("PENDING") // Статусы: "PENDING", "COMPLETED", "FAILED", "REFUNDED"
-  paymentUrl String?
-  paymentId  String? // ID платежа в платежной системе
+  id            Int     @id @default(autoincrement())
+  rentId        Int     @unique
+  amount        Decimal @db.Decimal(10, 2)
+  status        String  @default("PENDING") // Статусы: "PENDING", "COMPLETED", "FAILED", "REFUNDED"
+  paymentMethod String? // CASH, SBP, CARD, TRANSFER
+  paidAt        DateTime?
+  paymentUrl    String?
+  paymentId     String? // ID платежа в платежной системе
 
   // Отношения
   rent Rent @relation(fields: [rentId], references: [id], onDelete: Cascade)
@@ -130,4 +179,255 @@ model Payment {
   updatedAt DateTime @updatedAt
 
   @@index([status])
+}
+
+// Модель финансовых транзакций по аренде
+model RentTransaction {
+  id      Int     @id @default(autoincrement())
+  rentId  Int
+  type    String  // PAYMENT, EXTEND, REFUND, PENALTY, DEPOSIT
+  amount  Decimal @db.Decimal(10, 2)
+  method  String? // CASH, SBP, CARD, TRANSFER
+  comment String? @db.Text
+
+  rent Rent @relation(fields: [rentId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([rentId])
+}
+
+// Модель прочих финансовых операций (доходы/расходы вне аренды)
+model MiscTransaction {
+  id        Int      @id @default(autoincrement())
+  kind      String   // Тип: "INCOME" (доход) | "EXPENSE" (расход)
+  title     String   // Предмет: "Ремонт", "Аренда аккумулятора", "Сопутствующие товары" и т.п.
+  amount    Decimal  @db.Decimal(10, 2)
+  method    String?  // Способ оплаты: CASH, SBP, CARD, TRANSFER
+  category  String?  // Категория: REPAIR, SERVICE, BATTERY, BATTERY_RENT, ACCESSORIES, GOODS, OTHER
+  bikeId    Int?
+  comment   String?  @db.Text
+
+  // Отношения
+  bike Bike? @relation(fields: [bikeId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([kind])
+  @@index([createdAt])
+  @@index([bikeId])
+}
+
+// Журнал показаний пробега по байкам (вносится вручную)
+model MileageLog {
+  id      Int     @id @default(autoincrement())
+  bikeId  Int
+  rentId  Int? // Аренда, с которой связана запись (если есть)
+  mileage Int // Показание одометра, км
+  note    String?
+
+  // Отношения
+  bike Bike @relation(fields: [bikeId], references: [id], onDelete: Cascade)
+  rent Rent? @relation(fields: [rentId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([bikeId])
+  @@index([rentId])
+}
+
+// Модель аренды под выкуп (рассрочка)
+model Buyout {
+  id          Int       @id @default(autoincrement())
+  title       String    // Предмет выкупа (байк, аккумулятор и т.п.)
+  clientName  String
+  clientPhone String?
+  bikeId      Int?
+  totalPrice  Decimal   @db.Decimal(10, 2) // Полная стоимость выкупа
+  status      String    @default("ACTIVE") // Статусы: "ACTIVE", "COMPLETED", "CANCELLED"
+  startDate   DateTime  @default(now())
+  comment     String?   @db.Text
+
+  // Отношения
+  bike     Bike?           @relation(fields: [bikeId], references: [id], onDelete: SetNull)
+  payments BuyoutPayment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}
+
+// Строка графика платежей по выкупу
+model BuyoutPayment {
+  id       Int      @id @default(autoincrement())
+  buyoutId Int
+  dueDate  DateTime // Плановая дата платежа
+  amount   Decimal  @db.Decimal(10, 2)
+  status   String   @default("PENDING") // Статусы: "PENDING", "PAID"
+  paidAt   DateTime?
+  method   String? // CASH, SBP, CARD, TRANSFER
+  comment  String?  @db.Text
+
+  // Отношения
+  buyout Buyout @relation(fields: [buyoutId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([buyoutId])
+  @@index([dueDate])
+  @@index([status])
+}
+
+// Модель Hero секции главной страницы
+model Hero {
+  id                  Int     @id @default(autoincrement())
+  title               String
+  subtitle            String?
+  badge               String?
+  backgroundImageUrl  String?
+  bikeImageUrl        String?  // Фото электровелосипеда
+  courierImageUrl     String?  // Фото курьера
+  phone               String?  // Телефон для звонка
+  telegramUrl         String?  // Ссылка на Telegram бот
+  telegramManagerUrl  String?  // Ссылка на Telegram менеджера
+  maksUrl             String?  // Ссылка на Maks
+  price               String?  // Цена (например: "от 3000 ₽/неделя")
+  stat1Label          String?
+  stat1Value          String?
+  stat2Label          String?
+  stat2Value          String?
+  stat3Label          String?
+  stat3Value          String?
+  ctaText             String?
+  ctaLink             String?
+  secondaryCtaText    String?
+  secondaryCtaLink    String?
+  isActive            Boolean @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+// Модель Преимущества
+model Feature {
+  id          Int     @id @default(autoincrement())
+  icon        String?
+  imageUrl    String?
+  title       String
+  description String
+  order       Int     @default(0)
+  isMain      Boolean @default(false)
+  badges      String?  // JSON массив строк для badges
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([order])
+}
+
+// Модель Шага (Как это работает)
+model Step {
+  id          Int     @id @default(autoincrement())
+  number      String
+  imageUrl    String?
+  title       String
+  description String
+  order       Int     @default(0)
+  badges      String?  // JSON массив строк для badges
+  icon        String?  // Иконка emoji
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([order])
+}
+
+// Модель Тарифа
+model Tariff {
+  id          Int      @id @default(autoincrement())
+  name        String
+  subtitle    String?
+  price       Decimal  @db.Decimal(10, 2)
+  period      String
+  features    String   @db.Text // JSON массив строк
+  popular     Boolean  @default(false)
+  imageUrl    String?
+  icon        String?  // Emoji иконка тарифа
+  order       Int      @default(0)
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([order])
+}
+
+// Модель Отзыва
+model Review {
+  id          Int     @id @default(autoincrement())
+  author      String
+  avatarUrl   String?
+  platform    String?
+  duration    String?
+  rating      Int
+  text        String  @db.Text
+  order       Int     @default(0)
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([order])
+}
+
+// Модель FAQ
+model FAQ {
+  id        Int     @id @default(autoincrement())
+  question  String
+  answer    String  @db.Text
+  order     Int     @default(0)
+  isActive  Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([order])
+}
+
+// Склад: номенклатура запчастей
+model Part {
+  id        Int      @id @default(autoincrement())
+  name      String   // Название: "Покрышка 20x4.0"
+  sku       String?  // Артикул
+  category  String?  // Категория (текстовое поле)
+  unit      String   @default("шт") // Единица измерения
+  stockQty  Decimal  @default(0) @db.Decimal(10, 2) // Текущий остаток
+  minQty    Decimal? @db.Decimal(10, 2) // Минимальный остаток (пока не используется в UI)
+  lastPrice Decimal? @db.Decimal(10, 2) // Цена последней закупки
+  comment   String?  @db.Text
+
+  transactions PartTransaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Склад: журнал движения запчастей
+model PartTransaction {
+  id                Int      @id @default(autoincrement())
+  partId            Int
+  kind              String   // IN (приход), OUT (списание/установка), ADJUST (корректировка, qty со знаком)
+  qty               Decimal  @db.Decimal(10, 2)
+  price             Decimal? @db.Decimal(10, 2) // Цена за единицу (закупка/списание)
+  bikeId            Int? // Байк, на который установлена запчасть (для OUT)
+  miscTransactionId Int? // Связанная финансовая операция (расход при OUT)
+  comment           String?  @db.Text
+
+  part Part  @relation(fields: [partId], references: [id], onDelete: Cascade)
+  bike Bike? @relation(fields: [bikeId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([partId])
+  @@index([bikeId])
+  @@index([kind])
 }

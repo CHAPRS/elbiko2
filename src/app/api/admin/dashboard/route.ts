@@ -3,40 +3,484 @@ import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+function startOfDay(date: Date): Date {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function endOfDay(date: Date): Date {
+  const d = new Date(date);
+  d.setHours(23, 59, 59, 999);
+  return d;
+}
+
+// Ключ дня по локальной дате сервера (не UTC) — иначе «сегодня» сдвигается на графике
+function localDayKey(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+export async function GET(request: Request) {
   try {
-    // 1. Загружаем весь автопарк
-    const bikes = await prisma.bike.findMany({
-      orderBy: { name: 'asc' } // Сортируем по полю name, которое есть в вашей схеме
-    });
+    const { searchParams } = new URL(request.url);
+    const daysParam = searchParams.get('days');
+    let days = daysParam && !isNaN(Number(daysParam)) ? Number(daysParam) : 7;
+    days = Math.max(1, Math.min(days, 90));
 
-    // 2. Загружаем логи аренд с пользователями и байками
-    const rents = await prisma.rent.findMany({
-      include: {
-        user: true,
-        bike: true
+    const now = new Date();
+    const today = startOfDay(now);
+    const periodStart = new Date(today);
+    periodStart.setDate(periodStart.getDate() - (days - 1));
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const dayAfterTomorrow = new Date(tomorrow);
+    dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 1);
+
+    const userSelect = {
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        telegramChatId: true,
+        maxChatId: true,
+        preferredMessenger: true,
       },
-      orderBy: { createdAt: 'desc' }
-    });
+    };
 
-    // 3. Высчитываем KPI-метрики
-    const totalBikes = bikes.length;
-    const rentedBikes = bikes.filter((b: any) => String(b.status).toUpperCase() === 'RENTED').length;
-    const freeBikes = bikes.filter((b: any) => String(b.status).toUpperCase() === 'FREE').length;
-    
-    const totalUsers = await prisma.user.count();
-    
-    // Считаем пользователей с привязанным Telegram
-    const allUsers = await prisma.user.findMany();
-    const usersWithTg = allUsers.filter((u: any) => u.telegramChatId !== null && u.telegramChatId !== undefined).length;
+    const bikeSelect = {
+      select: { id: true, name: true, status: true },
+    };
+
+    const [
+      bikes,
+      totalUsers,
+      newLeads,
+      activeAndOverdueRents,
+      returningToday,
+      returningTomorrow,
+      completedRentsForAvg,
+      rentTxPeriod,
+      failedRefundedAgg,
+      rentRevenueByBike,
+      miscPeriodTx,
+      recentMisc,
+      buyoutPaidPeriod,
+      activeBuyouts,
+      pendingBuyoutAgg,
+      archivedBuyouts,
+      partsStock,
+    ] = await Promise.all([
+      prisma.bike.findMany({
+        orderBy: { name: 'asc' },
+      }),
+      prisma.user.count(),
+      prisma.lead.findMany({
+        where: { status: 'NEW' },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+        include: {
+          bike: {
+            select: { id: true, name: true },
+          },
+        },
+      }),
+      prisma.rent.findMany({
+        where: {
+          status: { in: ['ACTIVE', 'OVERDUE'] },
+        },
+        include: {
+          user: userSelect,
+          bike: bikeSelect,
+          payment: true,
+          rentTransactions: { select: { type: true, amount: true } },
+        },
+        orderBy: { endDate: 'asc' },
+      }),
+      prisma.rent.findMany({
+        where: {
+          status: { in: ['ACTIVE', 'OVERDUE'] },
+          endDate: { gte: today, lt: tomorrow },
+        },
+        include: {
+          user: userSelect,
+          bike: bikeSelect,
+        },
+        orderBy: { endDate: 'asc' },
+      }),
+      prisma.rent.findMany({
+        where: {
+          status: { in: ['ACTIVE', 'OVERDUE'] },
+          endDate: { gte: tomorrow, lt: dayAfterTomorrow },
+        },
+        include: {
+          user: userSelect,
+          bike: bikeSelect,
+        },
+        orderBy: { endDate: 'asc' },
+      }),
+      prisma.rent.aggregate({
+        where: { status: 'COMPLETED' },
+        _avg: { totalPrice: true },
+      }),
+      // Денежный журнал аренд за период: PAYMENT — поступления, REFUND — возвраты
+      prisma.rentTransaction.findMany({
+        where: {
+          type: { in: ['PAYMENT', 'REFUND'] },
+          createdAt: { gte: periodStart },
+        },
+        select: {
+          type: true,
+          amount: true,
+          createdAt: true,
+          method: true,
+          rent: { select: { user: { select: { name: true, phone: true } } } },
+        },
+      }),
+      prisma.payment.aggregate({
+        _sum: { amount: true },
+        where: {
+          status: { in: ['FAILED', 'REFUNDED'] },
+          updatedAt: { gte: periodStart },
+        },
+      }),
+      prisma.rent.groupBy({
+        by: ['bikeId'],
+        where: { status: 'COMPLETED' },
+        _sum: { totalPrice: true },
+      }),
+      prisma.miscTransaction.findMany({
+        where: {
+          createdAt: { gte: periodStart },
+        },
+        select: {
+          kind: true,
+          amount: true,
+          createdAt: true,
+          method: true,
+          category: true,
+        },
+      }),
+      prisma.miscTransaction.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+        include: {
+          bike: { select: { id: true, name: true, externalId: true } },
+        },
+      }),
+      prisma.buyoutPayment.findMany({
+        where: {
+          status: 'PAID',
+          paidAt: { gte: periodStart },
+        },
+        select: {
+          amount: true,
+          paidAt: true,
+          method: true,
+        },
+      }),
+      prisma.buyout.findMany({
+        where: { status: 'ACTIVE' },
+        include: {
+          payments: { orderBy: { dueDate: 'asc' } },
+          bike: { select: { id: true, name: true, externalId: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.buyoutPayment.aggregate({
+        _sum: { amount: true },
+        where: {
+          status: 'PENDING',
+          buyout: { status: 'ACTIVE' },
+        },
+      }),
+      prisma.buyout.findMany({
+        where: { status: { in: ['COMPLETED', 'CANCELLED'] } },
+        include: {
+          payments: { orderBy: { dueDate: 'asc' } },
+          bike: { select: { id: true, name: true, externalId: true } },
+        },
+        orderBy: { updatedAt: 'desc' },
+        take: 30,
+      }),
+      prisma.part.findMany({
+        select: { stockQty: true, lastPrice: true },
+      }),
+    ]);
+
+    // Оплачено/долг по каждой аренде — из денежного журнала (PAYMENT − REFUND)
+    const activeRents = activeAndOverdueRents.map((r) => {
+      const paid = r.rentTransactions.reduce(
+        (sum, t) =>
+          sum +
+          (t.type === 'PAYMENT' ? Number(t.amount) : t.type === 'REFUND' ? -Number(t.amount) : 0),
+        0
+      );
+      const { rentTransactions, ...rest } = r;
+      return {
+        ...rest,
+        paidTotal: Math.max(0, Math.round(paid * 100) / 100),
+        debt: Math.max(0, Math.round((Number(r.totalPrice) - paid) * 100) / 100),
+      };
+    });
+    const rentedBikeIds = new Set(activeAndOverdueRents.map((r) => r.bikeId));
+    const rentedBikes = rentedBikeIds.size;
+    const freeBikes = bikes.filter(
+      (b) => !rentedBikeIds.has(b.id) && b.status !== 'MAINTENANCE' && b.status !== 'BLOCKED'
+    );
+    const maintenanceBikes = bikes.filter((b) => b.status === 'MAINTENANCE');
+    const blockedBikes = bikes.filter((b) => b.status === 'BLOCKED');
+    const overdueRents = activeRents.filter((r) => new Date(r.endDate) < now);
+
+    const availableForRent = freeBikes.length;
+    const rentableFleet = bikes.length - maintenanceBikes.length - blockedBikes.length;
+    const occupancyRate =
+      bikes.length > 0
+        ? Math.round((rentedBikes / bikes.length) * 1000) / 10
+        : 0;
+
+    const expectedRevenue = activeRents.reduce(
+      (sum, r) => sum + Number(r.totalPrice),
+      0
+    );
+    const overdueRevenue = overdueRents.reduce(
+      (sum, r) => sum + Number(r.totalPrice),
+      0
+    );
+
+    const revenueToday = rentTxPeriod.reduce(
+      (sum, t) =>
+        t.createdAt >= today && t.createdAt < tomorrow
+          ? sum + (t.type === 'PAYMENT' ? Number(t.amount) : -Number(t.amount))
+          : sum,
+      0
+    );
+    // Долг по арендам = только реальный: была частичная оплата или назначен срок погашения.
+    // Полностью неотмеченная оплата (PENDING) долгом не считается — как раньше.
+    const rentDebt = activeRents.reduce(
+      (sum, r) => sum + (r.paidTotal > 0 || r.debtDueDate ? r.debt : 0),
+      0
+    );
+
+    const byDay = new Map<string, { revenue: number; misc: number; expense: number; buyout: number }>();
+    for (let i = 0; i < days; i++) {
+      const d = new Date(periodStart);
+      d.setDate(d.getDate() + i);
+      const key = localDayKey(d);
+      byDay.set(key, { revenue: 0, misc: 0, expense: 0, buyout: 0 });
+    }
+    for (const t of rentTxPeriod) {
+      const key = localDayKey(t.createdAt);
+      const entry = byDay.get(key);
+      if (entry) {
+        entry.revenue += t.type === 'PAYMENT' ? Number(t.amount) : -Number(t.amount);
+      }
+    }
+    for (const tx of miscPeriodTx) {
+      const key = localDayKey(tx.createdAt);
+      const entry = byDay.get(key);
+      if (entry) {
+        if (tx.kind === 'INCOME') entry.misc += Number(tx.amount);
+        else if (tx.kind === 'EXPENSE') entry.expense += Number(tx.amount);
+      }
+    }
+    for (const bp of buyoutPaidPeriod) {
+      if (!bp.paidAt) continue;
+      const key = localDayKey(bp.paidAt);
+      const entry = byDay.get(key);
+      if (entry) {
+        entry.buyout += Number(bp.amount);
+      }
+    }
+    const revenueByDay = Array.from(byDay.entries())
+      .map(([date, v]) => ({
+        date,
+        revenue: v.revenue,
+        misc: v.misc,
+        expense: v.expense,
+        buyout: v.buyout,
+        total: v.revenue + v.misc + v.buyout,
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    const revenuePeriod = revenueByDay.reduce((sum, d) => sum + d.revenue, 0);
+    const averageCheck = Number(completedRentsForAvg._avg.totalPrice ?? 0);
+    const failedRefundedRevenue = Number(failedRefundedAgg._sum.amount ?? 0);
+
+    let miscIncomePeriod = 0;
+    let miscIncomeToday = 0;
+    let expensesPeriod = 0;
+    let expensesToday = 0;
+    const expenseByCategory: Record<string, number> = {};
+    for (const tx of miscPeriodTx) {
+      const amount = Number(tx.amount);
+      const isToday = tx.createdAt >= today && tx.createdAt < tomorrow;
+      if (tx.kind === 'INCOME') {
+        miscIncomePeriod += amount;
+        if (isToday) miscIncomeToday += amount;
+      } else if (tx.kind === 'EXPENSE') {
+        expensesPeriod += amount;
+        if (isToday) expensesToday += amount;
+        const cat = tx.category || 'NONE';
+        expenseByCategory[cat] = (expenseByCategory[cat] || 0) + amount;
+      }
+    }
+    let buyoutIncomePeriod = 0;
+    let buyoutIncomeToday = 0;
+    for (const bp of buyoutPaidPeriod) {
+      const amount = Number(bp.amount);
+      buyoutIncomePeriod += amount;
+      if (bp.paidAt && bp.paidAt >= today && bp.paidAt < tomorrow) {
+        buyoutIncomeToday += amount;
+      }
+    }
+
+    const netProfitPeriod = revenuePeriod + miscIncomePeriod + buyoutIncomePeriod - expensesPeriod;
+    const totalIncomeToday = revenueToday + miscIncomeToday + buyoutIncomeToday;
+    const totalIncomePeriod = revenuePeriod + miscIncomePeriod + buyoutIncomePeriod;
+    const pendingBuyoutTotal = Number(pendingBuyoutAgg._sum.amount ?? 0);
+
+    const partsPositions = partsStock.length;
+    const partsValue = Math.round(
+      partsStock.reduce((sum, p) => sum + Number(p.stockQty) * Number(p.lastPrice ?? 0), 0) * 100
+    ) / 100;
+
+    const incomeByMethod: Record<string, number> = {};
+    const addMethodSum = (method: string | null, amount: number) => {
+      const key = method || 'NONE';
+      incomeByMethod[key] = (incomeByMethod[key] || 0) + amount;
+    };
+    rentTxPeriod.forEach((t) =>
+      addMethodSum(t.method, t.type === 'PAYMENT' ? Number(t.amount) : -Number(t.amount))
+    );
+    miscPeriodTx
+      .filter((tx) => tx.kind === 'INCOME')
+      .forEach((tx) => addMethodSum(tx.method, Number(tx.amount)));
+    buyoutPaidPeriod.forEach((bp) => addMethodSum(bp.method, Number(bp.amount)));
+
+    const bikeNameMap = new Map(bikes.map((b) => [b.id, b.name]));
+    const topBikes = rentRevenueByBike
+      .map((r) => ({
+        name: bikeNameMap.get(r.bikeId) || `Байк #${r.bikeId}`,
+        revenue: Number(r._sum.totalPrice ?? 0),
+      }))
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 5);
+
+    const clientAgg = new Map<string, { name: string; phone: string | null; revenue: number; count: number }>();
+    rentTxPeriod.forEach((t) => {
+      const user = t.rent?.user;
+      if (!user) return;
+      const key = user.phone || user.name;
+      const entry = clientAgg.get(key) || { name: user.name, phone: user.phone, revenue: 0, count: 0 };
+      entry.revenue += t.type === 'PAYMENT' ? Number(t.amount) : -Number(t.amount);
+      entry.count += 1;
+      clientAgg.set(key, entry);
+    });
+    const topClients = Array.from(clientAgg.values())
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 5);
+
+    const timelineDays = 14;
+    const timeline: {
+      date: string;
+      dayOfWeek: string;
+      freeCount: number;
+      returning: typeof activeRents;
+    }[] = [];
+
+    for (let i = 0; i < timelineDays; i++) {
+      const day = new Date(today);
+      day.setDate(day.getDate() + i);
+      const nextDay = new Date(day);
+      nextDay.setDate(nextDay.getDate() + 1);
+
+      const returning = activeRents.filter((r) => {
+        const end = startOfDay(new Date(r.endDate));
+        return end.getTime() === day.getTime();
+      });
+
+      const occupiedBikeIds = new Set<number>();
+      activeRents.forEach((r) => {
+        const start = startOfDay(new Date(r.startDate)).getTime();
+        const end = endOfDay(new Date(r.endDate)).getTime();
+        if (start <= day.getTime() && end > day.getTime()) {
+          occupiedBikeIds.add(r.bikeId);
+        }
+      });
+      const occupied = occupiedBikeIds.size;
+
+      const freeCount = Math.max(0, rentableFleet - occupied);
+
+      timeline.push({
+        date: localDayKey(day),
+        dayOfWeek: day.toLocaleDateString('ru-RU', { weekday: 'short' }),
+        freeCount,
+        returning,
+      });
+    }
+
+    const stats = {
+      totalBikes: bikes.length,
+      rentedBikes,
+      freeBikes: freeBikes.length,
+      maintenanceBikes: maintenanceBikes.length,
+      availableForRent,
+      occupancyRate,
+      totalUsers,
+      newLeads: newLeads.length,
+      activeRents: activeRents.length,
+      overdueRents: overdueRents.length,
+      returningToday: returningToday.length,
+      returningTomorrow: returningTomorrow.length,
+      revenueToday,
+      revenuePeriod,
+      expectedRevenue,
+      overdueRevenue,
+      rentDebt,
+      averageCheck,
+      failedRefundedRevenue,
+      miscIncomeToday,
+      miscIncomePeriod,
+      expensesToday,
+      expensesPeriod,
+      buyoutIncomeToday,
+      buyoutIncomePeriod,
+      netProfitPeriod,
+      totalIncomeToday,
+      totalIncomePeriod,
+      pendingBuyoutTotal,
+      partsPositions,
+      partsValue,
+      incomeByMethod,
+      expenseByCategory,
+    };
 
     return NextResponse.json({
-      stats: { totalBikes, rentedBikes, freeBikes, totalUsers, usersWithTg },
+      stats,
+      newLeads,
+      activeRents,
+      overdueRents,
+      returningToday,
+      returningTomorrow,
+      freeBikes,
+      maintenanceBikes,
+      revenueByDay,
+      topBikes,
+      topClients,
+      timeline,
       bikes,
-      rents
+      recentMisc,
+      buyouts: activeBuyouts,
+      archivedBuyouts,
     });
   } catch (error) {
-    console.error('Ошибка API админки:', error);
-    return NextResponse.json({ error: 'Внутренняя ошибка сервера' }, { status: 500 });
+    console.error('Ошибка API диспетчерской:', error);
+    return NextResponse.json(
+      { error: 'Внутренняя ошибка сервера' },
+      { status: 500 }
+    );
   }
 }

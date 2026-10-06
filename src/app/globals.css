@@ -2,10 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Принудительная разблокировка скролла */
+/* Базовая разблокировка скролла без !important, чтобы модалки могли перекрывать */
 body {
-  overflow: auto !important;
-  pointer-events: auto !important;
+  overflow: auto;
+  pointer-events: auto;
 }
 
 /* Оверлеи модальных окон должны пропускать клики только при закрытии */

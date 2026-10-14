@@ -39,11 +39,15 @@ export const updateBikeSchema = z.object({
 
 export const leadStatus = z.enum(['NEW', 'IN_PROGRESS', 'CONFIRMED', 'REJECTED']);
 
+export const leadItemType = z.enum(['BIKE', 'BATTERY']);
+
 export const updateLeadSchema = z.object({
   status: leadStatus.optional(),
   comment: z.string().max(1000).optional().nullable(),
   rejectReason: z.string().max(500).optional().nullable(),
   bikeId: z.number().int().positive().optional().nullable(),
+  batteryId: z.number().int().positive().optional().nullable(),
+  itemType: leadItemType.optional(),
 });
 
 export const createLeadSchema = z.object({
@@ -60,7 +64,9 @@ export const createLeadManualSchema = z.object({
   name: z.string().min(1).max(120),
   phone: z.string().min(5).max(30),
   bikeName: z.string().max(120).optional().nullable(),
-  bikeId: z.number().int().positive(),
+  bikeId: z.number().int().positive().optional().nullable(),
+  itemType: leadItemType.optional(),
+  batteryId: z.number().int().positive().optional().nullable(),
   message: z.string().max(2000).optional().nullable(),
   rentDays: z.number().int().positive().max(365).optional().nullable(),
   totalPrice: z.number().positive().max(10000000).optional().nullable(),

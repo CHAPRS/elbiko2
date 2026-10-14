@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { createRent } from '@/lib/rent';
+import { createBatteryRent } from '@/lib/batteryRent';
 import { upsertContactByPhone } from '@/lib/contact';
 
 // POST - Превращение заявки в аренду: создаёт курьера (если новый), аренду и закрывает заявку
@@ -12,6 +13,7 @@ export async function POST(
     const leadId = Number(params.id);
     const body = await request.json().catch(() => ({}));
     const bikeId = body.bikeId ? Number(body.bikeId) : null;
+    const batteryId = body.batteryId ? Number(body.batteryId) : null;
 
     const lead = await prisma.lead.findUnique({ where: { id: leadId } });
 
@@ -19,27 +21,14 @@ export async function POST(
       return NextResponse.json({ error: 'Заявка не найдена' }, { status: 404 });
     }
 
-    if (lead.rentId) {
+    if (lead.rentId || lead.batteryRentId) {
       return NextResponse.json(
         { error: 'По этой заявке уже оформлена аренда' },
         { status: 409 }
       );
     }
 
-    const targetBikeId = bikeId ?? lead.bikeId;
-
-    if (!targetBikeId) {
-      return NextResponse.json(
-        { error: 'Выберите велосипед для оформления аренды' },
-        { status: 400 }
-      );
-    }
-
-    const user = await prisma.user.upsert({
-      where: { phone: lead.phone },
-      update: { name: lead.name },
-      create: { phone: lead.phone, name: lead.name },
-    });
+    const isBattery = lead.itemType === 'BATTERY' || batteryId !== null;
 
     const startDate = body.startDate ? new Date(body.startDate) : (lead.startDate ? new Date(lead.startDate) : undefined);
     const endDate = body.endDate ? new Date(body.endDate) : (lead.endDate ? new Date(lead.endDate) : undefined);
@@ -57,6 +46,67 @@ export async function POST(
         : lead.totalPrice !== null && lead.totalPrice !== undefined
         ? Number(lead.totalPrice)
         : undefined;
+
+    if (isBattery) {
+      const targetBatteryId = batteryId ?? lead.batteryId;
+
+      if (!targetBatteryId) {
+        return NextResponse.json(
+          { error: 'Выберите аккумулятор для оформления аренды' },
+          { status: 400 }
+        );
+      }
+
+      const user = await prisma.user.upsert({
+        where: { phone: lead.phone },
+        update: { name: lead.name },
+        create: { phone: lead.phone, name: lead.name },
+      });
+
+      const batteryRent = await createBatteryRent({
+        userId: user.id,
+        batteryId: targetBatteryId,
+        startDate,
+        endDate,
+        days: rentDays,
+        totalPrice,
+      });
+
+      await upsertContactByPhone({
+        fullName: lead.name,
+        phone: lead.phone,
+        status: 'CUSTOMER',
+        source: 'ADMIN',
+      });
+
+      const updatedLead = await prisma.lead.update({
+        where: { id: leadId },
+        data: {
+          status: 'CONFIRMED',
+          processedAt: new Date(),
+          batteryRentId: batteryRent.id,
+          batteryId: targetBatteryId,
+        },
+        include: { battery: true },
+      });
+
+      return NextResponse.json({ lead: updatedLead, batteryRentId: batteryRent.id }, { status: 201 });
+    }
+
+    const targetBikeId = bikeId ?? lead.bikeId;
+
+    if (!targetBikeId) {
+      return NextResponse.json(
+        { error: 'Выберите велосипед для оформления аренды' },
+        { status: 400 }
+      );
+    }
+
+    const user = await prisma.user.upsert({
+      where: { phone: lead.phone },
+      update: { name: lead.name },
+      create: { phone: lead.phone, name: lead.name },
+    });
 
     const rent = await createRent({
       userId: user.id,

@@ -16,7 +16,7 @@ export async function GET(
 
     const lead = await prisma.lead.findUnique({
       where: { id: parsed.data.id },
-      include: { bike: true },
+      include: { bike: true, battery: true },
     });
 
     if (!lead) {
@@ -55,9 +55,9 @@ export async function PATCH(
       );
     }
 
-    const { status, comment, rejectReason, bikeId } = parsed.data;
+    const { status, comment, rejectReason, bikeId, batteryId, itemType } = parsed.data;
 
-    if (status === undefined && comment === undefined && rejectReason === undefined && bikeId === undefined) {
+    if (status === undefined && comment === undefined && rejectReason === undefined && bikeId === undefined && batteryId === undefined && itemType === undefined) {
       return NextResponse.json(
         { error: 'Нет полей для обновления' },
         { status: 400 }
@@ -85,10 +85,18 @@ export async function PATCH(
       data.bike = bikeId ? { connect: { id: bikeId } } : { disconnect: true };
     }
 
+    if (batteryId !== undefined) {
+      data.battery = batteryId ? { connect: { id: batteryId } } : { disconnect: true };
+    }
+
+    if (itemType !== undefined) {
+      data.itemType = itemType;
+    }
+
     const lead = await prisma.lead.update({
       where: { id },
       data,
-      include: { bike: true },
+      include: { bike: true, battery: true },
     });
 
     return NextResponse.json(lead);

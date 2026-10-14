@@ -38,6 +38,26 @@ model Bike {
   partTransactions PartTransaction[]
 }
 
+// Парк аккумуляторов (сдаются в аренду отдельно от байков)
+model Battery {
+  id            Int      @id @default(autoincrement())
+  name          String   // Название/метка: "АКБ 60V 45Ah №3"
+  serialNumber  String?  @db.VarChar(120) // Серийный/инвентарный номер
+  capacityAh    Decimal? @db.Decimal(10, 2) // Ёмкость, Ah
+  voltage       Int?     // Напряжение, В
+  status        String   @default("FREE") // Статусы: "FREE", "RENTED", "MAINTENANCE", "BLOCKED"
+  pricePerDay   Decimal  @default(0.00) @db.Decimal(10, 2) // Цена аренды за день
+  purchasePrice Decimal? @db.Decimal(10, 2) // Закупочная цена
+  purchaseDate  DateTime? // Дата покупки
+  comment       String?  @db.Text
+
+  rents BatteryRent[]
+  leads Lead[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 // Новая модель Курьера (User)
 model User {
   id             Int      @id @default(autoincrement())
@@ -60,6 +80,7 @@ model User {
 
   rentalSessions RentalSession[]
   rents          Rent[]
+  batteryRents   BatteryRent[]
 }
 
 // Новая модель Сессии Аренды (RentalSession)
@@ -104,6 +125,10 @@ model Lead {
   rentId       Int?
   bikeId       Int?
   bike         Bike?     @relation(fields: [bikeId], references: [id], onDelete: SetNull)
+  itemType     String    @default("BIKE") // "BIKE" | "BATTERY" — что арендует клиент
+  batteryId    Int?
+  battery      Battery?  @relation(fields: [batteryId], references: [id], onDelete: SetNull)
+  batteryRentId Int?     // Созданная аренда АКБ (аналог rentId для байков)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
@@ -159,6 +184,49 @@ model Rent {
   @@index([userId])
   @@index([bikeId])
   @@index([status])
+}
+
+// Модель аренды аккумулятора (параллельный контур Rent, без пробега и счёта Payment)
+model BatteryRent {
+  id               Int       @id @default(autoincrement())
+  userId           Int
+  batteryId        Int
+  startDate        DateTime  @default(now())
+  endDate          DateTime
+  actualReturnDate DateTime? // Фактическая дата возврата
+  totalPrice       Decimal   @db.Decimal(10, 2)
+  isActive         Boolean   @default(true)
+  status           String    @default("ACTIVE") // Статусы: "ACTIVE", "RETURNED", "COMPLETED", "CANCELLED", "OVERDUE"
+  comment          String?   @db.Text
+  debtDueDate      DateTime? // Планируемая дата погашения остатка долга
+
+  // Отношения
+  user         User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  battery      Battery                  @relation(fields: [batteryId], references: [id], onDelete: Cascade)
+  transactions BatteryRentTransaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([batteryId])
+  @@index([status])
+}
+
+// Денежный журнал аренды АКБ (аналог RentTransaction)
+model BatteryRentTransaction {
+  id            Int     @id @default(autoincrement())
+  batteryRentId Int
+  type          String  // PAYMENT, EXTEND, REFUND, PENALTY
+  amount        Decimal @db.Decimal(10, 2)
+  method        String? // CASH, SBP, CARD, TRANSFER
+  comment       String? @db.Text
+
+  batteryRent BatteryRent @relation(fields: [batteryRentId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([batteryRentId])
 }
 
 // Модель Платежа (Payment)

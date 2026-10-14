@@ -29,6 +29,13 @@ export async function GET(request: Request) {
             status: true,
           },
         },
+        battery: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
+          },
+        },
       },
       orderBy: {
         createdAt: 'desc',
@@ -58,7 +65,16 @@ export async function POST(request: Request) {
       );
     }
 
-    const { name, phone, bikeName, bikeId, message, rentDays, totalPrice, startDate, endDate } = parsed.data;
+    const { name, phone, bikeName, bikeId, itemType, batteryId, message, rentDays, totalPrice, startDate, endDate } = parsed.data;
+
+    const isBattery = itemType === 'BATTERY' || !!batteryId;
+
+    if (isBattery && !batteryId) {
+      return NextResponse.json({ error: 'Для заявки на АКБ выберите аккумулятор' }, { status: 400 });
+    }
+    if (!isBattery && !bikeId) {
+      return NextResponse.json({ error: 'Для заявки выберите велосипед' }, { status: 400 });
+    }
 
     let finalRentDays = rentDays;
     let finalTotalPrice = totalPrice;
@@ -70,10 +86,17 @@ export async function POST(request: Request) {
       finalRentDays = daysBetween(startDate, endDate);
     }
 
-    if (!finalTotalPrice && finalRentDays && bikeId) {
+    if (!finalTotalPrice && finalRentDays && bikeId && !isBattery) {
       const bike = await prisma.bike.findUnique({ where: { id: bikeId } });
       if (bike) {
         finalTotalPrice = Number(bike.pricePerDay) * finalRentDays;
+      }
+    }
+
+    if (!finalTotalPrice && finalRentDays && batteryId && isBattery) {
+      const battery = await prisma.battery.findUnique({ where: { id: batteryId } });
+      if (battery) {
+        finalTotalPrice = Number(battery.pricePerDay) * finalRentDays;
       }
     }
 
@@ -83,6 +106,8 @@ export async function POST(request: Request) {
         phone,
         bikeName: bikeName ?? null,
         bikeId: bikeId ?? null,
+        itemType: isBattery ? 'BATTERY' : 'BIKE',
+        batteryId: batteryId ?? null,
         message: message ?? null,
         rentDays: finalRentDays ?? null,
         totalPrice: finalTotalPrice ? finalTotalPrice : null,
@@ -92,6 +117,7 @@ export async function POST(request: Request) {
       },
       include: {
         bike: true,
+        battery: true,
       },
     });
 

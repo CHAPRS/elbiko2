@@ -708,14 +708,29 @@ export default function DispatchPage() {
     }
   };
 
+  const nowTsEarly = Date.now();
+  const DAY_MS_EARLY = 24 * 60 * 60 * 1000;
+  const searchQ = searchQuery.toLowerCase().trim();
+  const batteryReturnMatch = (rent: BatteryRent) =>
+    !searchQ ||
+    [rent.user.name, rent.user.phone, rent.battery.name].some((v) =>
+      String(v ?? '').toLowerCase().includes(searchQ)
+    );
+  const batteryReturningOn = (key: string) =>
+    (data?.batteryRents ?? []).filter(
+      (rent) => new Date(rent.endDate).toDateString() === key && batteryReturnMatch(rent)
+    );
+  const batteryReturningToday = batteryReturningOn(new Date().toDateString());
+  const batteryReturningTomorrow = batteryReturningOn(new Date(nowTsEarly + DAY_MS_EARLY).toDateString());
+
   const operationalStats: { label: string; value: number; color: string; suffix?: string }[] = data
     ? [
         { label: 'Новые заявки', value: data.stats.newLeads, color: 'text-emerald-400' },
         { label: 'Активные аренды', value: data.stats.activeRents, color: 'text-amber-400' },
         { label: 'Просроченные', value: data.stats.overdueRents, color: 'text-rose-400' },
         { label: 'Свободные байки', value: data.stats.freeBikes, color: 'text-cyan-400' },
-        { label: 'Возврат сегодня', value: data.stats.returningToday, color: 'text-blue-400' },
-        { label: 'Возврат завтра', value: data.stats.returningTomorrow, color: 'text-violet-400' },
+        { label: 'Возврат сегодня', value: data.stats.returningToday + batteryReturningToday.length, color: 'text-blue-400' },
+        { label: 'Возврат завтра', value: data.stats.returningTomorrow + batteryReturningTomorrow.length, color: 'text-violet-400' },
         { label: 'Загруженность', value: data.stats.occupancyRate, color: 'text-amber-500', suffix: '%' },
         { label: 'Доступно для аренды', value: data.stats.availableForRent, color: 'text-emerald-300' },
         { label: 'Аренды АКБ', value: data.stats.activeBatteryRents ?? 0, color: 'text-sky-400' },
@@ -911,6 +926,8 @@ export default function DispatchPage() {
   const filteredReturningTomorrow = data?.returningTomorrow.filter((rent) =>
     matchesSearch(rent.user.name, rent.user.phone, rent.bike.name)
   ) ?? [];
+
+
 
   const filteredFreeBikes = data?.freeBikes.filter((bike) =>
     matchesSearch(bike.name)
@@ -1478,7 +1495,7 @@ export default function DispatchPage() {
             <h2 className="text-lg font-semibold text-slate-200 mb-4">Возвращаются сегодня</h2>
             {loading ? (
               <p className="text-slate-400 text-sm">Загрузка...</p>
-            ) : filteredReturningToday.length === 0 ? (
+            ) : filteredReturningToday.length === 0 && batteryReturningToday.length === 0 ? (
               <p className="text-slate-400 text-sm">Сегодня никто не возвращается</p>
             ) : (
               <ul className="space-y-3">
@@ -1497,6 +1514,24 @@ export default function DispatchPage() {
                     </div>
                   </li>
                 ))}
+                {batteryReturningToday.map((rent) => (
+                  <li
+                    key={`b-${rent.id}`}
+                    className="border border-sky-900/60 rounded-lg p-3 bg-sky-950/20"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="font-medium text-slate-100">
+                          {rent.user.name}
+                          <span className="ml-2 px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-400 border border-sky-500/30 text-[10px] font-semibold uppercase">АКБ</span>
+                        </p>
+                        <p className="text-sm text-slate-400">{rent.user.phone}</p>
+                        <p className="text-xs text-slate-500 mt-1">{rent.battery.name} · {formatDate(rent.endDate)}</p>
+                      </div>
+                      <ContactLinks user={rent.user} />
+                    </div>
+                  </li>
+                ))}
               </ul>
             )}
           </section>
@@ -1505,7 +1540,7 @@ export default function DispatchPage() {
             <h2 className="text-lg font-semibold text-slate-200 mb-4">Возвращаются завтра</h2>
             {loading ? (
               <p className="text-slate-400 text-sm">Загрузка...</p>
-            ) : filteredReturningTomorrow.length === 0 ? (
+            ) : filteredReturningTomorrow.length === 0 && batteryReturningTomorrow.length === 0 ? (
               <p className="text-slate-400 text-sm">Завтра никто не возвращается</p>
             ) : (
               <ul className="space-y-3">
@@ -1519,6 +1554,24 @@ export default function DispatchPage() {
                         <p className="font-medium text-slate-100">{rent.user.name}</p>
                         <p className="text-sm text-slate-400">{rent.user.phone}</p>
                         <p className="text-xs text-slate-500 mt-1">{rent.bike.name}{rent.bike.externalId ? ` (ID: ${rent.bike.externalId})` : ''} · {formatDate(rent.endDate)}</p>
+                      </div>
+                      <ContactLinks user={rent.user} />
+                    </div>
+                  </li>
+                ))}
+                {batteryReturningTomorrow.map((rent) => (
+                  <li
+                    key={`b-${rent.id}`}
+                    className="border border-sky-900/60 rounded-lg p-3 bg-sky-950/20"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="font-medium text-slate-100">
+                          {rent.user.name}
+                          <span className="ml-2 px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-400 border border-sky-500/30 text-[10px] font-semibold uppercase">АКБ</span>
+                        </p>
+                        <p className="text-sm text-slate-400">{rent.user.phone}</p>
+                        <p className="text-xs text-slate-500 mt-1">{rent.battery.name} · {formatDate(rent.endDate)}</p>
                       </div>
                       <ContactLinks user={rent.user} />
                     </div>

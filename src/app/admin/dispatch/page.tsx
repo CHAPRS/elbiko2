@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { LeadForm } from '@/components/admin/LeadForm';
 import { MileagePrompt } from '@/components/admin/MileagePrompt';
 import { BuyoutSection, Buyout } from '@/components/admin/BuyoutSection';
+import { BatterySection, Battery, BatteryRent } from '@/components/admin/BatterySection';
 import { buildMaxLink } from '@/lib/messenger';
 
 interface Stats {
@@ -32,6 +33,12 @@ interface Stats {
   expensesPeriod: number;
   buyoutIncomeToday: number;
   buyoutIncomePeriod: number;
+  batteryIncomeToday?: number;
+  batteryIncomePeriod?: number;
+  batteryDebt?: number;
+  totalBatteries?: number;
+  freeBatteries?: number;
+  activeBatteryRents?: number;
   netProfitPeriod: number;
   totalIncomeToday: number;
   totalIncomePeriod: number;
@@ -65,6 +72,9 @@ interface Lead {
   createdAt: string;
   bike?: { id: number; name: string; externalId?: string | null } | null;
   bikeId?: number | null;
+  itemType?: string | null;
+  batteryId?: number | null;
+  battery?: { id: number; name: string; serialNumber?: string | null } | null;
 }
 
 interface RentUser {
@@ -151,6 +161,8 @@ interface DashboardData {
   topClients?: TopClient[];
   timeline: TimelineDay[];
   bikes: Bike[];
+  batteries: Battery[];
+  batteryRents: BatteryRent[];
   recentMisc: MiscTransaction[];
   buyouts: Buyout[];
   archivedBuyouts?: Buyout[];
@@ -210,7 +222,6 @@ const CATEGORY_ORDER = ['REPAIR', 'SERVICE', 'BATTERY', 'BATTERY_RENT', 'ACCESSO
 
 const MISC_TITLE_SUGGESTIONS = [
   'Ремонт',
-  'Аренда аккумулятора',
   'Сопутствующие товары',
   'Продажа',
   'Закупка байка',
@@ -255,6 +266,7 @@ export default function DispatchPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [convertingLead, setConvertingLead] = useState<Lead | null>(null);
   const [convertBikeId, setConvertBikeId] = useState('');
+  const [convertBatteryId, setConvertBatteryId] = useState('');
   const [convertDays, setConvertDays] = useState('1');
   const [convertTotalPrice, setConvertTotalPrice] = useState('');
   const [convertPriceManual, setConvertPriceManual] = useState(false);
@@ -331,6 +343,9 @@ export default function DispatchPage() {
     }
   };
 
+  const isBatteryLead = (lead: Lead | null) =>
+    lead?.itemType === 'BATTERY' || Boolean(lead?.batteryId);
+
   const openConvert = (lead: Lead) => {
     setConvertingLead(lead);
     setConvertPriceManual(false);
@@ -340,13 +355,22 @@ export default function DispatchPage() {
       ? String(lead.bike.id)
       : '';
     setConvertBikeId(defaultBikeId);
+    const defaultBatteryId = lead.batteryId
+      ? String(lead.batteryId)
+      : lead.battery
+      ? String(lead.battery.id)
+      : '';
+    setConvertBatteryId(defaultBatteryId);
     const defaultDays = lead.rentDays && lead.rentDays > 0 ? String(lead.rentDays) : '1';
     setConvertDays(defaultDays);
 
     const bike = data?.freeBikes.find((b) => String(b.id) === defaultBikeId);
+    const battery = data?.batteries.find((b) => String(b.id) === defaultBatteryId);
     const price =
       lead.totalPrice !== null && lead.totalPrice !== undefined
         ? String(lead.totalPrice)
+        : isBatteryLead(lead) && battery
+        ? String(Number(battery.pricePerDay) * Number(defaultDays))
         : bike
         ? String(Number(bike.pricePerDay) * Number(defaultDays))
         : '';
@@ -356,6 +380,7 @@ export default function DispatchPage() {
   const closeConvert = () => {
     setConvertingLead(null);
     setConvertBikeId('');
+    setConvertBatteryId('');
     setConvertDays('1');
     setConvertTotalPrice('');
     setConvertPriceManual(false);
@@ -364,16 +389,27 @@ export default function DispatchPage() {
 
   useEffect(() => {
     if (!convertingLead || convertPriceManual) return;
+    const days = Number(convertDays) || 1;
+    if (isBatteryLead(convertingLead)) {
+      const battery = data?.batteries.find((b) => String(b.id) === convertBatteryId);
+      if (!battery) return;
+      setConvertTotalPrice(String(Number(battery.pricePerDay) * days));
+      return;
+    }
     const bike = data?.freeBikes.find((b) => String(b.id) === convertBikeId);
     if (!bike) return;
-    const days = Number(convertDays) || 1;
     setConvertTotalPrice(String(Number(bike.pricePerDay) * days));
-  }, [convertBikeId, convertDays, convertingLead, data?.freeBikes, convertPriceManual]);
+  }, [convertBikeId, convertBatteryId, convertDays, convertingLead, data?.freeBikes, data?.batteries, convertPriceManual]);
 
   const handleConvert = async () => {
     if (!convertingLead) return;
-    if (!convertBikeId) {
+    const batteryMode = isBatteryLead(convertingLead);
+    if (!batteryMode && !convertBikeId) {
       setError('Выберите велосипед');
+      return;
+    }
+    if (batteryMode && !convertBatteryId) {
+      setError('Выберите аккумулятор');
       return;
     }
     const rentDays = Number(convertDays);
@@ -387,7 +423,8 @@ export default function DispatchPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          bikeId: Number(convertBikeId),
+          bikeId: batteryMode ? undefined : Number(convertBikeId),
+          batteryId: batteryMode ? Number(convertBatteryId) : undefined,
           days: rentDays,
           totalPrice: convertTotalPrice ? Number(convertTotalPrice) : undefined,
           startDate: convertingLead.startDate,
@@ -399,7 +436,7 @@ export default function DispatchPage() {
         setError(json.error || 'Не удалось оформить аренду');
         return;
       }
-      setNotice(`Аренда №${json.rentId} оформлена по заявке №${convertingLead.id}`);
+      setNotice(`Аренда №${json.rentId ?? json.batteryRentId} оформлена по заявке №${convertingLead.id}`);
       closeConvert();
       fetchDashboard(days);
     } catch {
@@ -681,6 +718,8 @@ export default function DispatchPage() {
         { label: 'Возврат завтра', value: data.stats.returningTomorrow, color: 'text-violet-400' },
         { label: 'Загруженность', value: data.stats.occupancyRate, color: 'text-amber-500', suffix: '%' },
         { label: 'Доступно для аренды', value: data.stats.availableForRent, color: 'text-emerald-300' },
+        { label: 'Аренды АКБ', value: data.stats.activeBatteryRents ?? 0, color: 'text-sky-400' },
+        { label: 'Свободные АКБ', value: data.stats.freeBatteries ?? 0, color: 'text-cyan-300' },
       ]
     : [];
 
@@ -689,6 +728,7 @@ export default function DispatchPage() {
         { label: 'Выручка всего сегодня', value: data.stats.totalIncomeToday, color: 'text-emerald-400' },
         { label: `Выручка всего за ${days} дн.`, value: data.stats.totalIncomePeriod, color: 'text-amber-400' },
         { label: `Аренда за ${days} дн.`, value: data.stats.revenuePeriod, color: 'text-sky-400' },
+        { label: `АКБ за ${days} дн.`, value: data.stats.batteryIncomePeriod ?? 0, color: 'text-sky-300' },
         { label: 'Ожидаемая выручка', value: data.stats.expectedRevenue, color: 'text-cyan-400' },
         { label: 'Просроченная выручка', value: data.stats.overdueRevenue, color: 'text-rose-400' },
         { label: 'Средний чек', value: data.stats.averageCheck, color: 'text-slate-200' },
@@ -716,7 +756,7 @@ export default function DispatchPage() {
   };
 
   const filteredNewLeads = data?.newLeads.filter((lead) =>
-    matchesSearch(lead.name, lead.phone, lead.bike?.name, lead.bikeName)
+    matchesSearch(lead.name, lead.phone, lead.bike?.name, lead.bikeName, lead.battery?.name)
   ) ?? [];
 
   const filteredActiveRents = data?.activeRents.filter((rent) =>
@@ -773,6 +813,49 @@ export default function DispatchPage() {
         name: rent.user.name,
         phone: rent.user.phone,
         target: rent.bike.name + (rent.bike.externalId ? ` (ID: ${rent.bike.externalId})` : ''),
+        amount: Number(rent.debt),
+        dueDate: rent.debtDueDate || rent.endDate,
+        daysOverdue: overdue ? Math.floor((nowTs - dueTs!) / DAY_MS) : 0,
+        notOverdue: !overdue,
+      });
+    });
+
+  // Просроченные аренды АКБ
+  (data?.batteryRents ?? [])
+    .filter((rent) =>
+      new Date(rent.endDate).getTime() < nowTs &&
+      matchesSearch(rent.user.name, rent.user.phone, rent.battery.name)
+    )
+    .forEach((rent) => {
+      debtors.push({
+        key: `brent-${rent.id}`,
+        kind: 'Аренда',
+        name: rent.user.name,
+        phone: rent.user.phone,
+        target: `АКБ ${rent.battery.name}`,
+        amount: (rent.debt ?? 0) > 0 ? Number(rent.debt) : Number(rent.totalPrice) || 0,
+        dueDate: rent.endDate,
+        daysOverdue: Math.floor((nowTs - new Date(rent.endDate).getTime()) / DAY_MS),
+      });
+    });
+
+  // «Доплата» по АКБ: частичная оплата, аренда ещё не просрочена
+  (data?.batteryRents ?? [])
+    .filter((rent) =>
+      (rent.debt ?? 0) > 0 &&
+      ((rent.paidTotal ?? 0) > 0 || Boolean(rent.debtDueDate)) &&
+      new Date(rent.endDate).getTime() >= nowTs &&
+      matchesSearch(rent.user.name, rent.user.phone, rent.battery.name)
+    )
+    .forEach((rent) => {
+      const dueTs = rent.debtDueDate ? new Date(rent.debtDueDate).getTime() : null;
+      const overdue = dueTs !== null && dueTs < nowTs;
+      debtors.push({
+        key: `bdebt-${rent.id}`,
+        kind: 'Доплата',
+        name: rent.user.name,
+        phone: rent.user.phone,
+        target: `АКБ ${rent.battery.name}`,
         amount: Number(rent.debt),
         dueDate: rent.debtDueDate || rent.endDate,
         daysOverdue: overdue ? Math.floor((nowTs - dueTs!) / DAY_MS) : 0,
@@ -928,7 +1011,11 @@ export default function DispatchPage() {
 
         <section className="bg-slate-900/50 border border-slate-800 rounded-xl p-6 mb-8">
           <h2 className="text-lg font-semibold text-slate-200 mb-4">Новая заявка</h2>
-          <LeadForm bikes={data?.freeBikes ?? []} onSuccess={() => fetchDashboard(days)} />
+          <LeadForm
+            bikes={data?.freeBikes ?? []}
+            batteries={(data?.batteries ?? []).filter((b) => b.status === 'FREE')}
+            onSuccess={() => fetchDashboard(days)}
+          />
         </section>
 
         <section className="bg-slate-900/50 border border-slate-800 rounded-xl p-6 mb-8">
@@ -1011,7 +1098,6 @@ export default function DispatchPage() {
                     <option value="REPAIR">Ремонт</option>
                     <option value="SERVICE">ТО</option>
                     <option value="BATTERY">Аккумулятор</option>
-                    <option value="BATTERY_RENT">Аренда аккумулятора</option>
                     <option value="ACCESSORIES">Аксессуары</option>
                     <option value="GOODS">Сопутствующие товары</option>
                     <option value="PARTS">Запчасти</option>
@@ -1188,10 +1274,19 @@ export default function DispatchPage() {
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div>
-                        <p className="font-medium text-slate-100">{lead.name}</p>
+                        <p className="font-medium text-slate-100">
+                          {lead.name}
+                          {isBatteryLead(lead) && (
+                            <span className="ml-2 px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-400 border border-sky-500/30 text-[10px] font-semibold uppercase">
+                              АКБ
+                            </span>
+                          )}
+                        </p>
                         <p className="text-sm text-slate-400">{lead.phone}</p>
                         <p className="text-xs text-slate-500 mt-1">
-                          {lead.bike
+                          {isBatteryLead(lead)
+                            ? `АКБ: ${lead.battery ? lead.battery.name : (lead.bikeName || 'не выбран')}`
+                            : lead.bike
                             ? `${lead.bike.name}${lead.bike.externalId ? ` (ID: ${lead.bike.externalId})` : ''}`
                             : (lead.bikeName || 'Байк не выбран')} · {formatDateTime(lead.createdAt)}
                         </p>
@@ -1304,6 +1399,14 @@ export default function DispatchPage() {
             )}
           </section>
         </div>
+
+        <BatterySection
+          batteries={data?.batteries ?? []}
+          rents={data?.batteryRents ?? []}
+          onChanged={() => fetchDashboard(days)}
+          onError={setError}
+          onNotice={setNotice}
+        />
 
         <section className={`border rounded-xl p-6 mb-8 ${
           debtors.length > 0
@@ -1821,12 +1924,38 @@ export default function DispatchPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="w-full max-w-md rounded-xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
             <h2 className="mb-2 text-lg font-semibold text-slate-100">
-              Оформить аренду по заявке #{convertingLead.id}
+              Оформить аренду {isBatteryLead(convertingLead) ? 'АКБ' : ''} по заявке #{convertingLead.id}
             </h2>
             <p className="mb-4 text-sm text-slate-400">
               {convertingLead.name} · {convertingLead.phone}
             </p>
 
+            {isBatteryLead(convertingLead) ? (
+              <div className="mb-4">
+                <label className="block text-xs font-medium text-slate-400 mb-1">Аккумулятор</label>
+                <select
+                  value={convertBatteryId}
+                  onChange={(e) => setConvertBatteryId(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500"
+                >
+                  <option value="">— выберите —</option>
+                  {(data?.batteries ?? [])
+                    .filter((b) => b.status === 'FREE')
+                    .map((battery) => (
+                      <option key={battery.id} value={battery.id}>
+                        {battery.name}{battery.serialNumber ? ` (SN: ${battery.serialNumber})` : ''} — {Number(battery.pricePerDay)} ₽/сут
+                      </option>
+                    ))}
+                  {convertingLead.batteryId &&
+                    !(data?.batteries ?? []).some((b) => b.id === convertingLead.batteryId && b.status === 'FREE') &&
+                    convertingLead.battery && (
+                      <option value={convertingLead.battery.id}>
+                        {convertingLead.battery.name}{convertingLead.battery.serialNumber ? ` (SN: ${convertingLead.battery.serialNumber})` : ''} — текущий выбор
+                      </option>
+                    )}
+                </select>
+              </div>
+            ) : (
             <div className="mb-4">
               <label className="block text-xs font-medium text-slate-400 mb-1">Велосипед</label>
               <select
@@ -1847,6 +1976,7 @@ export default function DispatchPage() {
                 )}
               </select>
             </div>
+            )}
 
             <div className="mb-4 grid grid-cols-2 gap-4">
               <div>

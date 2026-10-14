@@ -48,9 +48,14 @@ export async function GET(request: Request) {
       ? { gte: rangeStart, lt: rangeEnd }
       : { gte: rangeStart };
 
-    const [rentTx, miscTx, buyoutPayments] = await Promise.all([
+    const [rentTx, batteryTx, miscTx, buyoutPayments] = await Promise.all([
       // Денежный журнал аренд: реальные поступления/возвраты по дате операции
       prisma.rentTransaction.findMany({
+        where: { type: { in: ['PAYMENT', 'REFUND'] }, createdAt: period },
+        select: { type: true, amount: true, createdAt: true },
+      }),
+      // Журнал аренд АКБ — отдельная колонка «АКБ»
+      prisma.batteryRentTransaction.findMany({
         where: { type: { in: ['PAYMENT', 'REFUND'] }, createdAt: period },
         select: { type: true, amount: true, createdAt: true },
       }),
@@ -67,6 +72,7 @@ export async function GET(request: Request) {
     interface MonthRow {
       month: string;
       rent: number;
+      battery: number;
       misc: number;
       buyout: number;
       income: number;
@@ -80,7 +86,7 @@ export async function GET(request: Request) {
       const key = monthKey(d);
       let r = rows.get(key);
       if (!r) {
-        r = { month: key, rent: 0, misc: 0, buyout: 0, income: 0, expenses: 0, profit: 0, paymentsCount: 0 };
+        r = { month: key, rent: 0, battery: 0, misc: 0, buyout: 0, income: 0, expenses: 0, profit: 0, paymentsCount: 0 };
         rows.set(key, r);
       }
       return r;
@@ -89,6 +95,11 @@ export async function GET(request: Request) {
     rentTx.forEach((t) => {
       const r = row(t.createdAt);
       r.rent += t.type === 'PAYMENT' ? Number(t.amount) : -Number(t.amount);
+      if (t.type === 'PAYMENT') r.paymentsCount += 1;
+    });
+    batteryTx.forEach((t) => {
+      const r = row(t.createdAt);
+      r.battery += t.type === 'PAYMENT' ? Number(t.amount) : -Number(t.amount);
       if (t.type === 'PAYMENT') r.paymentsCount += 1;
     });
     miscTx.forEach((tx) => {
@@ -115,7 +126,7 @@ export async function GET(request: Request) {
 
     const monthsList = Array.from(rows.values())
       .map((r) => {
-        r.income = r.rent + r.misc + r.buyout;
+        r.income = r.rent + r.battery + r.misc + r.buyout;
         r.profit = r.income - r.expenses;
         return r;
       })
@@ -124,6 +135,7 @@ export async function GET(request: Request) {
     const totals = monthsList.reduce(
       (acc, r) => {
         acc.rent += r.rent;
+        acc.battery += r.battery;
         acc.misc += r.misc;
         acc.buyout += r.buyout;
         acc.income += r.income;
@@ -132,7 +144,7 @@ export async function GET(request: Request) {
         acc.paymentsCount += r.paymentsCount;
         return acc;
       },
-      { rent: 0, misc: 0, buyout: 0, income: 0, expenses: 0, profit: 0, paymentsCount: 0 }
+      { rent: 0, battery: 0, misc: 0, buyout: 0, income: 0, expenses: 0, profit: 0, paymentsCount: 0 }
     );
 
     return NextResponse.json({ months: monthsList, totals });

@@ -42,6 +42,7 @@ interface CategorySum {
 interface PnlMonth {
   month: string;
   rent: number;
+  battery: number;
   misc: number;
   buyout: number;
   income: number;
@@ -599,6 +600,7 @@ const monthLabel = (m: string) => {
                     <tr className="text-left text-sm text-slate-400">
                       <th className="p-4">Месяц</th>
                       <th className="p-4">Аренда</th>
+                      <th className="p-4">АКБ</th>
                       <th className="p-4">Прочие доходы</th>
                       <th className="p-4">Выкупы</th>
                       <th className="p-4">Итого доход</th>
@@ -617,6 +619,7 @@ const monthLabel = (m: string) => {
                           )}
                         </td>
                         <td className="p-4 text-slate-300">{formatMoney(m.rent)}</td>
+                        <td className="p-4 text-slate-300">{formatMoney(m.battery)}</td>
                         <td className="p-4 text-slate-300">{formatMoney(m.misc)}</td>
                         <td className="p-4 text-slate-300">{formatMoney(m.buyout)}</td>
                         <td className="p-4 text-emerald-400 font-medium">{formatMoney(m.income)}</td>
@@ -632,6 +635,7 @@ const monthLabel = (m: string) => {
                     <tr className="bg-slate-900/80 font-semibold">
                       <td className="p-4 text-slate-200">Итого</td>
                       <td className="p-4 text-slate-300">{formatMoney(pnl.totals.rent)}</td>
+                      <td className="p-4 text-slate-300">{formatMoney(pnl.totals.battery)}</td>
                       <td className="p-4 text-slate-300">{formatMoney(pnl.totals.misc)}</td>
                       <td className="p-4 text-slate-300">{formatMoney(pnl.totals.buyout)}</td>
                       <td className="p-4 text-emerald-400">{formatMoney(pnl.totals.income)}</td>

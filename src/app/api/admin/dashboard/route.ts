@@ -72,6 +72,9 @@ export async function GET(request: Request) {
       pendingBuyoutAgg,
       archivedBuyouts,
       partsStock,
+      batteries,
+      activeAndOverdueBatteryRents,
+      batteryTxPeriod,
     ] = await Promise.all([
       prisma.bike.findMany({
         orderBy: { name: 'asc' },
@@ -83,6 +86,9 @@ export async function GET(request: Request) {
         take: 20,
         include: {
           bike: {
+            select: { id: true, name: true },
+          },
+          battery: {
             select: { id: true, name: true },
           },
         },
@@ -208,6 +214,33 @@ export async function GET(request: Request) {
       prisma.part.findMany({
         select: { stockQty: true, lastPrice: true },
       }),
+      prisma.battery.findMany({
+        orderBy: { name: 'asc' },
+      }),
+      prisma.batteryRent.findMany({
+        where: {
+          status: { in: ['ACTIVE', 'OVERDUE'] },
+        },
+        include: {
+          user: userSelect,
+          battery: { select: { id: true, name: true, serialNumber: true, status: true } },
+          transactions: { select: { type: true, amount: true } },
+        },
+        orderBy: { endDate: 'asc' },
+      }),
+      // Журнал платежей по АКБ за период — для сводки доходов и способов оплаты
+      prisma.batteryRentTransaction.findMany({
+        where: {
+          type: { in: ['PAYMENT', 'REFUND'] },
+          createdAt: { gte: periodStart },
+        },
+        select: {
+          type: true,
+          amount: true,
+          createdAt: true,
+          method: true,
+        },
+      }),
     ]);
 
     // Оплачено/долг по каждой аренде — из денежного журнала (PAYMENT − REFUND)
@@ -225,6 +258,23 @@ export async function GET(request: Request) {
         debt: Math.max(0, Math.round((Number(r.totalPrice) - paid) * 100) / 100),
       };
     });
+    // paidTotal/debt по арендам АКБ — та же формула из журнала
+    const batteryRents = activeAndOverdueBatteryRents.map((r) => {
+      const paid = r.transactions.reduce(
+        (sum, t) =>
+          sum +
+          (t.type === 'PAYMENT' ? Number(t.amount) : t.type === 'REFUND' ? -Number(t.amount) : 0),
+        0
+      );
+      const { transactions, ...rest } = r;
+      return {
+        ...rest,
+        paidTotal: Math.max(0, Math.round(paid * 100) / 100),
+        debt: Math.max(0, Math.round((Number(r.totalPrice) - paid) * 100) / 100),
+      };
+    });
+    const freeBatteries = batteries.filter((b) => b.status === 'FREE');
+
     const rentedBikeIds = new Set(activeAndOverdueRents.map((r) => r.bikeId));
     const rentedBikes = rentedBikeIds.size;
     const freeBikes = bikes.filter(
@@ -257,6 +307,13 @@ export async function GET(request: Request) {
           : sum,
       0
     );
+    const batteryRevenueToday = batteryTxPeriod.reduce(
+      (sum, t) =>
+        t.createdAt >= today && t.createdAt < tomorrow
+          ? sum + (t.type === 'PAYMENT' ? Number(t.amount) : -Number(t.amount))
+          : sum,
+      0
+    );
     // Долг по арендам = только реальный: была частичная оплата или назначен срок погашения.
     // Полностью неотмеченная оплата (PENDING) долгом не считается — как раньше.
     const rentDebt = activeRents.reduce(
@@ -272,6 +329,13 @@ export async function GET(request: Request) {
       byDay.set(key, { revenue: 0, misc: 0, expense: 0, buyout: 0 });
     }
     for (const t of rentTxPeriod) {
+      const key = localDayKey(t.createdAt);
+      const entry = byDay.get(key);
+      if (entry) {
+        entry.revenue += t.type === 'PAYMENT' ? Number(t.amount) : -Number(t.amount);
+      }
+    }
+    for (const t of batteryTxPeriod) {
       const key = localDayKey(t.createdAt);
       const entry = byDay.get(key);
       if (entry) {
@@ -337,8 +401,14 @@ export async function GET(request: Request) {
       }
     }
 
+    const batteryIncomePeriod = batteryTxPeriod.reduce(
+      (sum, t) => sum + (t.type === 'PAYMENT' ? Number(t.amount) : -Number(t.amount)),
+      0
+    );
+
+    // revenuePeriod уже содержит платежи по АКБ (включены в byDay.revenue) — без двойного счёта
     const netProfitPeriod = revenuePeriod + miscIncomePeriod + buyoutIncomePeriod - expensesPeriod;
-    const totalIncomeToday = revenueToday + miscIncomeToday + buyoutIncomeToday;
+    const totalIncomeToday = revenueToday + batteryRevenueToday + miscIncomeToday + buyoutIncomeToday;
     const totalIncomePeriod = revenuePeriod + miscIncomePeriod + buyoutIncomePeriod;
     const pendingBuyoutTotal = Number(pendingBuyoutAgg._sum.amount ?? 0);
 
@@ -353,6 +423,9 @@ export async function GET(request: Request) {
       incomeByMethod[key] = (incomeByMethod[key] || 0) + amount;
     };
     rentTxPeriod.forEach((t) =>
+      addMethodSum(t.method, t.type === 'PAYMENT' ? Number(t.amount) : -Number(t.amount))
+    );
+    batteryTxPeriod.forEach((t) =>
       addMethodSum(t.method, t.type === 'PAYMENT' ? Number(t.amount) : -Number(t.amount))
     );
     miscPeriodTx
@@ -454,6 +527,15 @@ export async function GET(request: Request) {
       pendingBuyoutTotal,
       partsPositions,
       partsValue,
+      totalBatteries: batteries.length,
+      freeBatteries: freeBatteries.length,
+      activeBatteryRents: batteryRents.length,
+      batteryIncomeToday: batteryRevenueToday,
+      batteryIncomePeriod,
+      batteryDebt: batteryRents.reduce(
+        (sum, r) => sum + (r.paidTotal > 0 || r.debtDueDate ? r.debt : 0),
+        0
+      ),
       incomeByMethod,
       expenseByCategory,
     };
@@ -472,6 +554,8 @@ export async function GET(request: Request) {
       topClients,
       timeline,
       bikes,
+      batteries,
+      batteryRents,
       recentMisc,
       buyouts: activeBuyouts,
       archivedBuyouts,

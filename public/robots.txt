@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /admin/*
+Disallow: /dashboard
+Disallow: /login
+Disallow: /profile
+Disallow: /studio
+Disallow: /studio/*
+
+Sitemap: https://elbiko.ru/sitemap.xml

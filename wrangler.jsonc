@@ -1,0 +1,5 @@
+{
+  "name": "elbiko-telegram-relay",
+  "compatibility_date": "2026-09-03",
+  "main": "workers/telegram-relay.js"
+}

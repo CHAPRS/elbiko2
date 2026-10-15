@@ -1,52 +1,100 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { verifyAdminSessionToken } from "@/lib/session";
 
-export function middleware(request: NextRequest) {
+const allowedOrigin = process.env.NEXT_PUBLIC_SITE_URL ||
+  process.env.ALLOWED_ORIGIN ||
+  "*";
+
+function setCorsHeaders(response: NextResponse, origin: string | null) {
+  const corsOrigin = allowedOrigin === "*" ? origin || "*" : allowedOrigin;
+  response.headers.set("Access-Control-Allow-Origin", corsOrigin);
+  response.headers.set(
+    "Access-Control-Allow-Methods",
+    "GET, POST, PATCH, DELETE, OPTIONS"
+  );
+  response.headers.set(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization, Cookie"
+  );
+  if (allowedOrigin !== "*") {
+    response.headers.set("Access-Control-Allow-Credentials", "true");
+  }
+  return response;
+}
+
+function preflightResponse(request: NextRequest) {
+  const origin = request.headers.get("origin");
+  const response = new NextResponse(null, { status: 204 });
+  return setCorsHeaders(response, origin);
+}
+
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const origin = request.headers.get("origin");
 
-  // Админские API закрыты той же сессией, что и страницы админки
-  if (pathname.startsWith("/api/admin")) {
-    if (!request.cookies.has("admin_session")) {
-      return NextResponse.json({ error: "Требуется авторизация администратора" }, { status: 401 });
+  // 1. CORS + защита API
+  if (pathname.startsWith("/api")) {
+    // Preflight-запросы
+    if (request.method === "OPTIONS") {
+      return preflightResponse(request);
     }
-    return NextResponse.next();
+
+    // Админские API закрыты подписанной сессионной кукой
+    if (pathname.startsWith("/api/admin")) {
+      const adminSession = request.cookies.get("admin_session")?.value;
+      const { valid } = await verifyAdminSessionToken(adminSession);
+      if (!valid) {
+        const response = NextResponse.json(
+          { error: "Требуется авторизация администратора" },
+          { status: 401 }
+        );
+        return setCorsHeaders(response, origin);
+      }
+      const response = NextResponse.next();
+      return setCorsHeaders(response, origin);
+    }
+
+    // Публичные API — добавляем CORS-заголовки
+    const response = NextResponse.next();
+    return setCorsHeaders(response, origin);
   }
 
-  // 1. Позволяем свободно загружать системные файлы Next.js, картинки, API и главную
+  // 2. Позволяем свободно загружать системные файлы Next.js, картинки и главную
   if (
-    pathname.startsWith("/_next") || 
-    pathname.startsWith("/api") || 
+    pathname.startsWith("/_next") ||
     pathname === "/" ||
     pathname.includes(".")
   ) {
     return NextResponse.next();
   }
 
-  // Читаем сессионные куки
+  // 3. Читаем сессионные куки
   const hasCourierSession = request.cookies.has("courier_session");
-  const hasAdminSession = request.cookies.has("admin_session");
+  const adminSession = request.cookies.get("admin_session")?.value;
 
-  // 2. ЗАЩИТА ОТ ЦИКЛА: Если пользователь УЖЕ идет на страницу логина, не трогаем его
+  // 4. ЗАЩИТА ОТ ЦИКЛА: Если пользователь УЖЕ идет на страницу логина, не трогаем его
   if (pathname === "/login") {
-    // Если он уже авторизован, можно сразу перекинуть в ЛК
     if (hasCourierSession) {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
-    if (hasAdminSession) {
+    const { valid: isAdminValid } = await verifyAdminSessionToken(adminSession);
+    if (isAdminValid) {
       return NextResponse.redirect(new URL("/admin", request.url));
     }
     return NextResponse.next();
   }
 
-  // 3. Защита панели администратора
+  // 5. Защита панели администратора
   if (pathname.startsWith("/admin")) {
-    if (!hasAdminSession) {
+    const { valid: isAdminValid } = await verifyAdminSessionToken(adminSession);
+    if (!isAdminValid) {
       return NextResponse.redirect(new URL("/login", request.url));
     }
     return NextResponse.next();
   }
 
-  // 4. Защита личного кабинета курьера
+  // 6. Защита личного кабинета курьера
   if (pathname.startsWith("/dashboard")) {
     if (!hasCourierSession) {
       return NextResponse.redirect(new URL("/login", request.url));
@@ -57,7 +105,7 @@ export function middleware(request: NextRequest) {
   return NextResponse.next();
 }
 
-// Конфигурируем перехватчик для всех путей
 export const config = {
-  matcher: ["/api/admin/:path*", "/((?!api|_next/static|_next/image|favicon.ico).*)"],
+  // CORS + защита срабатывает на /admin, /dashboard и всех API
+  matcher: ["/admin/:path*", "/dashboard/:path*", "/api/:path*"],
 };

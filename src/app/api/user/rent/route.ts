@@ -1,12 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { createRent } from "@/lib/rent";
+import { upsertContactByPhone } from "@/lib/contact";
 import { cookies } from "next/headers";
-
-// Явно описываем тип данных, который вернет наша транзакция
-interface TransactionResult {
-  updatedBike: any;
-  rentalSession: any;
-}
 
 async function getCourierIdFromSession(): Promise<number | null> {
   const cookieStore = cookies();
@@ -30,7 +26,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { bikeId } = body;
+    const { bikeId, days } = body;
 
     if (!bikeId) {
       return NextResponse.json(
@@ -39,43 +35,39 @@ export async function POST(request: Request) {
       );
     }
 
-    // Явно указываем тип возвращаемого значения для стрелочной функции: : Promise<TransactionResult>
-    const result: TransactionResult = await prisma.$transaction(async (tx): Promise<TransactionResult> => {
-      // 1. Проверяем существование и статус велосипеда
-      const bike = await tx.bike.findUnique({
-        where: { id: Number(bikeId) },
-      });
+    const user = await prisma.user.findUnique({ where: { id: courierId } });
 
-      if (!bike) {
-        throw new Error("Велосипед не найден");
-      }
+    if (!user) {
+      return NextResponse.json(
+        { error: "Курьер не найден" },
+        { status: 404 }
+      );
+    }
 
-      if (bike.status !== "FREE") {
-        throw new Error("Этот велосипед уже арендован или находится на ТО");
-      }
+    const rentDays = Number(days) > 0 ? Number(days) : 1;
 
-      // 2. Обновляем статус велосипеда на RENTED
-      const updatedBike = await tx.bike.update({
-        where: { id: Number(bikeId) },
-        data: { status: "RENTED" },
-      });
+    const startDate = body.startDate ? new Date(body.startDate) : new Date();
+    const endDate = body.endDate ? new Date(body.endDate) : undefined;
 
-      // 3. Создаем новую сессию аренды для курьера
-      const rentalSession = await tx.rentalSession.create({
-        data: {
-          bikeId: Number(bikeId),
-          userId: courierId,
-        } as any,
-      });
+    const rent = await createRent({
+      userId: courierId,
+      bikeId: Number(bikeId),
+      days: endDate ? undefined : rentDays,
+      startDate,
+      endDate,
+    });
 
-      // Возвращаем строго типизированный объект
-      return { updatedBike, rentalSession };
+    await upsertContactByPhone({
+      fullName: user.name,
+      phone: user.phone,
+      status: 'CUSTOMER',
+      source: 'RENT',
     });
 
     return NextResponse.json({
       success: true,
       message: "Аренда успешно оформлена",
-      data: result,
+      data: { rentId: rent.id, totalPrice: rent.totalPrice, endDate: rent.endDate },
     });
 
   } catch (error: any) {

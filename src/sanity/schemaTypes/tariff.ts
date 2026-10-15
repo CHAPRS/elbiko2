@@ -1,4 +1,4 @@
-export default {
+export const tariffSchema = {
   name: 'tariff',
   title: 'Тариф',
   type: 'document',
@@ -36,12 +36,20 @@ export default {
       name: 'popular',
       title: 'Популярный тариф',
       type: 'boolean',
-      defaultValue: false,
+      initialValue: false, // Исправлено: в Sanity используется initialValue вместо defaultValue
     },
     {
       name: 'order',
       title: 'Порядок отображения',
       type: 'number',
+    },
+    {
+      name: 'image',
+      title: 'Изображение тарифа',
+      type: 'image',
+      options: {
+        hotspot: true,
+      },
     },
   ],
   preview: {

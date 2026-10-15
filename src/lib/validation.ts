@@ -84,6 +84,9 @@ export const miscCategory = z.enum([
   'ACCESSORIES',
   'GOODS',
   'PARTS',
+  'SALARY',
+  'DELIVERY',
+  'TOOLS',
   'OTHER',
 ]);
 

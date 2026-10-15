@@ -91,6 +91,9 @@ const CATEGORY_LABELS: Record<string, string> = {
   ACCESSORIES: 'Аксессуары',
   GOODS: 'Сопутствующие товары',
   PARTS: 'Запчасти',
+  SALARY: 'ЗП мастерам',
+  DELIVERY: 'Доставка',
+  TOOLS: 'Оборудование/инструменты',
   OTHER: 'Прочее',
   NONE: 'Без категории',
 };

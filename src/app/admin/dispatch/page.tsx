@@ -215,11 +215,14 @@ const CATEGORY_LABELS: Record<string, string> = {
   ACCESSORIES: 'Аксессуары',
   GOODS: 'Сопутствующие товары',
   PARTS: 'Запчасти',
+  SALARY: 'ЗП мастерам',
+  DELIVERY: 'Доставка',
+  TOOLS: 'Оборудование/инструменты',
   OTHER: 'Прочее',
   NONE: 'Без категории',
 };
 
-const CATEGORY_ORDER = ['REPAIR', 'SERVICE', 'BATTERY', 'BATTERY_RENT', 'ACCESSORIES', 'GOODS', 'PARTS', 'OTHER', 'NONE'];
+const CATEGORY_ORDER = ['REPAIR', 'SERVICE', 'BATTERY', 'BATTERY_RENT', 'ACCESSORIES', 'GOODS', 'PARTS', 'SALARY', 'DELIVERY', 'TOOLS', 'OTHER', 'NONE'];
 
 const MISC_TITLE_SUGGESTIONS = [
   'Ремонт',
@@ -1118,6 +1121,9 @@ export default function DispatchPage() {
                     <option value="ACCESSORIES">Аксессуары</option>
                     <option value="GOODS">Сопутствующие товары</option>
                     <option value="PARTS">Запчасти</option>
+                    <option value="SALARY">ЗП мастерам</option>
+                    <option value="DELIVERY">Доставка</option>
+                    <option value="TOOLS">Оборудование/инструменты</option>
                     <option value="OTHER">Прочее</option>
                   </select>
                 </div>

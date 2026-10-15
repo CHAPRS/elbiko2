@@ -291,14 +291,14 @@ export async function GET(request: Request) {
         ? Math.round((rentedBikes / bikes.length) * 1000) / 10
         : 0;
 
-    const expectedRevenue = activeRents.reduce(
-      (sum, r) => sum + Number(r.totalPrice),
-      0
-    );
-    const overdueRevenue = overdueRents.reduce(
-      (sum, r) => sum + Number(r.totalPrice),
-      0
-    );
+    const expectedRevenue =
+      activeRents.reduce((sum, r) => sum + Number(r.totalPrice), 0) +
+      batteryRents.reduce((sum, r) => sum + Number(r.totalPrice), 0);
+    const overdueRevenue =
+      overdueRents.reduce((sum, r) => sum + Number(r.totalPrice), 0) +
+      batteryRents
+        .filter((r) => new Date(r.endDate) < now)
+        .reduce((sum, r) => sum + Number(r.totalPrice), 0);
 
     const revenueToday = rentTxPeriod.reduce(
       (sum, t) =>
@@ -316,10 +316,11 @@ export async function GET(request: Request) {
     );
     // Долг по арендам = только реальный: была частичная оплата или назначен срок погашения.
     // Полностью неотмеченная оплата (PENDING) долгом не считается — как раньше.
+    // Долг по АКБ показывается сразу (без порога «первая оплата») — см. BatterySection
     const rentDebt = activeRents.reduce(
       (sum, r) => sum + (r.paidTotal > 0 || r.debtDueDate ? r.debt : 0),
       0
-    );
+    ) + batteryRents.reduce((sum, r) => sum + r.debt, 0);
 
     const byDay = new Map<string, { revenue: number; battery: number; misc: number; expense: number; buyout: number }>();
     for (let i = 0; i < days; i++) {
@@ -533,10 +534,7 @@ export async function GET(request: Request) {
       activeBatteryRents: batteryRents.length,
       batteryIncomeToday: batteryRevenueToday,
       batteryIncomePeriod,
-      batteryDebt: batteryRents.reduce(
-        (sum, r) => sum + (r.paidTotal > 0 || r.debtDueDate ? r.debt : 0),
-        0
-      ),
+      batteryDebt: batteryRents.reduce((sum, r) => sum + r.debt, 0),
       incomeByMethod,
       expenseByCategory,
     };

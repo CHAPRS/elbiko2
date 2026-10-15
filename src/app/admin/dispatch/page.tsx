@@ -855,11 +855,10 @@ export default function DispatchPage() {
       });
     });
 
-  // «Доплата» по АКБ: частичная оплата, аренда ещё не просрочена
+  // «Доплата» по АКБ: непогашенный долг, аренда ещё не просрочена
   (data?.batteryRents ?? [])
     .filter((rent) =>
       (rent.debt ?? 0) > 0 &&
-      ((rent.paidTotal ?? 0) > 0 || Boolean(rent.debtDueDate)) &&
       new Date(rent.endDate).getTime() >= nowTs &&
       matchesSearch(rent.user.name, rent.user.phone, rent.battery.name)
     )

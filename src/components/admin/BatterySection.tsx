@@ -543,7 +543,7 @@ export function BatterySection({ batteries, rents, onChanged, onError, onNotice 
                               <span className="ml-2 text-rose-400 font-medium">(просрочена)</span>
                             )}
                           </p>
-                          {(rent.debt ?? 0) > 0 && ((rent.paidTotal ?? 0) > 0 || Boolean(rent.debtDueDate)) && (
+                          {(rent.debt ?? 0) > 0 && (
                             <p className="text-xs mt-0.5 text-rose-400 font-medium">
                               Долг {formatMoney(Number(rent.debt))}
                               {rent.debtDueDate ? ` до ${formatDate(rent.debtDueDate)}` : ''}
@@ -572,7 +572,7 @@ export function BatterySection({ batteries, rents, onChanged, onError, onNotice 
                               MAX
                             </a>
                           )}
-                          {(rent.debt ?? 0) > 0 && ((rent.paidTotal ?? 0) > 0 || Boolean(rent.debtDueDate)) && (
+                          {(rent.debt ?? 0) > 0 && (
                             <button
                               onClick={() => openPay(rent)}
                               className="px-2.5 py-1.5 bg-violet-600 hover:bg-violet-500 text-white rounded text-xs transition-colors"

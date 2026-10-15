@@ -32,6 +32,7 @@ export interface BatteryRent {
   paidTotal?: number;
   debt?: number;
   debtDueDate?: string | null;
+  comment?: string | null;
   user: BatteryRentUser;
   battery: { id: number; name: string; serialNumber?: string | null; status: string };
 }
@@ -104,6 +105,21 @@ export function BatterySection({ batteries, rents, onChanged, onError, onNotice 
   const [payMethod, setPayMethod] = useState('CASH');
   const [payDue, setPayDue] = useState('');
   const [payBusy, setPayBusy] = useState(false);
+
+  const [editRent, setEditRent] = useState<BatteryRent | null>(null);
+  const [editStart, setEditStart] = useState('');
+  const [editEnd, setEditEnd] = useState('');
+  const [editTotal, setEditTotal] = useState('');
+  const [editComment, setEditComment] = useState('');
+  const [editBusy, setEditBusy] = useState(false);
+
+  const [extendRent_, setExtendRent] = useState<BatteryRent | null>(null);
+  const [extDays, setExtDays] = useState('1');
+  const [extPrice, setExtPrice] = useState('');
+  const [extPriceManual, setExtPriceManual] = useState(false);
+  const [extPaid, setExtPaid] = useState('');
+  const [extMethod, setExtMethod] = useState('CASH');
+  const [extBusy, setExtBusy] = useState(false);
 
   const freeBatteries = batteries.filter((b) => b.status === 'FREE');
 
@@ -260,8 +276,110 @@ export function BatterySection({ batteries, rents, onChanged, onError, onNotice 
     patchBatteryRent(rent.id, { status: 'COMPLETED' }, 'Аренда АКБ завершена, аккумулятор свободен');
   };
 
-  const extendRent = (rent: BatteryRent) => {
-    patchBatteryRent(rent.id, { extendDays: 1 }, `Аренда АКБ #${rent.id} продлена на 1 день`);
+  const openExtend = (rent: BatteryRent) => {
+    setExtendRent(rent);
+    setExtDays('1');
+    setExtPriceManual(false);
+    setExtPrice('');
+    setExtPaid('');
+    setExtMethod('CASH');
+    onError(null);
+    onNotice(null);
+  };
+
+  useEffect(() => {
+    if (extPriceManual || !extendRent_) return;
+    const battery = batteries.find((b) => b.id === extendRent_.battery.id);
+    const days = Number(extDays) || 0;
+    setExtPrice(battery && days > 0 ? String(Number(battery.pricePerDay) * days) : '');
+  }, [extDays, extendRent_, batteries, extPriceManual]);
+
+  const submitExtend = async () => {
+    if (!extendRent_) return;
+    const days = Number(extDays);
+    if (!days || days <= 0) {
+      onError('Укажите корректное число дней продления');
+      return;
+    }
+    setExtBusy(true);
+    try {
+      const res = await fetch(`/api/admin/battery-rents/${extendRent_.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          extendDays: days,
+          extendPrice: extPrice ? Number(extPrice) : undefined,
+          paidAmount: extPaid ? Number(extPaid) : undefined,
+          paidMethod: extPaid ? extMethod : undefined,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        onError(json.error || 'Не удалось продлить аренду АКБ');
+        return;
+      }
+      let msg = `Аренда АКБ #${extendRent_.id} продлена на ${days} дн. до ${formatDate(json.endDate)}`;
+      if (extPaid) msg += `, внесено ${Number(extPaid).toLocaleString('ru-RU')} ₽`;
+      onNotice(msg);
+      setExtendRent(null);
+      onChanged();
+    } catch {
+      onError('Нет связи с сервером');
+    } finally {
+      setExtBusy(false);
+    }
+  };
+
+  const openEdit = (rent: BatteryRent) => {
+    setEditRent(rent);
+    setEditStart(toInputDate(rent.startDate));
+    setEditEnd(toInputDate(rent.endDate));
+    setEditTotal(String(Number(rent.totalPrice)));
+    setEditComment(rent.comment ?? '');
+    onError(null);
+    onNotice(null);
+  };
+
+  const submitEdit = async () => {
+    if (!editRent) return;
+    if (!editStart || !editEnd) {
+      onError('Укажите даты начала и окончания');
+      return;
+    }
+    if (new Date(editEnd) < new Date(editStart)) {
+      onError('Дата окончания не может быть раньше даты начала');
+      return;
+    }
+    const total = Number(editTotal);
+    if (!Number.isFinite(total) || total < 0) {
+      onError('Некорректная итоговая сумма');
+      return;
+    }
+    setEditBusy(true);
+    try {
+      const res = await fetch(`/api/admin/battery-rents/${editRent.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          startDate: editStart,
+          endDate: editEnd,
+          totalPrice: total,
+          comment: editComment,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        onError(json.error || 'Не удалось обновить аренду АКБ');
+        return;
+      }
+      onNotice(`Аренда АКБ #${editRent.id} обновлена${json.debt > 0 ? `, долг ${Number(json.debt).toLocaleString('ru-RU')} ₽` : ''}`);
+      setEditRent(null);
+      onChanged();
+    } catch {
+      onError('Нет связи с сервером');
+    } finally {
+      setEditBusy(false);
+    }
   };
 
   const openPay = (rent: BatteryRent) => {
@@ -469,10 +587,16 @@ export function BatterySection({ batteries, rents, onChanged, onError, onNotice 
                             Завершить
                           </button>
                           <button
-                            onClick={() => extendRent(rent)}
+                            onClick={() => openExtend(rent)}
                             className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs transition-colors"
                           >
-                            +1 день
+                            Продлить
+                          </button>
+                          <button
+                            onClick={() => openEdit(rent)}
+                            className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs transition-colors"
+                          >
+                            Изменить
                           </button>
                         </div>
                       </div>
@@ -674,6 +798,155 @@ export function BatterySection({ batteries, rents, onChanged, onError, onNotice 
               <button
                 onClick={() => setPayRent(null)}
                 disabled={payBusy}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-300 rounded-lg text-sm transition-colors"
+              >
+                Отмена
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {extendRent_ && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
+            <h2 className="mb-2 text-lg font-semibold text-slate-100">
+              Продление аренды АКБ #{extendRent_.id}
+            </h2>
+            <p className="mb-4 text-sm text-slate-400">
+              {extendRent_.user.name} · {extendRent_.battery.name} · до {formatDate(extendRent_.endDate)}
+            </p>
+
+            <div className="mb-4 grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">Дней продления</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={extDays}
+                  onChange={(e) => setExtDays(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">Стоимость, ₽</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={extPrice}
+                  onChange={(e) => {
+                    setExtPriceManual(true);
+                    setExtPrice(e.target.value);
+                  }}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">Оплата сейчас, ₽ (необяз.)</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={extPaid}
+                  onChange={(e) => setExtPaid(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">Способ</label>
+                <select
+                  value={extMethod}
+                  onChange={(e) => setExtMethod(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500"
+                >
+                  {Object.entries(METHOD_LABELS).map(([value, label]) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={submitExtend}
+                disabled={extBusy}
+                className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors"
+              >
+                {extBusy ? 'Продлеваем...' : 'Продлить'}
+              </button>
+              <button
+                onClick={() => setExtendRent(null)}
+                disabled={extBusy}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-300 rounded-lg text-sm transition-colors"
+              >
+                Отмена
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editRent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
+            <h2 className="mb-2 text-lg font-semibold text-slate-100">
+              Редактировать аренду АКБ #{editRent.id}
+            </h2>
+            <p className="mb-4 text-sm text-slate-400">
+              {editRent.user.name} · {editRent.battery.name}
+            </p>
+
+            <div className="mb-4 grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">Дата начала</label>
+                <input
+                  type="date"
+                  value={editStart}
+                  onChange={(e) => setEditStart(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">Дата окончания</label>
+                <input
+                  type="date"
+                  value={editEnd}
+                  onChange={(e) => setEditEnd(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+              <div className="col-span-2">
+                <label className="block text-xs font-medium text-slate-400 mb-1">Итоговая сумма, ₽</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={editTotal}
+                  onChange={(e) => setEditTotal(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+              <div className="col-span-2">
+                <label className="block text-xs font-medium text-slate-400 mb-1">Комментарий</label>
+                <input
+                  type="text"
+                  value={editComment}
+                  onChange={(e) => setEditComment(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500"
+                  placeholder="Необязательно"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={submitEdit}
+                disabled={editBusy}
+                className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors"
+              >
+                {editBusy ? 'Сохраняем...' : 'Сохранить'}
+              </button>
+              <button
+                onClick={() => setEditRent(null)}
+                disabled={editBusy}
                 className="px-4 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-300 rounded-lg text-sm transition-colors"
               >
                 Отмена

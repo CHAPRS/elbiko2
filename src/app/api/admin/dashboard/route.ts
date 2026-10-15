@@ -321,12 +321,12 @@ export async function GET(request: Request) {
       0
     );
 
-    const byDay = new Map<string, { revenue: number; misc: number; expense: number; buyout: number }>();
+    const byDay = new Map<string, { revenue: number; battery: number; misc: number; expense: number; buyout: number }>();
     for (let i = 0; i < days; i++) {
       const d = new Date(periodStart);
       d.setDate(d.getDate() + i);
       const key = localDayKey(d);
-      byDay.set(key, { revenue: 0, misc: 0, expense: 0, buyout: 0 });
+      byDay.set(key, { revenue: 0, battery: 0, misc: 0, expense: 0, buyout: 0 });
     }
     for (const t of rentTxPeriod) {
       const key = localDayKey(t.createdAt);
@@ -339,7 +339,7 @@ export async function GET(request: Request) {
       const key = localDayKey(t.createdAt);
       const entry = byDay.get(key);
       if (entry) {
-        entry.revenue += t.type === 'PAYMENT' ? Number(t.amount) : -Number(t.amount);
+        entry.battery += t.type === 'PAYMENT' ? Number(t.amount) : -Number(t.amount);
       }
     }
     for (const tx of miscPeriodTx) {
@@ -362,10 +362,11 @@ export async function GET(request: Request) {
       .map(([date, v]) => ({
         date,
         revenue: v.revenue,
+        battery: v.battery,
         misc: v.misc,
         expense: v.expense,
         buyout: v.buyout,
-        total: v.revenue + v.misc + v.buyout,
+        total: v.revenue + v.battery + v.misc + v.buyout,
       }))
       .sort((a, b) => a.date.localeCompare(b.date));
 
@@ -406,10 +407,10 @@ export async function GET(request: Request) {
       0
     );
 
-    // revenuePeriod уже содержит платежи по АКБ (включены в byDay.revenue) — без двойного счёта
-    const netProfitPeriod = revenuePeriod + miscIncomePeriod + buyoutIncomePeriod - expensesPeriod;
+    // АКБ идут отдельной строкой: revenuePeriod — только байки, batteryIncomePeriod — АКБ
+    const netProfitPeriod = revenuePeriod + batteryIncomePeriod + miscIncomePeriod + buyoutIncomePeriod - expensesPeriod;
     const totalIncomeToday = revenueToday + batteryRevenueToday + miscIncomeToday + buyoutIncomeToday;
-    const totalIncomePeriod = revenuePeriod + miscIncomePeriod + buyoutIncomePeriod;
+    const totalIncomePeriod = revenuePeriod + batteryIncomePeriod + miscIncomePeriod + buyoutIncomePeriod;
     const pendingBuyoutTotal = Number(pendingBuyoutAgg._sum.amount ?? 0);
 
     const partsPositions = partsStock.length;

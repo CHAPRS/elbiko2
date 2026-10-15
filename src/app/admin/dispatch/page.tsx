@@ -109,6 +109,7 @@ interface Rent {
 interface RevenueDay {
   date: string;
   revenue: number;
+  battery?: number;
   misc?: number;
   expense?: number;
   buyout?: number;
@@ -1730,7 +1731,10 @@ export default function DispatchPage() {
                     <span className="w-2 h-2 rounded-full bg-amber-500" /> Всего
                   </span>
                   <span className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-sky-500" /> Аренда
+                    <span className="w-2 h-2 rounded-full bg-sky-500" /> Аренда байков
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-indigo-400" /> АКБ
                   </span>
                   <span className="flex items-center gap-1">
                     <span className="w-2 h-2 rounded-full bg-emerald-500" /> Прочие доходы
@@ -1760,13 +1764,21 @@ export default function DispatchPage() {
                             style={{ width: `${((day.total ?? 0) / maxRevenue) * 100}%` }}
                           />
                         </div>
-                        {((day.revenue ?? 0) > 0 || (day.misc ?? 0) > 0 || (day.expense ?? 0) > 0 || (day.buyout ?? 0) > 0) && (
+                        {((day.revenue ?? 0) > 0 || (day.battery ?? 0) > 0 || (day.misc ?? 0) > 0 || (day.expense ?? 0) > 0 || (day.buyout ?? 0) > 0) && (
                           <div className="mt-1 space-y-0.5">
                             {(day.revenue ?? 0) > 0 && (
                               <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
                                 <div
                                   className="h-full bg-sky-500 rounded-full"
                                   style={{ width: `${((day.revenue ?? 0) / maxRevenue) * 100}%` }}
+                                />
+                              </div>
+                            )}
+                            {(day.battery ?? 0) > 0 && (
+                              <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-indigo-400 rounded-full"
+                                  style={{ width: `${((day.battery ?? 0) / maxRevenue) * 100}%` }}
                                 />
                               </div>
                             )}

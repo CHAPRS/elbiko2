@@ -130,6 +130,8 @@ interface MiscTransaction {
 }
 
 interface TopBike {
+  id: number;
+  externalId?: string | null;
   name: string;
   revenue: number;
 }
@@ -146,9 +148,11 @@ interface TimelineDay {
   dayOfWeek: string;
   freeCount: number;
   returning: Rent[];
+  returningBatteries: BatteryRent[];
 }
 
 interface DashboardData {
+  period?: { days: number; from: string; to: string };
   stats: Stats;
   newLeads: Lead[];
   activeRents: Rent[];
@@ -292,6 +296,20 @@ export default function DispatchPage() {
   const [payMethod, setPayMethod] = useState('CASH');
   const [payDue, setPayDue] = useState('');
   const [payBusy, setPayBusy] = useState(false);
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
+  const [customPeriod, setCustomPeriod] = useState<{ from: string; to: string } | null>(null);
+  const [expandedTimelineDay, setExpandedTimelineDay] = useState<string | null>(null);
+  const [expandedRevenueDay, setExpandedRevenueDay] = useState<string | null>(null);
+  const [hideEmptyRevenueDays, setHideEmptyRevenueDays] = useState(false);
+  const [revenueChartCollapsed, setRevenueChartCollapsed] = useState(false);
+  const [showMiscHistory, setShowMiscHistory] = useState(false);
+  const [histFrom, setHistFrom] = useState('');
+  const [histTo, setHistTo] = useState('');
+  const [histKind, setHistKind] = useState('');
+  const [histCategory, setHistCategory] = useState('');
+  const [histItems, setHistItems] = useState<MiscTransaction[] | null>(null);
+  const [histLoading, setHistLoading] = useState(false);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -300,10 +318,13 @@ export default function DispatchPage() {
     return () => clearTimeout(timeout);
   }, [searchInput]);
 
-  const fetchDashboard = useCallback(async (selectedDays: number, silent = false) => {
+  const fetchDashboard = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const res = await fetch(`/api/admin/dashboard?days=${selectedDays}`);
+      const query = customPeriod
+        ? `from=${customPeriod.from}&to=${customPeriod.to}`
+        : `days=${days}`;
+      const res = await fetch(`/api/admin/dashboard?${query}`);
       const json = await res.json();
       if (!res.ok) {
         setError(json.error || 'Не удалось загрузить дашборд');
@@ -316,17 +337,52 @@ export default function DispatchPage() {
     } finally {
       if (!silent) setLoading(false);
     }
-  }, []);
+  }, [days, customPeriod]);
 
   useEffect(() => {
-    fetchDashboard(days);
+    fetchDashboard();
 
     const interval = setInterval(() => {
-      fetchDashboard(days, true);
+      fetchDashboard(true);
     }, 30000);
 
     return () => clearInterval(interval);
-  }, [days, fetchDashboard]);
+  }, [days, customPeriod, fetchDashboard]);
+
+  const applyCustomPeriod = () => {
+    if (!customFrom || !customTo) {
+      setError('Укажите обе даты периода');
+      return;
+    }
+    setCustomPeriod({ from: customFrom, to: customTo });
+  };
+
+  const selectPresetDays = (d: number) => {
+    setCustomPeriod(null);
+    setDays(d);
+  };
+
+  const fetchMiscHistory = async () => {
+    setHistLoading(true);
+    try {
+      const params = new URLSearchParams({ take: '500' });
+      if (histFrom) params.set('from', `${histFrom}T00:00:00`);
+      if (histTo) params.set('to', `${histTo}T23:59:59`);
+      if (histKind) params.set('kind', histKind);
+      if (histCategory) params.set('category', histCategory);
+      const res = await fetch(`/api/admin/finance?${params.toString()}`);
+      const json = await res.json();
+      setHistItems(res.ok ? json : []);
+      if (!res.ok) setError(json.error || 'Не удалось загрузить историю операций');
+    } catch {
+      setHistItems([]);
+      setError('Нет связи с сервером');
+    } finally {
+      setHistLoading(false);
+    }
+  };
+
+  const periodDaysLabel = data?.period?.days ?? days;
 
   const takeLead = async (id: number) => {
     try {
@@ -337,7 +393,7 @@ export default function DispatchPage() {
       });
       if (res.ok) {
         setNotice('Заявка взята в работу');
-        fetchDashboard(days);
+        fetchDashboard();
       } else {
         const json = await res.json();
         setError(json.error || 'Не удалось обновить заявку');
@@ -442,7 +498,7 @@ export default function DispatchPage() {
       }
       setNotice(`Аренда №${json.rentId ?? json.batteryRentId} оформлена по заявке №${convertingLead.id}`);
       closeConvert();
-      fetchDashboard(days);
+      fetchDashboard();
     } catch {
       setError('Нет связи с сервером');
     } finally {
@@ -502,7 +558,7 @@ export default function DispatchPage() {
       if (json.overpaid) msg += ' (сумма превышала долг)';
       setNotice(msg);
       setPayRent(null);
-      fetchDashboard(days);
+      fetchDashboard();
     } catch {
       setError('Нет связи с сервером');
     } finally {
@@ -538,7 +594,7 @@ export default function DispatchPage() {
         setNotice((prev) => `${prev}. Внимание: внесённый пробег меньше предыдущего`);
       }
       setMileageAction(null);
-      fetchDashboard(days);
+      fetchDashboard();
     } catch {
       setError('Нет связи с сервером');
     } finally {
@@ -570,7 +626,7 @@ export default function DispatchPage() {
           : `Пробег ${mileage} км записан для ${mileageBike.name}`
       );
       setMileageBike(null);
-      fetchDashboard(days);
+      fetchDashboard();
     } catch {
       setError('Нет связи с сервером');
     } finally {
@@ -595,7 +651,7 @@ export default function DispatchPage() {
         return;
       }
       setNotice(`ТО проведено: ${bike.name} на ${bike.mileage.toLocaleString('ru-RU')} км`);
-      fetchDashboard(days);
+      fetchDashboard();
     } catch {
       setError('Нет связи с сервером');
     }
@@ -621,7 +677,7 @@ export default function DispatchPage() {
         return;
       }
       setNotice(`Просрочено аренд: ${json.count}`);
-      fetchDashboard(days);
+      fetchDashboard();
     } catch {
       setError('Нет связи с сервером');
     } finally {
@@ -687,7 +743,8 @@ export default function DispatchPage() {
       }
       setNotice(editingMisc ? 'Операция обновлена' : 'Операция добавлена');
       resetMiscForm();
-      fetchDashboard(days);
+      fetchDashboard();
+      if (histItems !== null) fetchMiscHistory();
     } catch {
       setError('Нет связи с сервером');
     } finally {
@@ -705,12 +762,60 @@ export default function DispatchPage() {
         return;
       }
       if (editingMisc?.id === id) resetMiscForm();
+      setHistItems((prev) => (prev ? prev.filter((t) => t.id !== id) : prev));
       setNotice('Операция удалена');
-      fetchDashboard(days);
+      fetchDashboard();
     } catch {
       setError('Нет связи с сервером');
     }
   };
+
+  const renderMiscTx = (tx: MiscTransaction) => (
+    <li
+      key={tx.id}
+      className="border border-slate-800 rounded-lg p-3 bg-slate-950/50 flex items-start justify-between gap-3"
+    >
+      <div className="min-w-0">
+        <p className="text-sm font-medium text-slate-100 truncate">
+          {tx.title}
+          {tx.bike && (
+            <span className="text-slate-400 font-normal">
+              {' '}· {tx.bike.name}{tx.bike.externalId ? ` (ID: ${tx.bike.externalId})` : ''}
+            </span>
+          )}
+        </p>
+        <p className="text-xs text-slate-500 mt-0.5">
+          {formatDateTime(tx.createdAt)}
+          {tx.category ? ` · ${CATEGORY_LABELS[tx.category] || tx.category}` : ''}
+          {tx.method ? ` · ${METHOD_LABELS[tx.method] || tx.method}` : ''}
+          {tx.comment ? ` · ${tx.comment}` : ''}
+        </p>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <span
+          className={`text-sm font-semibold ${
+            tx.kind === 'INCOME' ? 'text-emerald-400' : 'text-rose-400'
+          }`}
+        >
+          {tx.kind === 'INCOME' ? '+' : '−'}{formatMoney(Number(tx.amount))}
+        </span>
+        <button
+          type="button"
+          onClick={() => startEditMisc(tx)}
+          className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs transition-colors"
+        >
+          Изм.
+        </button>
+        <button
+          type="button"
+          onClick={() => deleteMisc(tx.id)}
+          className="px-2 py-1 bg-slate-800 hover:bg-rose-900 text-slate-300 rounded text-xs transition-colors"
+        >
+          ✕
+        </button>
+      </div>
+    </li>
+  );
 
   const nowTsEarly = Date.now();
   const DAY_MS_EARLY = 24 * 60 * 60 * 1000;
@@ -745,17 +850,17 @@ export default function DispatchPage() {
   const financialStats: { label: string; value: number; color: string }[] = data
     ? [
         { label: 'Выручка всего сегодня', value: data.stats.totalIncomeToday, color: 'text-emerald-400' },
-        { label: `Выручка всего за ${days} дн.`, value: data.stats.totalIncomePeriod, color: 'text-amber-400' },
-        { label: `Аренда за ${days} дн.`, value: data.stats.revenuePeriod, color: 'text-sky-400' },
-        { label: `АКБ за ${days} дн.`, value: data.stats.batteryIncomePeriod ?? 0, color: 'text-sky-300' },
+        { label: `Выручка всего за ${periodDaysLabel} дн.`, value: data.stats.totalIncomePeriod, color: 'text-amber-400' },
+        { label: `Аренда за ${periodDaysLabel} дн.`, value: data.stats.revenuePeriod, color: 'text-sky-400' },
+        { label: `АКБ за ${periodDaysLabel} дн.`, value: data.stats.batteryIncomePeriod ?? 0, color: 'text-sky-300' },
         { label: 'Ожидаемая выручка', value: data.stats.expectedRevenue, color: 'text-cyan-400' },
         { label: 'Просроченная выручка', value: data.stats.overdueRevenue, color: 'text-rose-400' },
         { label: 'Средний чек', value: data.stats.averageCheck, color: 'text-slate-200' },
         { label: 'Неудачи / возвраты', value: data.stats.failedRefundedRevenue, color: 'text-slate-400' },
-        { label: `Прочие доходы за ${days} дн.`, value: data.stats.miscIncomePeriod, color: 'text-emerald-300' },
-        { label: `Доход по выкупам за ${days} дн.`, value: data.stats.buyoutIncomePeriod, color: 'text-cyan-300' },
-        { label: `Расходы за ${days} дн.`, value: data.stats.expensesPeriod, color: 'text-rose-300' },
-        { label: `Прибыль за ${days} дн.`, value: data.stats.netProfitPeriod, color: 'text-lime-400' },
+        { label: `Прочие доходы за ${periodDaysLabel} дн.`, value: data.stats.miscIncomePeriod, color: 'text-emerald-300' },
+        { label: `Доход по выкупам за ${periodDaysLabel} дн.`, value: data.stats.buyoutIncomePeriod, color: 'text-cyan-300' },
+        { label: `Расходы за ${periodDaysLabel} дн.`, value: data.stats.expensesPeriod, color: 'text-rose-300' },
+        { label: `Прибыль за ${periodDaysLabel} дн.`, value: data.stats.netProfitPeriod, color: 'text-lime-400' },
         { label: 'Осталось по выкупам', value: data.stats.pendingBuyoutTotal, color: 'text-violet-400' },
         { label: `Склад: ${data.stats.partsPositions} поз.`, value: data.stats.partsValue, color: 'text-orange-300' },
       ]
@@ -944,6 +1049,9 @@ export default function DispatchPage() {
     matchesSearch(day.date) ||
     day.returning.some((rent) =>
       matchesSearch(rent.user.name, rent.user.phone, rent.bike.name)
+    ) ||
+    (day.returningBatteries ?? []).some((rent) =>
+      matchesSearch(rent.user.name, rent.user.phone, rent.battery.name)
     )
   ) ?? [];
 
@@ -1034,7 +1142,7 @@ export default function DispatchPage() {
           <LeadForm
             bikes={data?.freeBikes ?? []}
             batteries={(data?.batteries ?? []).filter((b) => b.status === 'FREE')}
-            onSuccess={() => fetchDashboard(days)}
+            onSuccess={() => fetchDashboard()}
           />
         </section>
 
@@ -1183,55 +1291,93 @@ export default function DispatchPage() {
                 <p className="text-slate-400 text-sm">Операций пока нет</p>
               ) : (
                 <ul className="space-y-2">
-                  {data.recentMisc.map((tx) => (
-                    <li
-                      key={tx.id}
-                      className="border border-slate-800 rounded-lg p-3 bg-slate-950/50 flex items-start justify-between gap-3"
-                    >
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-slate-100 truncate">
-                          {tx.title}
-                          {tx.bike && (
-                            <span className="text-slate-400 font-normal">
-                              {' '}· {tx.bike.name}{tx.bike.externalId ? ` (ID: ${tx.bike.externalId})` : ''}
-                            </span>
-                          )}
-                        </p>
-                        <p className="text-xs text-slate-500 mt-0.5">
-                          {formatDateTime(tx.createdAt)}
-                          {tx.category ? ` · ${CATEGORY_LABELS[tx.category] || tx.category}` : ''}
-                          {tx.method ? ` · ${METHOD_LABELS[tx.method] || tx.method}` : ''}
-                          {tx.comment ? ` · ${tx.comment}` : ''}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span
-                          className={`text-sm font-semibold ${
-                            tx.kind === 'INCOME' ? 'text-emerald-400' : 'text-rose-400'
-                          }`}
-                        >
-                          {tx.kind === 'INCOME' ? '+' : '−'}{formatMoney(Number(tx.amount))}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => startEditMisc(tx)}
-                          className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs transition-colors"
-                        >
-                          Изм.
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => deleteMisc(tx.id)}
-                          className="px-2 py-1 bg-slate-800 hover:bg-rose-900 text-slate-300 rounded text-xs transition-colors"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    </li>
-                  ))}
+                  {data.recentMisc.map((tx) => renderMiscTx(tx))}
                 </ul>
               )}
             </div>
+          </div>
+
+          <div className="mt-6 border-t border-slate-800 pt-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-slate-300">История операций</h3>
+              <button
+                type="button"
+                onClick={() => {
+                  const next = !showMiscHistory;
+                  setShowMiscHistory(next);
+                  if (next && histItems === null) fetchMiscHistory();
+                }}
+                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs transition-colors"
+              >
+                {showMiscHistory ? 'Скрыть' : 'Показать всю историю →'}
+              </button>
+            </div>
+            {showMiscHistory && (
+              <>
+                <div className="flex flex-wrap items-center gap-2 mb-3">
+                  <input
+                    type="date"
+                    value={histFrom}
+                    onChange={(e) => setHistFrom(e.target.value)}
+                    className="px-2 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-amber-500 [color-scheme:dark]"
+                  />
+                  <span className="text-slate-500 text-xs">—</span>
+                  <input
+                    type="date"
+                    value={histTo}
+                    onChange={(e) => setHistTo(e.target.value)}
+                    className="px-2 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-amber-500 [color-scheme:dark]"
+                  />
+                  <select
+                    value={histKind}
+                    onChange={(e) => setHistKind(e.target.value)}
+                    className="px-2 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="">Все операции</option>
+                    <option value="INCOME">Доходы</option>
+                    <option value="EXPENSE">Расходы</option>
+                  </select>
+                  <select
+                    value={histCategory}
+                    onChange={(e) => setHistCategory(e.target.value)}
+                    className="px-2 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="">Все категории</option>
+                    {CATEGORY_ORDER.map((c) => (
+                      <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={fetchMiscHistory}
+                    className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-medium transition-colors"
+                  >
+                    Показать
+                  </button>
+                </div>
+                {histLoading ? (
+                  <p className="text-slate-400 text-sm">Загрузка...</p>
+                ) : !histItems || histItems.length === 0 ? (
+                  <p className="text-slate-400 text-sm">Операций за выбранный период нет</p>
+                ) : (
+                  <>
+                    <p className="text-xs text-slate-500 mb-2">
+                      Найдено: {histItems.length} · Доходов:{' '}
+                      <span className="text-emerald-400 font-semibold">
+                        {formatMoney(histItems.filter((t) => t.kind === 'INCOME').reduce((s, t) => s + Number(t.amount), 0))}
+                      </span>
+                      {' '}· Расходов:{' '}
+                      <span className="text-rose-400 font-semibold">
+                        {formatMoney(histItems.filter((t) => t.kind === 'EXPENSE').reduce((s, t) => s + Number(t.amount), 0))}
+                      </span>
+                    </p>
+                    <ul className="space-y-2 max-h-[32rem] overflow-y-auto pr-1">
+                      {histItems.map((tx) => renderMiscTx(tx))}
+                    </ul>
+                  </>
+                )}
+              </>
+            )}
           </div>
         </section>
 
@@ -1267,7 +1413,7 @@ export default function DispatchPage() {
           buyouts={data?.buyouts ?? []}
           archivedBuyouts={data?.archivedBuyouts ?? []}
           bikes={data?.bikes ?? []}
-          onChanged={() => fetchDashboard(days)}
+          onChanged={() => fetchDashboard()}
           onError={setError}
           onNotice={setNotice}
         />
@@ -1426,7 +1572,7 @@ export default function DispatchPage() {
         <BatterySection
           batteries={data?.batteries ?? []}
           rents={data?.batteryRents ?? []}
-          onChanged={() => fetchDashboard(days)}
+          onChanged={() => fetchDashboard()}
           onError={setError}
           onNotice={setNotice}
         />
@@ -1589,59 +1735,118 @@ export default function DispatchPage() {
         </div>
 
         <section className="bg-slate-900/50 border border-slate-800 rounded-xl p-6 mb-8">
-          <h2 className="text-lg font-semibold text-slate-200 mb-4">Таймлайн загруженности на 14 дней</h2>
+          <h2 className="text-lg font-semibold text-slate-200 mb-1">Таймлайн загруженности на 14 дней</h2>
+          <p className="text-xs text-slate-500 mb-4">Нажмите на день, чтобы увидеть все планируемые возвраты</p>
           {loading ? (
             <p className="text-slate-400 text-sm">Загрузка...</p>
           ) : filteredTimeline.length === 0 ? (
             <p className="text-slate-400 text-sm">Нет данных</p>
           ) : (
-            <div className="overflow-x-auto pb-2">
-              <div className="flex gap-3 min-w-max">
-                {filteredTimeline.map((day) => (
-                  <div
-                    key={day.date}
-                    className="min-w-[12rem] max-w-[12rem] bg-slate-950/50 border border-slate-800 rounded-lg p-3 flex flex-col"
-                  >
-                    <div className="text-sm font-medium text-slate-200 mb-1">
-                      {day.dayOfWeek}, {formatShortDay(day.date)}
-                    </div>
-                    <div className="text-2xl font-bold text-emerald-400 mb-1">{day.freeCount}</div>
-                    <div className="text-xs text-slate-500 mb-3">свободных байков</div>
-                    {day.returning.length > 0 && (
-                      <div className="mt-auto">
-                        <div className="text-xs font-medium text-amber-400 mb-1">
-                          Возвратов: {day.returning.length}
+            <>
+              <div className="overflow-x-auto pb-2">
+                <div className="flex gap-3 min-w-max">
+                  {filteredTimeline.map((day) => {
+                    const totalReturns = day.returning.length + (day.returningBatteries?.length ?? 0);
+                    const isExpanded = expandedTimelineDay === day.date;
+                    return (
+                      <button
+                        type="button"
+                        key={day.date}
+                        onClick={() => setExpandedTimelineDay(isExpanded ? null : day.date)}
+                        className={`min-w-[12rem] max-w-[12rem] text-left border rounded-lg p-3 flex flex-col transition-colors cursor-pointer ${
+                          isExpanded
+                            ? 'bg-slate-900 border-amber-500/60'
+                            : 'bg-slate-950/50 border-slate-800 hover:border-slate-600'
+                        }`}
+                      >
+                        <div className="text-sm font-medium text-slate-200 mb-1">
+                          {day.dayOfWeek}, {formatShortDay(day.date)}
                         </div>
-                        <ul className="space-y-1 text-xs text-slate-400">
-                          {day.returning.slice(0, 3).map((rent) => (
-                            <li key={rent.id} className="truncate">
-                              {rent.bike.name}{rent.bike.externalId ? ` (ID: ${rent.bike.externalId})` : ''} · {rent.user.name}
-                            </li>
-                          ))}
-                          {day.returning.length > 3 && (
-                            <li className="text-slate-500">+{day.returning.length - 3}</li>
-                          )}
-                        </ul>
-                      </div>
-                    )}
-                    {day.returning.length === 0 && (
-                      <div className="mt-auto text-xs text-slate-600">Без возвратов</div>
+                        <div className="text-2xl font-bold text-emerald-400 mb-1">{day.freeCount}</div>
+                        <div className="text-xs text-slate-500 mb-3">свободных байков</div>
+                        {totalReturns > 0 ? (
+                          <div className="mt-auto">
+                            <div className="text-xs font-medium text-amber-400 mb-1">
+                              Возвратов: {totalReturns}
+                            </div>
+                            <ul className="space-y-1 text-xs text-slate-400 max-h-16 overflow-y-auto pr-1">
+                              {day.returning.map((rent) => (
+                                <li key={`b-${rent.id}`} className="truncate">
+                                  {rent.bike.name}{rent.bike.externalId ? ` (ID: ${rent.bike.externalId})` : ''} · {rent.user.name}
+                                </li>
+                              ))}
+                              {(day.returningBatteries ?? []).map((rent) => (
+                                <li key={`a-${rent.id}`} className="truncate">
+                                  🔋 {rent.battery.name} · {rent.user.name}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : (
+                          <div className="mt-auto text-xs text-slate-600">Без возвратов</div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              {expandedTimelineDay && (() => {
+                const day = filteredTimeline.find((d) => d.date === expandedTimelineDay);
+                if (!day) return null;
+                const total = day.returning.length + (day.returningBatteries?.length ?? 0);
+                return (
+                  <div className="mt-4 bg-slate-950/50 border border-amber-500/30 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-sm font-semibold text-slate-200">
+                        Возвраты {day.dayOfWeek}, {formatShortDay(day.date)} — {total}
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => setExpandedTimelineDay(null)}
+                        className="text-slate-500 hover:text-slate-300 text-xs"
+                      >
+                        Свернуть ✕
+                      </button>
+                    </div>
+                    {total === 0 ? (
+                      <p className="text-sm text-slate-500">В этот день возвратов нет</p>
+                    ) : (
+                      <ul className="space-y-2">
+                        {day.returning.map((rent) => (
+                          <li key={`exp-b-${rent.id}`} className="flex items-center justify-between gap-3 text-sm border border-slate-800 rounded-lg px-3 py-2">
+                            <span className="text-slate-200">
+                              {rent.bike.name}{rent.bike.externalId ? ` (ID: ${rent.bike.externalId})` : ''}
+                              <span className="text-slate-400"> · {rent.user.name} · {rent.user.phone}</span>
+                            </span>
+                            <ContactLinks user={rent.user} />
+                          </li>
+                        ))}
+                        {(day.returningBatteries ?? []).map((rent) => (
+                          <li key={`exp-a-${rent.id}`} className="flex items-center justify-between gap-3 text-sm border border-indigo-900/50 rounded-lg px-3 py-2">
+                            <span className="text-slate-200">
+                              🔋 АКБ {rent.battery.name}{rent.battery.serialNumber ? ` (№${rent.battery.serialNumber})` : ''}
+                              <span className="text-slate-400"> · {rent.user.name} · {rent.user.phone}</span>
+                            </span>
+                            <ContactLinks user={rent.user} />
+                          </li>
+                        ))}
+                      </ul>
                     )}
                   </div>
-                ))}
-              </div>
-            </div>
+                );
+              })()}
+            </>
           )}
         </section>
 
         <section className="bg-slate-900/50 border border-slate-800 rounded-xl p-6 mb-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
             <h2 className="text-lg font-semibold text-slate-200">Финансы</h2>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
-                onClick={() => setDays(7)}
+                onClick={() => selectPresetDays(7)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                  days === 7
+                  !customPeriod && days === 7
                     ? 'bg-amber-500 text-slate-950'
                     : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                 }`}
@@ -1649,15 +1854,40 @@ export default function DispatchPage() {
                 7 дней
               </button>
               <button
-                onClick={() => setDays(30)}
+                onClick={() => selectPresetDays(30)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                  days === 30
+                  !customPeriod && days === 30
                     ? 'bg-amber-500 text-slate-950'
                     : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                 }`}
               >
                 30 дней
               </button>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="date"
+                  value={customFrom}
+                  onChange={(e) => setCustomFrom(e.target.value)}
+                  className="px-2 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-amber-500 [color-scheme:dark]"
+                />
+                <span className="text-slate-500 text-xs">—</span>
+                <input
+                  type="date"
+                  value={customTo}
+                  onChange={(e) => setCustomTo(e.target.value)}
+                  className="px-2 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-amber-500 [color-scheme:dark]"
+                />
+                <button
+                  onClick={applyCustomPeriod}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    customPeriod
+                      ? 'bg-amber-500 text-slate-950'
+                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  Показать
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1684,7 +1914,7 @@ export default function DispatchPage() {
             <div className="mb-8 bg-slate-950/50 border border-slate-800 rounded-xl p-4 space-y-4">
               {Object.keys(data.stats.incomeByMethod).length > 0 && (
                 <div>
-                  <h3 className="text-sm font-semibold text-slate-200 mb-3">Доходы по способам оплаты за {days} дн.</h3>
+                  <h3 className="text-sm font-semibold text-slate-200 mb-3">Доходы по способам оплаты за {periodDaysLabel} дн.</h3>
                   <div className="flex flex-wrap gap-3">
                     {['CASH', 'SBP', 'CARD', 'TRANSFER', 'NONE']
                       .filter((m) => (data.stats.incomeByMethod[m] ?? 0) > 0)
@@ -1706,7 +1936,7 @@ export default function DispatchPage() {
               )}
               {Object.keys(data.stats.expenseByCategory ?? {}).length > 0 && (
                 <div>
-                  <h3 className="text-sm font-semibold text-slate-200 mb-3">Расходы по категориям за {days} дн.</h3>
+                  <h3 className="text-sm font-semibold text-slate-200 mb-3">Расходы по категориям за {periodDaysLabel} дн.</h3>
                   <div className="flex flex-wrap gap-3">
                     {CATEGORY_ORDER
                       .filter((c) => (data.stats.expenseByCategory[c] ?? 0) > 0)
@@ -1731,18 +1961,36 @@ export default function DispatchPage() {
             <div className="lg:col-span-2 bg-slate-950/50 border border-slate-800 rounded-xl p-4">
               <div className="flex items-center justify-between gap-4 mb-4">
                 <h3 className="text-sm font-semibold text-slate-200">Выручка по дням</h3>
-                <div className="flex gap-3 text-[10px] text-slate-400">
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-1.5 text-[10px] text-slate-400 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={hideEmptyRevenueDays}
+                      onChange={(e) => setHideEmptyRevenueDays(e.target.checked)}
+                      className="accent-amber-500"
+                    />
+                    Скрыть пустые
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setRevenueChartCollapsed((v) => !v)}
+                    className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px] transition-colors"
+                  >
+                    {revenueChartCollapsed ? 'Развернуть' : 'Свернуть'}
+                  </button>
+                </div>
+              </div>
+
+              {!revenueChartCollapsed && (
+                <div className="flex flex-wrap gap-3 text-[10px] text-slate-400 mb-3">
                   <span className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-amber-500" /> Всего
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-sky-500" /> Аренда байков
+                    <span className="w-2 h-2 rounded-full bg-sky-500" /> Аренда
                   </span>
                   <span className="flex items-center gap-1">
                     <span className="w-2 h-2 rounded-full bg-indigo-400" /> АКБ
                   </span>
                   <span className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500" /> Прочие доходы
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" /> Прочее
                   </span>
                   <span className="flex items-center gap-1">
                     <span className="w-2 h-2 rounded-full bg-cyan-500" /> Выкупы
@@ -1750,75 +1998,77 @@ export default function DispatchPage() {
                   <span className="flex items-center gap-1">
                     <span className="w-2 h-2 rounded-full bg-rose-500" /> Расходы
                   </span>
+                  <span className="text-slate-500 ml-auto">клик по дню — детализация</span>
                 </div>
-              </div>
+              )}
 
               {loading ? (
                 <p className="text-slate-400 text-sm">Загрузка...</p>
               ) : data && data.revenueByDay.length === 0 ? (
                 <p className="text-slate-400 text-sm">Нет данных за период</p>
-              ) : (
-                <div className="space-y-2">
-                  {data?.revenueByDay.map((day) => (
-                    <div key={day.date} className="flex items-center gap-3 text-sm">
-                      <div className="w-14 shrink-0 text-xs text-slate-400">{formatShortDay(day.date)}</div>
-                      <div className="flex-1">
-                        <div className="h-3 bg-slate-800 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-amber-500 rounded-full"
-                            style={{ width: `${((day.total ?? 0) / maxRevenue) * 100}%` }}
-                          />
+              ) : revenueChartCollapsed ? null : (
+                <div className="space-y-1.5">
+                  {data?.revenueByDay
+                    .filter((day) =>
+                      !hideEmptyRevenueDays ||
+                      (day.total ?? 0) > 0 || (day.expense ?? 0) > 0
+                    )
+                    .map((day) => {
+                      const total = day.total ?? 0;
+                      const seg = (v: number | undefined) =>
+                        `${((v ?? 0) / maxRevenue) * 100}%`;
+                      const isExpanded = expandedRevenueDay === day.date;
+                      return (
+                        <div key={day.date}>
+                          <button
+                            type="button"
+                            onClick={() => setExpandedRevenueDay(isExpanded ? null : day.date)}
+                            className={`w-full flex items-center gap-3 text-sm rounded-lg px-1 py-1 transition-colors cursor-pointer ${
+                              isExpanded ? 'bg-slate-900' : 'hover:bg-slate-900/60'
+                            }`}
+                          >
+                            <div className="w-14 shrink-0 text-xs text-slate-400 text-left">{formatShortDay(day.date)}</div>
+                            <div className="flex-1">
+                              <div className="h-3 bg-slate-800 rounded-full overflow-hidden flex" title={`Всего: ${formatMoney(total)}`}>
+                                {(day.revenue ?? 0) > 0 && (
+                                  <div className="h-full bg-sky-500" style={{ width: seg(day.revenue) }} />
+                                )}
+                                {(day.battery ?? 0) > 0 && (
+                                  <div className="h-full bg-indigo-400" style={{ width: seg(day.battery) }} />
+                                )}
+                                {(day.misc ?? 0) > 0 && (
+                                  <div className="h-full bg-emerald-500" style={{ width: seg(day.misc) }} />
+                                )}
+                                {(day.buyout ?? 0) > 0 && (
+                                  <div className="h-full bg-cyan-500" style={{ width: seg(day.buyout) }} />
+                                )}
+                              </div>
+                              {(day.expense ?? 0) > 0 && (
+                                <div className="h-1 bg-slate-800 rounded-full overflow-hidden mt-0.5">
+                                  <div
+                                    className="h-full bg-rose-500"
+                                    style={{ width: `${Math.min(((day.expense ?? 0) / maxRevenue) * 100, 100)}%` }}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                            <div className="w-24 text-right text-xs text-slate-200 font-medium">
+                              {formatMoney(total)}
+                            </div>
+                          </button>
+                          {isExpanded && (
+                            <div className="ml-16 mr-28 mt-1 mb-2 text-xs text-slate-400 space-y-0.5 border-l-2 border-slate-700 pl-3">
+                              {(day.revenue ?? 0) > 0 && <div><span className="text-sky-400">Аренда:</span> {formatMoney(day.revenue!)}</div>}
+                              {(day.battery ?? 0) > 0 && <div><span className="text-indigo-300">АКБ:</span> {formatMoney(day.battery!)}</div>}
+                              {(day.misc ?? 0) > 0 && <div><span className="text-emerald-400">Прочие доходы:</span> {formatMoney(day.misc!)}</div>}
+                              {(day.buyout ?? 0) > 0 && <div><span className="text-cyan-400">Выкупы:</span> {formatMoney(day.buyout!)}</div>}
+                              {(day.expense ?? 0) > 0 && <div><span className="text-rose-400">Расходы:</span> −{formatMoney(day.expense!)}</div>}
+                              <div className="text-slate-300 font-medium pt-0.5">Итого доход: {formatMoney(total)}</div>
+                            </div>
+                          )}
                         </div>
-                        {((day.revenue ?? 0) > 0 || (day.battery ?? 0) > 0 || (day.misc ?? 0) > 0 || (day.expense ?? 0) > 0 || (day.buyout ?? 0) > 0) && (
-                          <div className="mt-1 space-y-0.5">
-                            {(day.revenue ?? 0) > 0 && (
-                              <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
-                                <div
-                                  className="h-full bg-sky-500 rounded-full"
-                                  style={{ width: `${((day.revenue ?? 0) / maxRevenue) * 100}%` }}
-                                />
-                              </div>
-                            )}
-                            {(day.battery ?? 0) > 0 && (
-                              <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
-                                <div
-                                  className="h-full bg-indigo-400 rounded-full"
-                                  style={{ width: `${((day.battery ?? 0) / maxRevenue) * 100}%` }}
-                                />
-                              </div>
-                            )}
-                            {(day.misc ?? 0) > 0 && (
-                              <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
-                                <div
-                                  className="h-full bg-emerald-500 rounded-full"
-                                  style={{ width: `${((day.misc ?? 0) / maxRevenue) * 100}%` }}
-                                />
-                              </div>
-                            )}
-                            {(day.buyout ?? 0) > 0 && (
-                              <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
-                                <div
-                                  className="h-full bg-cyan-500 rounded-full"
-                                  style={{ width: `${((day.buyout ?? 0) / maxRevenue) * 100}%` }}
-                                />
-                              </div>
-                            )}
-                            {(day.expense ?? 0) > 0 && (
-                              <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
-                                <div
-                                  className="h-full bg-rose-500 rounded-full"
-                                  style={{ width: `${((day.expense ?? 0) / maxRevenue) * 100}%` }}
-                                />
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                      <div className="w-24 text-right text-xs text-slate-200 font-medium">
-                        {formatMoney(day.total ?? 0)}
-                      </div>
-                    </div>
-                  ))}
+                      );
+                    })}
                 </div>
               )}
             </div>
@@ -1833,14 +2083,19 @@ export default function DispatchPage() {
               ) : (
                 <ul className="space-y-3">
                   {data?.topBikes.map((bike, index) => (
-                    <li key={bike.name} className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2">
-                        <span className="w-5 h-5 rounded bg-slate-800 text-slate-400 text-xs flex items-center justify-center">
+                    <li key={bike.id} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="w-5 h-5 rounded bg-slate-800 text-slate-400 text-xs flex items-center justify-center shrink-0">
                           {index + 1}
                         </span>
-                        <span className="text-slate-200">{bike.name}</span>
+                        <span className="text-slate-200 truncate">
+                          {bike.name}
+                          {bike.externalId && (
+                            <span className="text-xs text-slate-500"> · ID: {bike.externalId}</span>
+                          )}
+                        </span>
                       </div>
-                      <span className="font-medium text-amber-500">{formatMoney(bike.revenue)}</span>
+                      <span className="font-medium text-amber-500 shrink-0">{formatMoney(bike.revenue)}</span>
                     </li>
                   ))}
                 </ul>
@@ -1848,7 +2103,7 @@ export default function DispatchPage() {
             </div>
 
             <div className="bg-slate-950/50 border border-slate-800 rounded-xl p-4">
-              <h3 className="text-sm font-semibold text-slate-200 mb-4">Топ клиентов за {days} дн.</h3>
+              <h3 className="text-sm font-semibold text-slate-200 mb-4">Топ клиентов за {periodDaysLabel} дн.</h3>
 
               {loading ? (
                 <p className="text-slate-400 text-sm">Загрузка...</p>

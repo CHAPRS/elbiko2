@@ -5,7 +5,7 @@ import { createMiscTransactionSchema } from '@/lib/validation';
 export const dynamic = 'force-dynamic';
 
 // GET - Список прочих операций (доходы/расходы вне аренды)
-// Параметры: kind=INCOME|EXPENSE, from, to (ISO-даты), bikeId, take
+// Параметры: kind=INCOME|EXPENSE, from, to (ISO-даты), bikeId, category, take
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -13,6 +13,7 @@ export async function GET(request: Request) {
     const from = searchParams.get('from');
     const to = searchParams.get('to');
     const bikeId = searchParams.get('bikeId');
+    const category = searchParams.get('category');
     const takeParam = Number(searchParams.get('take'));
     const take = Number.isFinite(takeParam) && takeParam > 0
       ? Math.min(Math.floor(takeParam), 500)
@@ -45,6 +46,11 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: 'Некорректный bikeId' }, { status: 400 });
       }
       where.bikeId = id;
+    }
+    if (category === 'NONE') {
+      where.category = null;
+    } else if (category) {
+      where.category = category;
     }
 
     const items = await prisma.miscTransaction.findMany({

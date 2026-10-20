@@ -27,13 +27,43 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const daysParam = searchParams.get('days');
-    let days = daysParam && !isNaN(Number(daysParam)) ? Number(daysParam) : 7;
-    days = Math.max(1, Math.min(days, 90));
+    const fromParam = searchParams.get('from');
+    const toParam = searchParams.get('to');
 
     const now = new Date();
     const today = startOfDay(now);
-    const periodStart = new Date(today);
-    periodStart.setDate(periodStart.getDate() - (days - 1));
+
+    let periodStart: Date;
+    let periodEnd: Date;
+    const fromDate = fromParam ? new Date(fromParam) : null;
+    const toDate = toParam ? new Date(toParam) : null;
+
+    if (
+      fromDate && !isNaN(fromDate.getTime()) &&
+      toDate && !isNaN(toDate.getTime())
+    ) {
+      // Произвольный период: inclusive, лимит 366 дней
+      periodStart = startOfDay(fromDate);
+      periodEnd = endOfDay(toDate);
+      if (periodEnd < periodStart) {
+        periodStart = startOfDay(toDate);
+        periodEnd = endOfDay(fromDate);
+      }
+      const maxStart = new Date(periodEnd);
+      maxStart.setDate(maxStart.getDate() - 365);
+      if (periodStart < maxStart) periodStart = startOfDay(maxStart);
+    } else {
+      let days = daysParam && !isNaN(Number(daysParam)) ? Number(daysParam) : 7;
+      days = Math.max(1, Math.min(days, 366));
+      periodStart = new Date(today);
+      periodStart.setDate(periodStart.getDate() - (days - 1));
+      periodEnd = endOfDay(now);
+    }
+
+    const days = Math.max(
+      1,
+      Math.ceil((startOfDay(periodEnd).getTime() - periodStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
+    );
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
     const dayAfterTomorrow = new Date(tomorrow);
@@ -135,7 +165,7 @@ export async function GET(request: Request) {
       prisma.rentTransaction.findMany({
         where: {
           type: { in: ['PAYMENT', 'REFUND'] },
-          createdAt: { gte: periodStart },
+          createdAt: { gte: periodStart, lte: periodEnd },
         },
         select: {
           type: true,
@@ -149,7 +179,7 @@ export async function GET(request: Request) {
         _sum: { amount: true },
         where: {
           status: { in: ['FAILED', 'REFUNDED'] },
-          updatedAt: { gte: periodStart },
+          updatedAt: { gte: periodStart, lte: periodEnd },
         },
       }),
       prisma.rent.groupBy({
@@ -159,7 +189,7 @@ export async function GET(request: Request) {
       }),
       prisma.miscTransaction.findMany({
         where: {
-          createdAt: { gte: periodStart },
+          createdAt: { gte: periodStart, lte: periodEnd },
         },
         select: {
           kind: true,
@@ -179,7 +209,7 @@ export async function GET(request: Request) {
       prisma.buyoutPayment.findMany({
         where: {
           status: 'PAID',
-          paidAt: { gte: periodStart },
+          paidAt: { gte: periodStart, lte: periodEnd },
         },
         select: {
           amount: true,
@@ -232,7 +262,7 @@ export async function GET(request: Request) {
       prisma.batteryRentTransaction.findMany({
         where: {
           type: { in: ['PAYMENT', 'REFUND'] },
-          createdAt: { gte: periodStart },
+          createdAt: { gte: periodStart, lte: periodEnd },
         },
         select: {
           type: true,
@@ -435,12 +465,17 @@ export async function GET(request: Request) {
       .forEach((tx) => addMethodSum(tx.method, Number(tx.amount)));
     buyoutPaidPeriod.forEach((bp) => addMethodSum(bp.method, Number(bp.amount)));
 
-    const bikeNameMap = new Map(bikes.map((b) => [b.id, b.name]));
+    const bikeById = new Map(bikes.map((b) => [b.id, b]));
     const topBikes = rentRevenueByBike
-      .map((r) => ({
-        name: bikeNameMap.get(r.bikeId) || `Байк #${r.bikeId}`,
-        revenue: Number(r._sum.totalPrice ?? 0),
-      }))
+      .map((r) => {
+        const bike = bikeById.get(r.bikeId);
+        return {
+          id: r.bikeId,
+          externalId: bike?.externalId ?? null,
+          name: bike?.name || `Байк #${r.bikeId}`,
+          revenue: Number(r._sum.totalPrice ?? 0),
+        };
+      })
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 5);
 
@@ -464,6 +499,7 @@ export async function GET(request: Request) {
       dayOfWeek: string;
       freeCount: number;
       returning: typeof activeRents;
+      returningBatteries: typeof batteryRents;
     }[] = [];
 
     for (let i = 0; i < timelineDays; i++) {
@@ -473,6 +509,11 @@ export async function GET(request: Request) {
       nextDay.setDate(nextDay.getDate() + 1);
 
       const returning = activeRents.filter((r) => {
+        const end = startOfDay(new Date(r.endDate));
+        return end.getTime() === day.getTime();
+      });
+
+      const returningBatteries = batteryRents.filter((r) => {
         const end = startOfDay(new Date(r.endDate));
         return end.getTime() === day.getTime();
       });
@@ -494,6 +535,7 @@ export async function GET(request: Request) {
         dayOfWeek: day.toLocaleDateString('ru-RU', { weekday: 'short' }),
         freeCount,
         returning,
+        returningBatteries,
       });
     }
 
@@ -540,6 +582,7 @@ export async function GET(request: Request) {
     };
 
     return NextResponse.json({
+      period: { days, from: localDayKey(periodStart), to: localDayKey(periodEnd) },
       stats,
       newLeads,
       activeRents,

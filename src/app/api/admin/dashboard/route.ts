@@ -242,7 +242,7 @@ export async function GET(request: Request) {
         take: 30,
       }),
       prisma.part.findMany({
-        select: { stockQty: true, lastPrice: true },
+        select: { stockQty: true, lastPrice: true, minQty: true },
       }),
       prisma.battery.findMany({
         orderBy: { name: 'asc' },
@@ -448,6 +448,9 @@ export async function GET(request: Request) {
     const partsValue = Math.round(
       partsStock.reduce((sum, p) => sum + Number(p.stockQty) * Number(p.lastPrice ?? 0), 0) * 100
     ) / 100;
+    const partsLowStock = partsStock.filter(
+      (p) => p.minQty != null && Number(p.stockQty) <= Number(p.minQty)
+    ).length;
 
     const incomeByMethod: Record<string, number> = {};
     const addMethodSum = (method: string | null, amount: number) => {
@@ -571,6 +574,7 @@ export async function GET(request: Request) {
       pendingBuyoutTotal,
       partsPositions,
       partsValue,
+      partsLowStock,
       totalBatteries: batteries.length,
       freeBatteries: freeBatteries.length,
       activeBatteryRents: batteryRents.length,

@@ -79,6 +79,7 @@ export default function PartsPage() {
   const [historyId, setHistoryId] = useState<number | null>(null);
   const [history, setHistory] = useState<PartTransaction[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [lowOnly, setLowOnly] = useState(false);
 
   const fetchParts = async () => {
     try {
@@ -244,6 +245,9 @@ export default function PartsPage() {
   };
 
   const stockValue = (p: Part) => Number(p.stockQty) * Number(p.lastPrice ?? 0);
+  const isLow = (p: Part) => p.minQty != null && Number(p.stockQty) <= Number(p.minQty);
+  const lowParts = parts.filter(isLow);
+  const visibleParts = lowOnly ? lowParts : parts;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-6 font-sans">
@@ -287,6 +291,24 @@ export default function PartsPage() {
           </div>
         </div>
 
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <button
+            onClick={() => setLowOnly(!lowOnly)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              lowOnly
+                ? 'bg-rose-500 text-slate-950'
+                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+            }`}
+          >
+            Заканчивается{lowParts.length > 0 ? ` (${lowParts.length})` : ''}
+          </button>
+          {lowOnly && (
+            <span className="text-xs text-slate-500">
+              показаны позиции, где остаток не выше минимального
+            </span>
+          )}
+        </div>
+
         <div className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -304,10 +326,14 @@ export default function PartsPage() {
               <tbody className="divide-y divide-slate-800">
                 {loading ? (
                   <tr><td colSpan={7} className="p-8 text-center text-slate-400">Загрузка...</td></tr>
-                ) : parts.length === 0 ? (
-                  <tr><td colSpan={7} className="p-8 text-center text-slate-400">Склад пуст — добавьте первую позицию</td></tr>
+                ) : visibleParts.length === 0 ? (
+                  <tr><td colSpan={7} className="p-8 text-center text-slate-400">
+                    {parts.length === 0
+                      ? 'Склад пуст — добавьте первую позицию'
+                      : 'Нет позиций ниже минимального остатка'}
+                  </td></tr>
                 ) : (
-                  parts.map((p) => (
+                  visibleParts.map((p) => (
                     <React.Fragment key={p.id}>
                       <tr className="hover:bg-slate-800/30">
                         <td className="p-4">

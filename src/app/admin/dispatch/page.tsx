@@ -45,6 +45,7 @@ interface Stats {
   pendingBuyoutTotal: number;
   partsPositions: number;
   partsValue: number;
+  partsLowStock: number;
   incomeByMethod: Record<string, number>;
   expenseByCategory: Record<string, number>;
 }
@@ -862,7 +863,7 @@ export default function DispatchPage() {
         { label: `Расходы за ${periodDaysLabel} дн.`, value: data.stats.expensesPeriod, color: 'text-rose-300' },
         { label: `Прибыль за ${periodDaysLabel} дн.`, value: data.stats.netProfitPeriod, color: 'text-lime-400' },
         { label: 'Осталось по выкупам', value: data.stats.pendingBuyoutTotal, color: 'text-violet-400' },
-        { label: `Склад: ${data.stats.partsPositions} поз.`, value: data.stats.partsValue, color: 'text-orange-300' },
+        { label: `Склад: ${data.stats.partsPositions} поз.${data.stats.partsLowStock > 0 ? ` · мало: ${data.stats.partsLowStock}` : ''}`, value: data.stats.partsValue, color: data.stats.partsLowStock > 0 ? 'text-rose-300' : 'text-orange-300' },
       ]
     : [];
 

@@ -44,7 +44,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { name, phone, bikeId, bikeName, message, startDate, endDate } = parsed.data;
+    const { name, phone, bikeId, bikeName, itemType, batteryId, message, startDate, endDate } = parsed.data;
+
+    const isBattery = itemType === 'BATTERY';
 
     let rentDays: number | undefined = undefined;
     let totalPrice: number | undefined = undefined;
@@ -55,7 +57,16 @@ export async function POST(request: NextRequest) {
       }
       rentDays = daysBetween(startDate, endDate);
 
-      if (bikeId) {
+      if (isBattery && batteryId) {
+        const battery = await prisma.battery.findUnique({ where: { id: batteryId } });
+        if (battery) {
+          const dayPrice = Number(battery.pricePerDay);
+          const weekPrice = battery.pricePerWeek ? Number(battery.pricePerWeek) : null;
+          totalPrice = weekPrice && rentDays >= 7
+            ? Math.floor(rentDays / 7) * weekPrice + (rentDays % 7) * dayPrice
+            : dayPrice * rentDays;
+        }
+      } else if (bikeId) {
         const bike = await prisma.bike.findUnique({ where: { id: bikeId } });
         if (bike) {
           totalPrice = Number(bike.pricePerDay) * rentDays;
@@ -68,7 +79,9 @@ export async function POST(request: NextRequest) {
         name,
         phone,
         bikeName: bikeName ?? null,
-        bikeId: bikeId ?? null,
+        bikeId: isBattery ? null : (bikeId ?? null),
+        itemType: isBattery ? 'BATTERY' : 'BIKE',
+        batteryId: isBattery ? (batteryId ?? null) : null,
         message: message ?? null,
         startDate: startDate ? new Date(startDate) : null,
         endDate: endDate ? new Date(endDate) : null,
@@ -91,7 +104,9 @@ export async function POST(request: NextRequest) {
       '────────────────────────',
       `👤 Клиент: ${escapeHtml(lead.name)}`,
       `📞 Телефон: ${escapeHtml(lead.phone)}`,
-      `🚲 Велосипед: ${escapeHtml(lead.bikeName || 'не выбран')}`,
+      lead.itemType === 'BATTERY'
+        ? `🔋 Аккумулятор: ${escapeHtml(lead.bikeName || 'не выбран')}`
+        : `🚲 Велосипед: ${escapeHtml(lead.bikeName || 'не выбран')}`,
       rentDays ? `📅 Дней: ${rentDays}` : null,
       totalPrice ? `💰 Итого: ${totalPrice} ₽` : null,
       lead.message ? `📝 Сообщение: ${escapeHtml(lead.message)}` : null,

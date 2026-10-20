@@ -17,13 +17,16 @@ import Header from '@/components/Header';
 import { ContactModal } from '@/components/ContactModal';
 import { BookingModal } from '@/components/BookingModal';
 import CompactCatalog from '@/components/CompactCatalog';
+import BatteryCatalog from '@/components/BatteryCatalog';
 import { useRentStore } from '@/store/useRentStore';
 import { getHeroFromDB, getTariffsFromDB, getFeaturesFromDB, getStepsFromDB } from '@/lib/contentQueries';
 import { CONTACTS, SHOW_REPAIR_SECTION, FAQ_ITEMS } from '@/app/constants';
 
 export default function HomePage() {
   const [bikes, setBikes] = useState<any[]>([]);
+  const [batteries, setBatteries] = useState<any[]>([]);
   const [selectedBike, setSelectedBike] = useState<any | null>(null);
+  const [selectedBattery, setSelectedBattery] = useState<any | null>(null);
   const [faqOpen, setFaqOpen] = useState<number | null>(null);
   const { toggleContactModal, toggleAuthModal, toggleBookingModal } = useRentStore();
   
@@ -46,6 +49,15 @@ export default function HomePage() {
       .then(data => {
         if (Array.isArray(data)) {
           setBikes(data);
+        }
+      })
+      .catch(err => console.error(err));
+
+    fetch('/api/batteries')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setBatteries(data);
         }
       })
       .catch(err => console.error(err));
@@ -128,6 +140,9 @@ export default function HomePage() {
 
       {/* Компактный каталог после преимуществ */}
       <CompactCatalog bikes={bikes} onBook={(b) => setSelectedBike(b)} />
+
+      {/* Аренда аккумуляторов — под каталогом байков */}
+      <BatteryCatalog batteries={batteries} onBook={(b) => setSelectedBattery(b)} />
 
       {/* Тарифы */}
       {tariffsData.length > 0 ? <TariffsDB tariffs={tariffsData} /> : <Tariffs />}
@@ -357,6 +372,15 @@ export default function HomePage() {
         <OrderModal 
           bike={selectedBike} 
           onClose={() => setSelectedBike(null)} 
+        />
+      )}
+
+      {/* Модалка заказа АКБ */}
+      {selectedBattery && (
+        <OrderModal 
+          bike={selectedBattery}
+          itemType="BATTERY"
+          onClose={() => setSelectedBattery(null)} 
         />
       )}
 

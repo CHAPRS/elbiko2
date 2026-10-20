@@ -11,6 +11,8 @@ export interface Battery {
   voltage?: number | null;
   status: string; // FREE, RENTED, MAINTENANCE, BLOCKED
   pricePerDay: number | string;
+  pricePerWeek?: number | string | null;
+  imageUrl?: string | null;
   comment?: string | null;
 }
 
@@ -98,7 +100,20 @@ export function BatterySection({ batteries, rents, onChanged, onError, onNotice 
   const [newCapacity, setNewCapacity] = useState('');
   const [newVoltage, setNewVoltage] = useState('');
   const [newPrice, setNewPrice] = useState('');
+  const [newPriceWeek, setNewPriceWeek] = useState('');
+  const [newImage, setNewImage] = useState('');
   const [newSaving, setNewSaving] = useState(false);
+
+  const [editBattery, setEditBattery] = useState<Battery | null>(null);
+  const [ebName, setEbName] = useState('');
+  const [ebSerial, setEbSerial] = useState('');
+  const [ebVoltage, setEbVoltage] = useState('');
+  const [ebCapacity, setEbCapacity] = useState('');
+  const [ebPriceDay, setEbPriceDay] = useState('');
+  const [ebPriceWeek, setEbPriceWeek] = useState('');
+  const [ebImage, setEbImage] = useState('');
+  const [ebComment, setEbComment] = useState('');
+  const [ebSaving, setEbSaving] = useState(false);
 
   const [payRent, setPayRent] = useState<BatteryRent | null>(null);
   const [payAmount, setPayAmount] = useState('');
@@ -194,6 +209,8 @@ export function BatterySection({ batteries, rents, onChanged, onError, onNotice 
           capacityAh: newCapacity ? Number(newCapacity) : null,
           voltage: newVoltage ? Number(newVoltage) : null,
           pricePerDay: newPrice ? Number(newPrice) : 0,
+          pricePerWeek: newPriceWeek ? Number(newPriceWeek) : null,
+          imageUrl: newImage.trim() || null,
         }),
       });
       const json = await res.json();
@@ -207,11 +224,62 @@ export function BatterySection({ batteries, rents, onChanged, onError, onNotice 
       setNewCapacity('');
       setNewVoltage('');
       setNewPrice('');
+      setNewPriceWeek('');
+      setNewImage('');
       onChanged();
     } catch {
       onError('Нет связи с сервером');
     } finally {
       setNewSaving(false);
+    }
+  };
+
+  const openEditBattery = (b: Battery) => {
+    setEditBattery(b);
+    setEbName(b.name);
+    setEbSerial(b.serialNumber ?? '');
+    setEbVoltage(b.voltage ? String(b.voltage) : '');
+    setEbCapacity(b.capacityAh ? String(b.capacityAh) : '');
+    setEbPriceDay(String(Number(b.pricePerDay) || ''));
+    setEbPriceWeek(b.pricePerWeek ? String(Number(b.pricePerWeek)) : '');
+    setEbImage(b.imageUrl ?? '');
+    setEbComment(b.comment ?? '');
+  };
+
+  const submitEditBattery = async () => {
+    if (!editBattery) return;
+    if (!ebName.trim()) {
+      onError('Укажите название аккумулятора');
+      return;
+    }
+    setEbSaving(true);
+    try {
+      const res = await fetch(`/api/admin/batteries/${editBattery.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: ebName.trim(),
+          serialNumber: ebSerial.trim() || null,
+          voltage: ebVoltage ? Number(ebVoltage) : null,
+          capacityAh: ebCapacity ? Number(ebCapacity) : null,
+          pricePerDay: ebPriceDay ? Number(ebPriceDay) : 0,
+          pricePerWeek: ebPriceWeek ? Number(ebPriceWeek) : null,
+          imageUrl: ebImage.trim() || null,
+          comment: ebComment.trim() || null,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        onError(json.error || 'Не удалось сохранить аккумулятор');
+        return;
+      }
+      onNotice(`Аккумулятор «${json.name}» обновлён`);
+      setEditBattery(null);
+      onChanged();
+    } catch {
+      onError('Нет связи с сервером');
+    } finally {
+      setEbSaving(false);
     }
   };
 
@@ -632,6 +700,7 @@ export function BatterySection({ batteries, rents, onChanged, onError, onNotice 
                         b.voltage ? `${b.voltage}В` : null,
                         b.capacityAh ? `${Number(b.capacityAh)} Ah` : null,
                         `${Number(b.pricePerDay)} ₽/сут`,
+                        b.pricePerWeek ? `${Number(b.pricePerWeek)} ₽/нед` : null,
                       ].filter(Boolean).join(' · ')}
                     </p>
                   </div>
@@ -670,6 +739,13 @@ export function BatterySection({ batteries, rents, onChanged, onError, onNotice 
                         )}
                         <button
                           type="button"
+                          onClick={() => openEditBattery(b)}
+                          className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs transition-colors"
+                        >
+                          Ред.
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => deleteBattery(b)}
                           className="px-2 py-1 bg-slate-800 hover:bg-rose-900 text-slate-300 rounded text-xs transition-colors"
                         >
@@ -702,7 +778,7 @@ export function BatterySection({ batteries, rents, onChanged, onError, onNotice 
                 className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500"
                 placeholder="Серийный номер (необяз.)"
               />
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-4 gap-2">
                 <input
                   type="number"
                   min={0}
@@ -727,6 +803,23 @@ export function BatterySection({ batteries, rents, onChanged, onError, onNotice 
                   className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500"
                   placeholder="₽/сут"
                 />
+                <input
+                  type="number"
+                  min={0}
+                  value={newPriceWeek}
+                  onChange={(e) => setNewPriceWeek(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500"
+                  placeholder="₽/нед"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <input
+                  type="text"
+                  value={newImage}
+                  onChange={(e) => setNewImage(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500"
+                  placeholder="URL фото для каталога, напр. /images/battery-60v.webp (необяз.)"
+                />
               </div>
               <div className="md:col-span-2">
                 <button
@@ -742,6 +835,97 @@ export function BatterySection({ batteries, rents, onChanged, onError, onNotice 
           </div>
         </div>
       </div>
+
+      {editBattery && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
+            <h2 className="mb-4 text-lg font-semibold text-slate-100">
+              Редактировать «{editBattery.name}»
+            </h2>
+            <div className="space-y-3">
+              <input
+                type="text"
+                value={ebName}
+                onChange={(e) => setEbName(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500"
+                placeholder="Название"
+              />
+              <input
+                type="text"
+                value={ebSerial}
+                onChange={(e) => setEbSerial(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500"
+                placeholder="Серийный номер (необяз.)"
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="number"
+                  min={0}
+                  value={ebVoltage}
+                  onChange={(e) => setEbVoltage(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500"
+                  placeholder="Напряжение, В"
+                />
+                <input
+                  type="number"
+                  min={0}
+                  value={ebCapacity}
+                  onChange={(e) => setEbCapacity(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500"
+                  placeholder="Ёмкость, Ah"
+                />
+                <input
+                  type="number"
+                  min={0}
+                  value={ebPriceDay}
+                  onChange={(e) => setEbPriceDay(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500"
+                  placeholder="₽/сут"
+                />
+                <input
+                  type="number"
+                  min={0}
+                  value={ebPriceWeek}
+                  onChange={(e) => setEbPriceWeek(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500"
+                  placeholder="₽/нед (необяз.)"
+                />
+              </div>
+              <input
+                type="text"
+                value={ebImage}
+                onChange={(e) => setEbImage(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500"
+                placeholder="URL фото, напр. /images/battery-60v.webp (необяз.)"
+              />
+              <input
+                type="text"
+                value={ebComment}
+                onChange={(e) => setEbComment(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500"
+                placeholder="Комментарий (необяз.)"
+              />
+            </div>
+            <div className="mt-5 flex gap-2">
+              <button
+                type="button"
+                onClick={submitEditBattery}
+                disabled={ebSaving}
+                className="flex-1 px-4 py-2 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors"
+              >
+                {ebSaving ? 'Сохраняем...' : 'Сохранить'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditBattery(null)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm transition-colors"
+              >
+                Отмена
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {payRent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">

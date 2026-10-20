@@ -34,7 +34,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { name, serialNumber, capacityAh, voltage, pricePerDay, purchasePrice, purchaseDate, comment } = body;
+    const { name, serialNumber, capacityAh, voltage, pricePerDay, pricePerWeek, purchasePrice, purchaseDate, imageUrl, comment } = body;
 
     if (!name || !String(name).trim()) {
       return NextResponse.json(
@@ -48,10 +48,11 @@ export async function POST(request: Request) {
 
     const capacity = parseNum(capacityAh);
     const price = parseNum(pricePerDay);
+    const priceWeek = parseNum(pricePerWeek);
     const purchase = parseNum(purchasePrice);
     const volts = voltage === undefined || voltage === null || voltage === '' ? null : Number(voltage);
 
-    for (const [label, v] of [['Ёмкость', capacity], ['Цена за день', price], ['Закупочная цена', purchase], ['Напряжение', volts]] as const) {
+    for (const [label, v] of [['Ёмкость', capacity], ['Цена за день', price], ['Цена за неделю', priceWeek], ['Закупочная цена', purchase], ['Напряжение', volts]] as const) {
       if (v !== null && (!Number.isFinite(v) || v < 0)) {
         return NextResponse.json({ error: `Некорректное значение: ${label}` }, { status: 400 });
       }
@@ -64,8 +65,10 @@ export async function POST(request: Request) {
         capacityAh: capacity,
         voltage: volts !== null ? Math.round(volts) : null,
         pricePerDay: price ?? 0,
+        pricePerWeek: priceWeek,
         purchasePrice: purchase,
         purchaseDate: purchaseDate ? new Date(purchaseDate) : null,
+        imageUrl: imageUrl ? String(imageUrl).trim() : null,
         comment: comment ? String(comment).trim() : null,
       },
     });

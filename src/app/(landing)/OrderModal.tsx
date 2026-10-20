@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 
 interface OrderModalProps {
   bike: any;
+  itemType?: 'BIKE' | 'BATTERY';
   onClose: () => void;
 }
 
@@ -10,7 +11,7 @@ function toISODate(d: Date): string {
   return d.toISOString().split('T')[0];
 }
 
-export default function OrderModal({ bike, onClose }: OrderModalProps) {
+export default function OrderModal({ bike, itemType = 'BIKE', onClose }: OrderModalProps) {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [message, setMessage] = useState('');
@@ -51,7 +52,9 @@ export default function OrderModal({ bike, onClose }: OrderModalProps) {
         body: JSON.stringify({
           name: name.trim(),
           phone: phone.trim(),
-          bikeId: bike?.id ?? null,
+          itemType,
+          bikeId: itemType === 'BATTERY' ? null : (bike?.id ?? null),
+          batteryId: itemType === 'BATTERY' ? (bike?.id ?? null) : null,
           bikeName: bike?.name ?? null,
           message: message.trim() || 'Заявка на аренду',
           startDate,
@@ -74,6 +77,16 @@ export default function OrderModal({ bike, onClose }: OrderModalProps) {
   };
 
   const totalDays = Math.max(1, Math.floor((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1);
+
+  const estimate = (() => {
+    if (!bike?.pricePerDay) return null;
+    const dayPrice = Number(bike.pricePerDay);
+    const weekPrice = itemType === 'BATTERY' && bike?.pricePerWeek ? Number(bike.pricePerWeek) : null;
+    if (weekPrice && totalDays >= 7) {
+      return Math.floor(totalDays / 7) * weekPrice + (totalDays % 7) * dayPrice;
+    }
+    return dayPrice * totalDays;
+  })();
 
   if (success) {
     return (
@@ -106,7 +119,9 @@ export default function OrderModal({ bike, onClose }: OrderModalProps) {
           ✕
         </button>
 
-        <h3 className="text-xl font-black text-white mb-2">Бронирование байка</h3>
+        <h3 className="text-xl font-black text-white mb-2">
+          {itemType === 'BATTERY' ? 'Бронирование аккумулятора' : 'Бронирование байка'}
+        </h3>
         <p className="text-xs text-slate-400 mb-6">
           Вы выбрали: <span className="text-yellow-400 font-bold">{bike?.name}{bike?.model ? ` (${bike.model})` : ''}</span>
         </p>
@@ -169,8 +184,8 @@ export default function OrderModal({ bike, onClose }: OrderModalProps) {
 
           <div className="text-xs text-slate-400">
             Выбрано дней: <span className="text-yellow-400 font-bold">{totalDays}</span>
-            {bike?.pricePerDay ? (
-              <span className="ml-2">≈ {Number(bike.pricePerDay) * totalDays} ₽</span>
+            {estimate !== null ? (
+              <span className="ml-2">≈ {estimate} ₽</span>
             ) : null}
           </div>
 

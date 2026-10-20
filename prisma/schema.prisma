@@ -47,8 +47,10 @@ model Battery {
   voltage       Int?     // Напряжение, В
   status        String   @default("FREE") // Статусы: "FREE", "RENTED", "MAINTENANCE", "BLOCKED"
   pricePerDay   Decimal  @default(0.00) @db.Decimal(10, 2) // Цена аренды за день
+  pricePerWeek  Decimal? @db.Decimal(10, 2) // Цена аренды за неделю (если задана — недельная скидка)
   purchasePrice Decimal? @db.Decimal(10, 2) // Закупочная цена
   purchaseDate  DateTime? // Дата покупки
+  imageUrl      String?  // Ссылка на фото аккумулятора для каталога
   comment       String?  @db.Text
 
   rents BatteryRent[]

@@ -55,6 +55,8 @@ export const createLeadSchema = z.object({
   phone: z.string().min(5).max(30),
   bikeName: z.string().max(120).optional().nullable(),
   bikeId: z.number().int().positive().optional().nullable(),
+  itemType: leadItemType.optional(),
+  batteryId: z.number().int().positive().optional().nullable(),
   message: z.string().max(2000).optional().nullable(),
   startDate: z.coerce.date().optional().nullable(),
   endDate: z.coerce.date().optional().nullable(),

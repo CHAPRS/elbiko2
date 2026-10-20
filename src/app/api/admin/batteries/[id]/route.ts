@@ -9,7 +9,7 @@ export async function PATCH(
   try {
     const id = Number(params.id);
     const body = await request.json();
-    const { name, serialNumber, capacityAh, voltage, status, pricePerDay, purchasePrice, purchaseDate, comment } = body;
+    const { name, serialNumber, capacityAh, voltage, status, pricePerDay, pricePerWeek, purchasePrice, purchaseDate, imageUrl, comment } = body;
 
     const battery = await prisma.battery.findUnique({
       where: { id },
@@ -33,6 +33,7 @@ export async function PATCH(
     }
 
     if (serialNumber !== undefined) data.serialNumber = serialNumber ? String(serialNumber).trim() : null;
+    if (imageUrl !== undefined) data.imageUrl = imageUrl ? String(imageUrl).trim() : null;
     if (comment !== undefined) data.comment = comment ? String(comment).trim() : null;
     if (purchaseDate !== undefined) data.purchaseDate = purchaseDate ? new Date(purchaseDate) : null;
 
@@ -40,6 +41,7 @@ export async function PATCH(
       ['capacityAh', capacityAh],
       ['voltage', voltage],
       ['pricePerDay', pricePerDay],
+      ['pricePerWeek', pricePerWeek],
       ['purchasePrice', purchasePrice],
     ];
     for (const [field, raw] of numFields) {

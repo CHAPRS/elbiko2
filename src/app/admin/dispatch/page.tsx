@@ -1354,6 +1354,15 @@ export default function DispatchPage() {
                   >
                     Показать
                   </button>
+                  <a
+                    href={`/api/admin/finance/export?${[
+                      histFrom ? `from=${histFrom}` : '',
+                      histTo ? `to=${histTo}` : '',
+                    ].filter(Boolean).join('&')}`}
+                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium transition-colors"
+                  >
+                    Скачать CSV
+                  </a>
                 </div>
                 {histLoading ? (
                   <p className="text-slate-400 text-sm">Загрузка...</p>

@@ -569,7 +569,7 @@ export default function RentsPage() {
         )}
 
         {/* Фильтры */}
-        <div className="mb-6 flex gap-4">
+        <div className="mb-6 flex flex-wrap items-center gap-4">
           <button
             onClick={() => setFilter('ALL')}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -610,6 +610,12 @@ export default function RentsPage() {
           >
             Просроченные
           </button>
+          <a
+            href="/api/admin/rents/export"
+            className="ml-auto px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium transition-colors"
+          >
+            Выгрузка CSV
+          </a>
         </div>
 
         {/* Таблица аренд */}

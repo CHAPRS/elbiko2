@@ -1,6 +1,6 @@
 'use client';
 import React, { useState } from 'react';
-import { normalizeImageUrl } from '@/lib/image';
+import { normalizeImageUrl, resolveDefaultBatteryImage } from '@/lib/image';
 
 interface BatteryCardProps {
   battery: any;
@@ -15,7 +15,7 @@ export default function BatteryCard({ battery, onBook }: BatteryCardProps) {
   const priceWeek = battery.pricePerWeek
     ? Number(battery.pricePerWeek).toLocaleString('ru-RU')
     : '1 500';
-  const image = normalizeImageUrl(battery.imageUrl);
+  const image = normalizeImageUrl(battery.imageUrl) ?? resolveDefaultBatteryImage(battery.name);
 
   return (
     <div className="w-full bg-slate-900/40 backdrop-blur-md border border-slate-800/80 rounded-3xl overflow-hidden hover:border-indigo-500/40 transition-all duration-300 group hover:shadow-xl hover:shadow-indigo-500/5">

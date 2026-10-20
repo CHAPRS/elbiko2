@@ -29,3 +29,9 @@ export function resolveDefaultBikeImage(name?: string | null): string {
   if (n.includes('u1') || n.includes('wenbox')) return defaultBikeImages.u1;
   return defaultBikeImages.u1;
 }
+
+// Фото АКБ по умолчанию: если у аккумулятора не задан imageUrl —
+// показываем стандартное фото батареи из каталога
+export function resolveDefaultBatteryImage(_name?: string | null): string {
+  return '/images/battery-60v-45ah.webp';
+}

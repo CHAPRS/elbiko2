@@ -450,7 +450,11 @@ export default function RentsPage() {
       rentRows.push(
         <tr key={rent.id} className={`border-b border-slate-800 hover:bg-slate-900/50 transition-colors ${overdue ? 'bg-rose-950/20' : ''}`}>
           <td className="p-4 font-medium text-white">{rent.id}</td>
-          <td className="p-4 text-white">{rent.user.name}</td>
+          <td className="p-4 text-white">
+            <a href={`/admin/clients/${rent.user.id}`} className="hover:text-cyan-400 transition-colors">
+              {rent.user.name}
+            </a>
+          </td>
           <td className="p-4 text-slate-300">{rent.user.phone}</td>
           <td className="p-4 text-slate-300">
             {rent.bike.name}{rent.bike.externalId ? ` (ID: ${rent.bike.externalId})` : ''}

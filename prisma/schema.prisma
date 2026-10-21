@@ -80,6 +80,10 @@ model User {
   emailVerificationToken     String?  @unique
   emailVerificationTokenExpiresAt DateTime?
 
+  adminNote        String?  @db.Text // Заметки менеджера о клиенте
+  isBlacklisted    Boolean  @default(false) // Чёрный список
+  blacklistReason  String? // Причина блокировки
+
   rentalSessions RentalSession[]
   rents          Rent[]
   batteryRents   BatteryRent[]

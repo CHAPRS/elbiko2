@@ -11,6 +11,7 @@ const NAV = [
   { href: '/admin/bike-stats', label: 'Статистика' },
   { href: '/admin/leads', label: 'Заявки' },
   { href: '/admin/rents', label: 'Аренды' },
+  { href: '/admin/clients', label: 'Клиенты' },
   { href: '/admin/contacts', label: 'Контакты' },
 ];
 

@@ -890,6 +890,21 @@ export default function DispatchPage() {
 
   const nowTs = Date.now();
   const DAY_MS = 24 * 60 * 60 * 1000;
+
+  // Возврат просрочен: срок вчера и раньше — сразу; срок сегодня — только после 16:00
+  const RETURN_CUTOFF_HOUR = 16;
+  const dayStartTs = (d: Date | string) => {
+    const x = new Date(d);
+    x.setHours(0, 0, 0, 0);
+    return x.getTime();
+  };
+  const todayTs = dayStartTs(new Date());
+  const isReturnOverdue = (endDate: Date | string) => {
+    const end = dayStartTs(endDate);
+    if (end < todayTs) return true;
+    if (end === todayTs) return new Date().getHours() >= RETURN_CUTOFF_HOUR;
+    return false;
+  };
   type Debtor = {
     key: string;
     kind: 'Аренда' | 'Выкуп' | 'Доплата';
@@ -905,7 +920,7 @@ export default function DispatchPage() {
 
   (data?.activeRents ?? [])
     .filter((rent) =>
-      new Date(rent.endDate).getTime() < nowTs &&
+      isReturnOverdue(rent.endDate) &&
       matchesSearch(rent.user.name, rent.user.phone, rent.bike.name)
     )
     .forEach((rent) => {
@@ -926,7 +941,7 @@ export default function DispatchPage() {
     .filter((rent) =>
       (rent.debt ?? 0) > 0 &&
       ((rent.paidTotal ?? 0) > 0 || Boolean(rent.debtDueDate)) &&
-      new Date(rent.endDate).getTime() >= nowTs &&
+      !isReturnOverdue(rent.endDate) &&
       matchesSearch(rent.user.name, rent.user.phone, rent.bike.name)
     )
     .forEach((rent) => {
@@ -948,7 +963,7 @@ export default function DispatchPage() {
   // Просроченные аренды АКБ
   (data?.batteryRents ?? [])
     .filter((rent) =>
-      new Date(rent.endDate).getTime() < nowTs &&
+      isReturnOverdue(rent.endDate) &&
       matchesSearch(rent.user.name, rent.user.phone, rent.battery.name)
     )
     .forEach((rent) => {
@@ -968,7 +983,8 @@ export default function DispatchPage() {
   (data?.batteryRents ?? [])
     .filter((rent) =>
       (rent.debt ?? 0) > 0 &&
-      new Date(rent.endDate).getTime() >= nowTs &&
+      ((rent.paidTotal ?? 0) > 0 || Boolean(rent.debtDueDate)) &&
+      !isReturnOverdue(rent.endDate) &&
       matchesSearch(rent.user.name, rent.user.phone, rent.battery.name)
     )
     .forEach((rent) => {
@@ -1527,7 +1543,11 @@ export default function DispatchPage() {
                     >
                       <div className="flex items-start justify-between gap-4">
                         <div>
-                          <p className="font-medium text-slate-100">{rent.user.name}</p>
+                          <p className="font-medium text-slate-100">
+                            <Link href={`/admin/clients/${rent.user.id}`} className="hover:text-cyan-400 transition-colors">
+                              {rent.user.name}
+                            </Link>
+                          </p>
                           <p className="text-sm text-slate-400">{rent.user.phone}</p>
                           <p className="text-xs text-slate-500 mt-1">
                             {rent.bike.name}{rent.bike.externalId ? ` (ID: ${rent.bike.externalId})` : ''} · до {formatDate(rent.endDate)}
@@ -1664,13 +1684,28 @@ export default function DispatchPage() {
                 {filteredReturningToday.map((rent) => (
                   <li
                     key={rent.id}
-                    className="border border-slate-800 rounded-lg p-3 bg-slate-950/50"
+                    className={`border rounded-lg p-3 ${
+                      isReturnOverdue(rent.endDate)
+                        ? 'border-rose-900 bg-rose-950/20'
+                        : 'border-slate-800 bg-slate-950/50'
+                    }`}
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div>
-                        <p className="font-medium text-slate-100">{rent.user.name}</p>
+                        <p className="font-medium text-slate-100">
+                          <Link href={`/admin/clients/${rent.user.id}`} className="hover:text-cyan-400 transition-colors">
+                            {rent.user.name}
+                          </Link>
+                        </p>
                         <p className="text-sm text-slate-400">{rent.user.phone}</p>
-                        <p className="text-xs text-slate-500 mt-1">{rent.bike.name}{rent.bike.externalId ? ` (ID: ${rent.bike.externalId})` : ''} · {formatDate(rent.endDate)}</p>
+                        <p className="text-xs text-slate-500 mt-1">
+                          {rent.bike.name}{rent.bike.externalId ? ` (ID: ${rent.bike.externalId})` : ''} · {formatDate(rent.endDate)}
+                          {isReturnOverdue(rent.endDate) ? (
+                            <span className="ml-2 text-rose-400 font-medium">должник</span>
+                          ) : (
+                            <span className="ml-2 text-amber-400 font-medium">возврат сегодня</span>
+                          )}
+                        </p>
                       </div>
                       <ContactLinks user={rent.user} />
                     </div>
@@ -1679,16 +1714,29 @@ export default function DispatchPage() {
                 {batteryReturningToday.map((rent) => (
                   <li
                     key={`b-${rent.id}`}
-                    className="border border-sky-900/60 rounded-lg p-3 bg-sky-950/20"
+                    className={`border rounded-lg p-3 ${
+                      isReturnOverdue(rent.endDate)
+                        ? 'border-rose-900 bg-rose-950/20'
+                        : 'border-sky-900/60 bg-sky-950/20'
+                    }`}
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div>
                         <p className="font-medium text-slate-100">
-                          {rent.user.name}
+                          <Link href={`/admin/clients/${rent.user.id}`} className="hover:text-cyan-400 transition-colors">
+                            {rent.user.name}
+                          </Link>
                           <span className="ml-2 px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-400 border border-sky-500/30 text-[10px] font-semibold uppercase">АКБ</span>
                         </p>
                         <p className="text-sm text-slate-400">{rent.user.phone}</p>
-                        <p className="text-xs text-slate-500 mt-1">{rent.battery.name} · {formatDate(rent.endDate)}</p>
+                        <p className="text-xs text-slate-500 mt-1">
+                          {rent.battery.name} · {formatDate(rent.endDate)}
+                          {isReturnOverdue(rent.endDate) ? (
+                            <span className="ml-2 text-rose-400 font-medium">должник</span>
+                          ) : (
+                            <span className="ml-2 text-amber-400 font-medium">возврат сегодня</span>
+                          )}
+                        </p>
                       </div>
                       <ContactLinks user={rent.user} />
                     </div>
@@ -1713,7 +1761,11 @@ export default function DispatchPage() {
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div>
-                        <p className="font-medium text-slate-100">{rent.user.name}</p>
+                        <p className="font-medium text-slate-100">
+                          <Link href={`/admin/clients/${rent.user.id}`} className="hover:text-cyan-400 transition-colors">
+                            {rent.user.name}
+                          </Link>
+                        </p>
                         <p className="text-sm text-slate-400">{rent.user.phone}</p>
                         <p className="text-xs text-slate-500 mt-1">{rent.bike.name}{rent.bike.externalId ? ` (ID: ${rent.bike.externalId})` : ''} · {formatDate(rent.endDate)}</p>
                       </div>

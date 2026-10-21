@@ -39,13 +39,15 @@ export function isReturnOverdue(endDate: Date | string, now: Date = new Date()):
 export function hasVisibleDebt(input: {
   totalPrice: number;
   paidTotal: number;
+  penaltiesTotal?: number;
   debtDueDate?: Date | string | null;
   endDate: Date | string;
   status: string;
   now?: Date;
 }): number {
   const finished = ['RETURNED', 'COMPLETED', 'CANCELLED'].includes(input.status);
-  const debt = Math.max(0, input.totalPrice - input.paidTotal);
+  // Долг = цена аренды + штрафы − внесено
+  const debt = Math.max(0, input.totalPrice + (input.penaltiesTotal ?? 0) - input.paidTotal);
   if (debt <= 0) return 0;
   // Завершённая аренда с остатком — реальный долг; активная — только если просрочен возврат,
   // была частичная оплата или назначен срок погашения
@@ -61,6 +63,7 @@ interface RatingRentLike {
   actualReturnDate: Date | null;
   totalPrice: number;
   paidTotal: number;
+  penaltiesTotal: number;
   debtDueDate: Date | null;
   penaltyCount: number;
 }
@@ -98,6 +101,7 @@ export function computeClientRating(input: {
     const debt = hasVisibleDebt({
       totalPrice: r.totalPrice,
       paidTotal: r.paidTotal,
+      penaltiesTotal: r.penaltiesTotal,
       debtDueDate: r.debtDueDate,
       endDate: r.endDate,
       status: r.status,

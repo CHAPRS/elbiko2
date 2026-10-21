@@ -62,7 +62,7 @@ export async function GET(request: Request) {
 
     const [rentTx, batteryTx, miscTx, buyoutPaid] = await Promise.all([
       prisma.rentTransaction.findMany({
-        where: { type: { in: ['PAYMENT', 'REFUND'] }, createdAt: { gte: from, lte: to } },
+        where: { type: { in: ['PAYMENT', 'REFUND', 'PENALTY'] }, createdAt: { gte: from, lte: to } },
         select: {
           type: true,
           amount: true,
@@ -74,7 +74,7 @@ export async function GET(request: Request) {
         },
       }),
       prisma.batteryRentTransaction.findMany({
-        where: { type: { in: ['PAYMENT', 'REFUND'] }, createdAt: { gte: from, lte: to } },
+        where: { type: { in: ['PAYMENT', 'REFUND', 'PENALTY'] }, createdAt: { gte: from, lte: to } },
         select: {
           type: true,
           amount: true,
@@ -117,12 +117,14 @@ export async function GET(request: Request) {
 
     for (const t of rentTx) {
       const isRefund = t.type === 'REFUND';
+      const isPenalty = t.type === 'PENALTY';
       rows.push({
         date: t.createdAt,
         source: 'Аренда байка',
-        subject: `Аренда #${t.rentId}${t.rent?.user?.name ? ` · ${t.rent.user.name}` : ''}${isRefund ? ' · возврат' : ''}`,
+        subject: `Аренда #${t.rentId}${t.rent?.user?.name ? ` · ${t.rent.user.name}` : ''}${isRefund ? ' · возврат' : ''}${isPenalty ? ' · штраф/ущерб' : ''}`,
         category: 'Аренда',
-        kind: isRefund ? 'Расход' : 'Доход',
+        // PENALTY — начисление, а не доход: деньги приходят отдельным PAYMENT
+        kind: isPenalty ? 'Начисление штрафа' : isRefund ? 'Расход' : 'Доход',
         amount: Number(t.amount),
         method: t.method ? METHOD_LABELS[t.method] ?? t.method : '',
         comment: t.comment ?? '',
@@ -131,12 +133,13 @@ export async function GET(request: Request) {
 
     for (const t of batteryTx) {
       const isRefund = t.type === 'REFUND';
+      const isPenalty = t.type === 'PENALTY';
       rows.push({
         date: t.createdAt,
         source: 'Аренда АКБ',
-        subject: `Аренда АКБ #${t.batteryRentId}${t.batteryRent?.user?.name ? ` · ${t.batteryRent.user.name}` : ''}${isRefund ? ' · возврат' : ''}`,
+        subject: `Аренда АКБ #${t.batteryRentId}${t.batteryRent?.user?.name ? ` · ${t.batteryRent.user.name}` : ''}${isRefund ? ' · возврат' : ''}${isPenalty ? ' · штраф/ущерб' : ''}`,
         category: 'Аренда аккумулятора',
-        kind: isRefund ? 'Расход' : 'Доход',
+        kind: isPenalty ? 'Начисление штрафа' : isRefund ? 'Расход' : 'Доход',
         amount: Number(t.amount),
         method: t.method ? METHOD_LABELS[t.method] ?? t.method : '',
         comment: t.comment ?? '',

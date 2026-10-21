@@ -22,6 +22,10 @@ export async function PATCH(
       paidAmount,
       paidMethod,
       debtDueDate,
+      penaltyAmount,
+      penaltyComment,
+      penaltyPaid,
+      penaltyMethod,
     } = body;
 
     const rent = await prisma.batteryRent.findUnique({
@@ -49,6 +53,19 @@ export async function PATCH(
       cashReceived = Math.round(parsed * 100) / 100;
     }
 
+    // Штраф/ущерб: начисление увеличивает долг аренды
+    let penaltyCharge: number | null = null;
+    if (penaltyAmount !== undefined && penaltyAmount !== null && penaltyAmount !== '') {
+      const parsed = Number(penaltyAmount);
+      if (!Number.isFinite(parsed) || parsed <= 0) {
+        return NextResponse.json(
+          { error: 'Некорректная сумма штрафа' },
+          { status: 400 }
+        );
+      }
+      penaltyCharge = Math.round(parsed * 100) / 100;
+    }
+
     // Планируемая дата погашения долга (null/'' — снять)
     let debtDueDateProvided = false;
     let parsedDebtDueDate: Date | null = null;
@@ -71,6 +88,7 @@ export async function PATCH(
     let overpaid = false;
     let paidTotalOut = 0;
     let debtOut = 0;
+    let penaltiesOut = 0;
 
     const updatedRentId = await prisma.$transaction(
       async (tx) => {
@@ -107,6 +125,14 @@ export async function PATCH(
 
         if (status === 'OVERDUE') {
           updateData.isActive = false;
+        }
+
+        // Реактивация/возврат в ACTIVE или OVERDUE — аккумулятор снова занят
+        if ((status === 'ACTIVE' || status === 'OVERDUE') && currentBattery && currentBattery.status !== 'RENTED') {
+          await tx.battery.update({
+            where: { id: currentBattery.id },
+            data: { status: 'RENTED' },
+          });
         }
       }
 
@@ -218,8 +244,8 @@ export async function PATCH(
           ? Number(updateData.totalPrice)
           : Number(rent.totalPrice ?? 0);
 
-      // Сколько уже внесено по аренде (PAYMENT минус REFUND) — денежный журнал
-      const [paidAgg, refundAgg] = await Promise.all([
+      // Сколько уже внесено и начислено штрафами — денежный журнал
+      const [paidAgg, refundAgg, penaltyAgg] = await Promise.all([
         tx.batteryRentTransaction.aggregate({
           where: { batteryRentId: id, type: 'PAYMENT' },
           _sum: { amount: true },
@@ -228,13 +254,51 @@ export async function PATCH(
           where: { batteryRentId: id, type: 'REFUND' },
           _sum: { amount: true },
         }),
+        tx.batteryRentTransaction.aggregate({
+          where: { batteryRentId: id, type: 'PENALTY' },
+          _sum: { amount: true },
+        }),
       ]);
       let paidSoFar =
         Number(paidAgg._sum.amount ?? 0) - Number(refundAgg._sum.amount ?? 0);
+      let penaltiesTotal = Number(penaltyAgg._sum.amount ?? 0);
+
+      // Начисление штрафа/ущерба — увеличивает начисленное по аренде
+      if (penaltyCharge !== null) {
+        await tx.batteryRentTransaction.create({
+          data: {
+            batteryRentId: id,
+            type: 'PENALTY',
+            amount: penaltyCharge,
+            comment:
+              typeof penaltyComment === 'string' && penaltyComment.trim()
+                ? penaltyComment.trim()
+                : 'Штраф/ущерб',
+          },
+        });
+        penaltiesTotal += penaltyCharge;
+
+        // «Оплачен сразу» — сразу проводим оплату тем же способом
+        if (penaltyPaid) {
+          await tx.batteryRentTransaction.create({
+            data: {
+              batteryRentId: id,
+              type: 'PAYMENT',
+              amount: penaltyCharge,
+              method: penaltyMethod ?? null,
+              comment: 'Оплата штрафа',
+            },
+          });
+          paidSoFar += penaltyCharge;
+        }
+      }
+
+      // Начислено по аренде: цена аренды + штрафы
+      const effectiveCharge = effectiveTotal + penaltiesTotal;
 
       // Полученные сейчас деньги: полная/частичная оплата или погашение долга
       if (cashReceived !== null) {
-        const due = Math.max(0, effectiveTotal - paidSoFar);
+        const due = Math.max(0, effectiveCharge - paidSoFar);
         if (cashReceived > due + 0.001) overpaid = true;
 
         await tx.batteryRentTransaction.create({
@@ -251,8 +315,8 @@ export async function PATCH(
         paidSoFar += cashReceived;
       }
 
-      // Долг = начислено − внесено; дата погашения сбрасывается при нулевом долге
-      const newDebt = Math.round(Math.max(0, effectiveTotal - paidSoFar) * 100) / 100;
+      // Долг = начислено (цена + штрафы) − внесено; дата погашения сбрасывается при нулевом долге
+      const newDebt = Math.round(Math.max(0, effectiveCharge - paidSoFar) * 100) / 100;
       if (debtDueDateProvided) {
         updateData.debtDueDate = newDebt > 0 ? parsedDebtDueDate : null;
       } else if (newDebt <= 0) {
@@ -260,6 +324,7 @@ export async function PATCH(
       }
       paidTotalOut = Math.max(0, Math.round(paidSoFar * 100) / 100);
       debtOut = newDebt;
+      penaltiesOut = penaltiesTotal;
 
       const updated = await tx.batteryRent.update({
         where: { id },
@@ -297,6 +362,7 @@ export async function PATCH(
       overpaid,
       paidTotal: paidTotalOut,
       debt: debtOut,
+      penaltiesTotal: penaltiesOut,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Ошибка при обновлении аренды АКБ';

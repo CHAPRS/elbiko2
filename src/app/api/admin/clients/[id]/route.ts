@@ -14,6 +14,13 @@ function txSum(txs: TxLike[]): number {
   );
 }
 
+function penSum(txs: TxLike[]): number {
+  return txs.reduce(
+    (sum, t) => sum + (t.type === 'PENALTY' ? Number(t.amount) : 0),
+    0
+  );
+}
+
 // GET /api/admin/clients/[id] — карточка клиента: контакты, рейтинг, история
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
   try {
@@ -68,6 +75,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
         actualReturnDate: r.actualReturnDate,
         totalPrice: Number(r.totalPrice),
         paidTotal: txSum(r.rentTransactions),
+        penaltiesTotal: penSum(r.rentTransactions),
         debtDueDate: r.debtDueDate,
         penaltyCount: r.rentTransactions.filter((t) => t.type === 'PENALTY').length,
       })),
@@ -77,6 +85,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
         actualReturnDate: r.actualReturnDate,
         totalPrice: Number(r.totalPrice),
         paidTotal: txSum(r.transactions),
+        penaltiesTotal: penSum(r.transactions),
         debtDueDate: r.debtDueDate,
         penaltyCount: r.transactions.filter((t) => t.type === 'PENALTY').length,
       })),
@@ -85,6 +94,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 
     const rents = user.rents.map((r) => {
       const paid = txSum(r.rentTransactions);
+      const pen = penSum(r.rentTransactions);
       return {
         id: r.id,
         itemType: 'BIKE' as const,
@@ -96,13 +106,15 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
         actualReturnDate: r.actualReturnDate,
         totalPrice: Number(r.totalPrice),
         paidTotal: Math.round(paid * 100) / 100,
-        debt: Math.max(0, Math.round((Number(r.totalPrice) - paid) * 100) / 100),
+        penaltiesTotal: Math.round(pen * 100) / 100,
+        debt: Math.max(0, Math.round((Number(r.totalPrice) + pen - paid) * 100) / 100),
         comment: r.comment,
         createdAt: r.createdAt,
       };
     });
     const batteryRents = user.batteryRents.map((r) => {
       const paid = txSum(r.transactions);
+      const pen = penSum(r.transactions);
       return {
         id: r.id,
         itemType: 'BATTERY' as const,
@@ -114,7 +126,8 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
         actualReturnDate: r.actualReturnDate,
         totalPrice: Number(r.totalPrice),
         paidTotal: Math.round(paid * 100) / 100,
-        debt: Math.max(0, Math.round((Number(r.totalPrice) - paid) * 100) / 100),
+        penaltiesTotal: Math.round(pen * 100) / 100,
+        debt: Math.max(0, Math.round((Number(r.totalPrice) + pen - paid) * 100) / 100),
         comment: r.comment,
         createdAt: r.createdAt,
       };

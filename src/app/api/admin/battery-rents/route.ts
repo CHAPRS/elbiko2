@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { ledgerDebt } from '@/lib/rentLedger';
 import { createBatteryRentAndMarkContact } from '@/lib/batteryRent';
 
 export const dynamic = 'force-dynamic';
@@ -42,20 +43,10 @@ export async function GET(request: Request) {
       },
     });
 
-    // paidTotal — внесённая сумма из журнала (PAYMENT − REFUND), debt — остаток
+    // paidTotal — внесённая сумма (PAYMENT − REFUND), debt = цена + штрафы − внесено
     const result = rents.map((r) => {
-      const paid = r.transactions.reduce(
-        (sum, t) =>
-          sum +
-          (t.type === 'PAYMENT' ? Number(t.amount) : t.type === 'REFUND' ? -Number(t.amount) : 0),
-        0
-      );
       const { transactions, ...rest } = r;
-      return {
-        ...rest,
-        paidTotal: Math.max(0, Math.round(paid * 100) / 100),
-        debt: Math.max(0, Math.round((Number(r.totalPrice) - paid) * 100) / 100),
-      };
+      return { ...rest, ...ledgerDebt(Number(r.totalPrice), transactions) };
     });
 
     return NextResponse.json(result);

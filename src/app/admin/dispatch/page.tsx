@@ -102,6 +102,7 @@ interface Rent {
   status: string;
   paidTotal?: number;
   debt?: number;
+  penaltiesTotal?: number;
   debtDueDate?: string | null;
   user: RentUser;
   bike: RentBike;
@@ -297,6 +298,12 @@ export default function DispatchPage() {
   const [payMethod, setPayMethod] = useState('CASH');
   const [payDue, setPayDue] = useState('');
   const [payBusy, setPayBusy] = useState(false);
+  const [penRent, setPenRent] = useState<Rent | null>(null);
+  const [penAmount, setPenAmount] = useState('');
+  const [penComment, setPenComment] = useState('');
+  const [penPaid, setPenPaid] = useState(false);
+  const [penMethod, setPenMethod] = useState('CASH');
+  const [penBusy, setPenBusy] = useState(false);
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
   const [customPeriod, setCustomPeriod] = useState<{ from: string; to: string } | null>(null);
@@ -564,6 +571,54 @@ export default function DispatchPage() {
       setError('Нет связи с сервером');
     } finally {
       setPayBusy(false);
+    }
+  };
+
+  const openPenalty = (rent: Rent) => {
+    setPenRent(rent);
+    setPenAmount('');
+    setPenComment('');
+    setPenPaid(false);
+    setPenMethod('CASH');
+    setError(null);
+    setNotice(null);
+  };
+
+  const submitPenalty = async () => {
+    if (!penRent) return;
+    const amount = Number(penAmount);
+    if (!amount || amount <= 0) {
+      setError('Укажите корректную сумму штрафа');
+      return;
+    }
+    setPenBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/rents/${penRent.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          penaltyAmount: amount,
+          penaltyComment: penComment || undefined,
+          penaltyPaid: penPaid,
+          penaltyMethod: penPaid ? penMethod : undefined,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error || 'Не удалось начислить штраф');
+        return;
+      }
+      let msg = `Штраф ${amount.toLocaleString('ru-RU')} ₽ начислен по аренде #${penRent.id}`;
+      if (penPaid) msg += ' (оплачен сразу)';
+      else if (json.debt > 0) msg += `, долг ${Number(json.debt).toLocaleString('ru-RU')} ₽`;
+      setNotice(msg);
+      setPenRent(null);
+      fetchDashboard();
+    } catch {
+      setError('Нет связи с сервером');
+    } finally {
+      setPenBusy(false);
     }
   };
 
@@ -936,11 +991,11 @@ export default function DispatchPage() {
       });
     });
 
-  // «Доплата»: частично оплаченные аренды с остатком долга (ещё не просроченные)
+  // «Доплата»: частично оплаченные аренды с остатком долга или непогашенный штраф
   (data?.activeRents ?? [])
     .filter((rent) =>
       (rent.debt ?? 0) > 0 &&
-      ((rent.paidTotal ?? 0) > 0 || Boolean(rent.debtDueDate)) &&
+      ((rent.paidTotal ?? 0) > 0 || Boolean(rent.debtDueDate) || (rent.penaltiesTotal ?? 0) > 0) &&
       !isReturnOverdue(rent.endDate) &&
       matchesSearch(rent.user.name, rent.user.phone, rent.bike.name)
     )
@@ -979,11 +1034,11 @@ export default function DispatchPage() {
       });
     });
 
-  // «Доплата» по АКБ: непогашенный долг, аренда ещё не просрочена
+  // «Доплата» по АКБ: непогашенный долг или штраф, аренда ещё не просрочена
   (data?.batteryRents ?? [])
     .filter((rent) =>
       (rent.debt ?? 0) > 0 &&
-      ((rent.paidTotal ?? 0) > 0 || Boolean(rent.debtDueDate)) &&
+      ((rent.paidTotal ?? 0) > 0 || Boolean(rent.debtDueDate) || (rent.penaltiesTotal ?? 0) > 0) &&
       !isReturnOverdue(rent.endDate) &&
       matchesSearch(rent.user.name, rent.user.phone, rent.battery.name)
     )
@@ -1555,7 +1610,7 @@ export default function DispatchPage() {
                               <span className="ml-2 text-rose-400 font-medium">(просрочена)</span>
                             )}
                           </p>
-                          {(rent.debt ?? 0) > 0 && ((rent.paidTotal ?? 0) > 0 || Boolean(rent.debtDueDate)) && (
+                          {(rent.debt ?? 0) > 0 && ((rent.paidTotal ?? 0) > 0 || Boolean(rent.debtDueDate) || (rent.penaltiesTotal ?? 0) > 0) && (
                             <p className="text-xs mt-0.5 text-rose-400 font-medium">
                               Долг {formatMoney(Number(rent.debt))}
                               {rent.debtDueDate ? ` до ${formatDate(rent.debtDueDate)}` : ''}
@@ -1566,10 +1621,21 @@ export default function DispatchPage() {
                               )}
                             </p>
                           )}
+                          {(rent.penaltiesTotal ?? 0) > 0 && (
+                            <p className="text-xs mt-0.5 text-orange-400">
+                              Штрафы: {formatMoney(Number(rent.penaltiesTotal))}
+                            </p>
+                          )}
                         </div>
                         <div className="flex gap-2 shrink-0 flex-wrap justify-end items-start">
                           <ContactLinks user={rent.user} />
-                          {(rent.debt ?? 0) > 0 && ((rent.paidTotal ?? 0) > 0 || Boolean(rent.debtDueDate)) && (
+                          <button
+                            onClick={() => openPenalty(rent)}
+                            className="px-2.5 py-1.5 bg-orange-700 hover:bg-orange-600 text-white rounded text-xs transition-colors"
+                          >
+                            + Штраф
+                          </button>
+                          {(rent.debt ?? 0) > 0 && ((rent.paidTotal ?? 0) > 0 || Boolean(rent.debtDueDate) || (rent.penaltiesTotal ?? 0) > 0) && (
                             <button
                               onClick={() => openPay(rent)}
                               className="px-2.5 py-1.5 bg-violet-600 hover:bg-violet-500 text-white rounded text-xs transition-colors"
@@ -2512,6 +2578,95 @@ export default function DispatchPage() {
                 className="rounded-lg bg-violet-600 px-4 py-2 text-sm text-white hover:bg-violet-500 disabled:opacity-50 transition-colors"
               >
                 {payBusy ? 'Сохранение...' : 'Внести'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {penRent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
+            <h2 className="mb-4 text-lg font-semibold text-slate-100">
+              Штраф / ущерб — аренда #{penRent.id}
+            </h2>
+            <p className="mb-4 text-sm text-slate-400">
+              {penRent.user.name} · {penRent.user.phone}
+              <br />
+              {penRent.bike.name}{penRent.bike.externalId ? ` (ID: ${penRent.bike.externalId})` : ''}
+              {' '}· {penRent.status === 'ACTIVE' ? 'активна' : 'закрыта'}
+            </p>
+
+            <div className="mb-4">
+              <label className="mb-1 block text-xs font-medium text-slate-400">Сумма штрафа, ₽</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={penAmount}
+                onChange={(e) => setPenAmount(e.target.value)}
+                className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+              />
+            </div>
+
+            <div className="mb-4">
+              <label className="mb-1 block text-xs font-medium text-slate-400">Причина</label>
+              <input
+                type="text"
+                value={penComment}
+                onChange={(e) => setPenComment(e.target.value)}
+                placeholder="Например: ущерб — разбита фара"
+                className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+              />
+            </div>
+
+            <div className="mb-4">
+              <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={penPaid}
+                  onChange={(e) => setPenPaid(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-600 bg-slate-900 accent-cyan-500"
+                />
+                Оплачен сразу
+              </label>
+              <p className="mt-1 text-xs text-slate-500">
+                {penPaid
+                  ? 'Штраф будет оприходован как оплата — долг не вырастет'
+                  : 'Сумма добавится к долгу по аренде'}
+              </p>
+            </div>
+
+            {penPaid && (
+              <div className="mb-4">
+                <label className="mb-1 block text-xs font-medium text-slate-400">Способ оплаты</label>
+                <select
+                  value={penMethod}
+                  onChange={(e) => setPenMethod(e.target.value)}
+                  className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+                >
+                  <option value="CASH">Наличные</option>
+                  <option value="SBP">СБП</option>
+                  <option value="CARD">Карта</option>
+                  <option value="TRANSFER">Перевод</option>
+                </select>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => !penBusy && setPenRent(null)}
+                disabled={penBusy}
+                className="rounded-lg bg-slate-800 px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 disabled:opacity-50 transition-colors"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={submitPenalty}
+                disabled={penBusy}
+                className="rounded-lg bg-orange-600 px-4 py-2 text-sm text-white hover:bg-orange-500 disabled:opacity-50 transition-colors"
+              >
+                {penBusy ? 'Сохранение...' : 'Начислить'}
               </button>
             </div>
           </div>

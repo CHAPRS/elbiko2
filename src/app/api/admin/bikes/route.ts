@@ -2,12 +2,15 @@ import { NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { createBikeSchema, updateBikeSchema } from '@/lib/validation';
+import { reconcileFleetStatuses } from '@/lib/fleet';
 
 // ==========================================
 // GET: Получение списка всех велосипедов
 // ==========================================
 export async function GET() {
   try {
+    await reconcileFleetStatuses();
+
     const bikes = await prisma.bike.findMany({
       orderBy: {
         id: 'desc', // Новые велосипеды будут вверху списка

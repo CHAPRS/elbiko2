@@ -47,7 +47,7 @@ export async function GET() {
     const header = [
       'ID', 'Клиент', 'Телефон', 'Telegram ID', 'MAX ID', 'Мессенджер',
       'Байк', 'ID байка', 'Старт', 'Окончание', 'Факт. возврат', 'Статус',
-      'Сумма', 'Оплачено', 'Долг', 'Срок погашения', 'Комментарий',
+      'Сумма', 'Штрафы', 'Оплачено', 'Долг', 'Срок погашения', 'Комментарий',
     ];
     const lines = [header.map(escapeCsv).join(';')];
 
@@ -58,7 +58,11 @@ export async function GET() {
           (t.type === 'PAYMENT' ? Number(t.amount) : t.type === 'REFUND' ? -Number(t.amount) : 0),
         0
       );
-      const debt = Math.max(0, Number(r.totalPrice) - paid);
+      const penalties = r.rentTransactions.reduce(
+        (sum, t) => sum + (t.type === 'PENALTY' ? Number(t.amount) : 0),
+        0
+      );
+      const debt = Math.max(0, Number(r.totalPrice) + penalties - paid);
 
       lines.push(
         [
@@ -75,6 +79,7 @@ export async function GET() {
           fmtDate(r.actualReturnDate),
           STATUS_LABELS[r.status] ?? r.status,
           Number(r.totalPrice),
+          Math.round(penalties * 100) / 100,
           Math.round(paid * 100) / 100,
           Math.round(debt * 100) / 100,
           fmtDate(r.debtDueDate),

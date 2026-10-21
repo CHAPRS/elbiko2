@@ -14,6 +14,13 @@ function txSum(txs: TxLike[]): number {
   );
 }
 
+function penSum(txs: TxLike[]): number {
+  return txs.reduce(
+    (sum, t) => sum + (t.type === 'PENALTY' ? Number(t.amount) : 0),
+    0
+  );
+}
+
 // GET /api/admin/clients — список клиентов с агрегатами и рейтингом
 export async function GET() {
   try {
@@ -51,6 +58,7 @@ export async function GET() {
       const ratingInput = allRents.map((r) => {
         const txs = 'rentTransactions' in r ? r.rentTransactions : r.transactions;
         const paid = txSum(txs);
+        const penaltiesTotal = penSum(txs);
         const penaltyCount = txs.filter((t) => t.type === 'PENALTY').length;
         return {
           status: r.status,
@@ -58,6 +66,7 @@ export async function GET() {
           actualReturnDate: r.actualReturnDate,
           totalPrice: Number(r.totalPrice),
           paidTotal: paid,
+          penaltiesTotal,
           debtDueDate: r.debtDueDate,
           penaltyCount,
         };

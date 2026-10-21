@@ -26,6 +26,10 @@ export async function PATCH(
       paidAmount,
       paidMethod,
       debtDueDate,
+      penaltyAmount,
+      penaltyComment,
+      penaltyPaid,
+      penaltyMethod,
     } = body;
 
     const rent = await prisma.rent.findUnique({
@@ -69,6 +73,19 @@ export async function PATCH(
       cashReceived = Math.round(parsed * 100) / 100;
     }
 
+    // Штраф/ущерб: начисление увеличивает долг аренды
+    let penaltyCharge: number | null = null;
+    if (penaltyAmount !== undefined && penaltyAmount !== null && penaltyAmount !== '') {
+      const parsed = Number(penaltyAmount);
+      if (!Number.isFinite(parsed) || parsed <= 0) {
+        return NextResponse.json(
+          { error: 'Некорректная сумма штрафа' },
+          { status: 400 }
+        );
+      }
+      penaltyCharge = Math.round(parsed * 100) / 100;
+    }
+
     // Планируемая дата погашения долга (null/'' — снять)
     let debtDueDateProvided = false;
     let parsedDebtDueDate: Date | null = null;
@@ -91,6 +108,7 @@ export async function PATCH(
     let overpaid = false;
     let paidTotalOut = 0;
     let debtOut = 0;
+    let penaltiesOut = 0;
 
     const updatedRentId = await prisma.$transaction(
       async (tx) => {
@@ -127,6 +145,14 @@ export async function PATCH(
 
         if (status === 'OVERDUE') {
           updateData.isActive = false;
+        }
+
+        // Реактивация/возврат в ACTIVE или OVERDUE — байк снова занят
+        if ((status === 'ACTIVE' || status === 'OVERDUE') && currentBike && currentBike.status !== 'RENTED') {
+          await tx.bike.update({
+            where: { id: currentBike.id },
+            data: { status: 'RENTED' },
+          });
         }
       }
 
@@ -238,8 +264,8 @@ export async function PATCH(
           ? Number(updateData.totalPrice)
           : Number(rent.totalPrice ?? 0);
 
-      // Сколько уже внесено по аренде (PAYMENT минус REFUND) — денежный журнал
-      const [paidAgg, refundAgg] = await Promise.all([
+      // Сколько уже внесено и начислено штрафами — денежный журнал
+      const [paidAgg, refundAgg, penaltyAgg] = await Promise.all([
         tx.rentTransaction.aggregate({
           where: { rentId: id, type: 'PAYMENT' },
           _sum: { amount: true },
@@ -248,13 +274,51 @@ export async function PATCH(
           where: { rentId: id, type: 'REFUND' },
           _sum: { amount: true },
         }),
+        tx.rentTransaction.aggregate({
+          where: { rentId: id, type: 'PENALTY' },
+          _sum: { amount: true },
+        }),
       ]);
       let paidSoFar =
         Number(paidAgg._sum.amount ?? 0) - Number(refundAgg._sum.amount ?? 0);
+      let penaltiesTotal = Number(penaltyAgg._sum.amount ?? 0);
+
+      // Начисление штрафа/ущерба — увеличивает начисленное по аренде
+      if (penaltyCharge !== null) {
+        await tx.rentTransaction.create({
+          data: {
+            rentId: id,
+            type: 'PENALTY',
+            amount: penaltyCharge,
+            comment:
+              typeof penaltyComment === 'string' && penaltyComment.trim()
+                ? penaltyComment.trim()
+                : 'Штраф/ущерб',
+          },
+        });
+        penaltiesTotal += penaltyCharge;
+
+        // «Оплачен сразу» — сразу проводим оплату тем же способом
+        if (penaltyPaid) {
+          await tx.rentTransaction.create({
+            data: {
+              rentId: id,
+              type: 'PAYMENT',
+              amount: penaltyCharge,
+              method: penaltyMethod ?? null,
+              comment: 'Оплата штрафа',
+            },
+          });
+          paidSoFar += penaltyCharge;
+        }
+      }
+
+      // Начислено по аренде: цена аренды + штрафы
+      const effectiveCharge = effectiveTotal + penaltiesTotal;
 
       // Полученные сейчас деньги: полная/частичная оплата или погашение долга
       if (cashReceived !== null) {
-        const due = Math.max(0, effectiveTotal - paidSoFar);
+        const due = Math.max(0, effectiveCharge - paidSoFar);
         if (cashReceived > due + 0.001) overpaid = true;
 
         await tx.rentTransaction.create({
@@ -315,8 +379,8 @@ export async function PATCH(
         }
 
         if (paymentStatus === 'COMPLETED') {
-          // Фиксируем только неоплаченный остаток — иначе при частичных оплатах был бы двойной счёт
-          const remainder = Math.round(Math.max(0, effectiveTotal - paidSoFar) * 100) / 100;
+          // Фиксируем только неоплаченный остаток (включая штрафы) — иначе двойной счёт
+          const remainder = Math.round(Math.max(0, effectiveCharge - paidSoFar) * 100) / 100;
           if (remainder > 0) {
             await tx.rentTransaction.create({
               data: {
@@ -348,8 +412,8 @@ export async function PATCH(
         !paymentStatus &&
         rent.payment &&
         rent.payment.status === 'PENDING' &&
-        effectiveTotal > 0 &&
-        paidSoFar >= effectiveTotal - 0.001
+        effectiveCharge > 0 &&
+        paidSoFar >= effectiveCharge - 0.001
       ) {
         await tx.payment.update({
           where: { id: rent.payment.id },
@@ -361,8 +425,8 @@ export async function PATCH(
         });
       }
 
-      // Долг = начислено − внесено; дата погашения сбрасывается при нулевом долге
-      const newDebt = Math.round(Math.max(0, effectiveTotal - paidSoFar) * 100) / 100;
+      // Долг = начислено (цена + штрафы) − внесено; дата погашения сбрасывается при нулевом долге
+      const newDebt = Math.round(Math.max(0, effectiveCharge - paidSoFar) * 100) / 100;
       if (debtDueDateProvided) {
         updateData.debtDueDate = newDebt > 0 ? parsedDebtDueDate : null;
       } else if (newDebt <= 0) {
@@ -370,6 +434,7 @@ export async function PATCH(
       }
       paidTotalOut = Math.max(0, Math.round(paidSoFar * 100) / 100);
       debtOut = newDebt;
+      penaltiesOut = penaltiesTotal;
 
       const updated = await tx.rent.update({
         where: { id },
@@ -425,6 +490,7 @@ export async function PATCH(
       overpaid,
       paidTotal: paidTotalOut,
       debt: debtOut,
+      penaltiesTotal: penaltiesOut,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Ошибка при обновлении аренды';

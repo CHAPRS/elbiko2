@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { reconcileFleetStatuses } from '@/lib/fleet';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,6 +9,10 @@ export const dynamic = 'force-dynamic';
 // CompactCatalog сам отфильтрует дубли и скроет City Courier.
 export async function GET() {
   try {
+    // Подтягиваем статусы к реальным арендам: арендованный байк не должен
+    // светиться в каталоге как свободный из-за рассинхрона status
+    await reconcileFleetStatuses();
+
     const bikes = await prisma.bike.findMany({
       orderBy: { id: 'asc' },
     });

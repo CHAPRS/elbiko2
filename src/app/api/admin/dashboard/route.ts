@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { ledgerDebt } from '@/lib/rentLedger';
+import { reconcileFleetStatuses } from '@/lib/fleet';
 
 export const dynamic = 'force-dynamic';
 
@@ -106,9 +108,9 @@ export async function GET(request: Request) {
       activeAndOverdueBatteryRents,
       batteryTxPeriod,
     ] = await Promise.all([
-      prisma.bike.findMany({
+      reconcileFleetStatuses().then(() => prisma.bike.findMany({
         orderBy: { name: 'asc' },
-      }),
+      })),
       prisma.user.count(),
       prisma.lead.findMany({
         where: { status: 'NEW' },
@@ -273,35 +275,17 @@ export async function GET(request: Request) {
       }),
     ]);
 
-    // Оплачено/долг по каждой аренде — из денежного журнала (PAYMENT − REFUND)
+    // Оплачено/штрафы/долг по каждой аренде — из денежного журнала
     const activeRents = activeAndOverdueRents.map((r) => {
-      const paid = r.rentTransactions.reduce(
-        (sum, t) =>
-          sum +
-          (t.type === 'PAYMENT' ? Number(t.amount) : t.type === 'REFUND' ? -Number(t.amount) : 0),
-        0
-      );
+      const ledger = ledgerDebt(Number(r.totalPrice), r.rentTransactions);
       const { rentTransactions, ...rest } = r;
-      return {
-        ...rest,
-        paidTotal: Math.max(0, Math.round(paid * 100) / 100),
-        debt: Math.max(0, Math.round((Number(r.totalPrice) - paid) * 100) / 100),
-      };
+      return { ...rest, ...ledger };
     });
-    // paidTotal/debt по арендам АКБ — та же формула из журнала
+    // paidTotal/penaltiesTotal/debt по арендам АКБ — та же формула из журнала
     const batteryRents = activeAndOverdueBatteryRents.map((r) => {
-      const paid = r.transactions.reduce(
-        (sum, t) =>
-          sum +
-          (t.type === 'PAYMENT' ? Number(t.amount) : t.type === 'REFUND' ? -Number(t.amount) : 0),
-        0
-      );
+      const ledger = ledgerDebt(Number(r.totalPrice), r.transactions);
       const { transactions, ...rest } = r;
-      return {
-        ...rest,
-        paidTotal: Math.max(0, Math.round(paid * 100) / 100),
-        debt: Math.max(0, Math.round((Number(r.totalPrice) - paid) * 100) / 100),
-      };
+      return { ...rest, ...ledger };
     });
     const freeBatteries = batteries.filter((b) => b.status === 'FREE');
 

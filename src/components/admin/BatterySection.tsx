@@ -33,6 +33,7 @@ export interface BatteryRent {
   status: string;
   paidTotal?: number;
   debt?: number;
+  penaltiesTotal?: number;
   debtDueDate?: string | null;
   comment?: string | null;
   user: BatteryRentUser;
@@ -120,6 +121,13 @@ export function BatterySection({ batteries, rents, onChanged, onError, onNotice 
   const [payMethod, setPayMethod] = useState('CASH');
   const [payDue, setPayDue] = useState('');
   const [payBusy, setPayBusy] = useState(false);
+
+  const [penRent, setPenRent] = useState<BatteryRent | null>(null);
+  const [penAmount, setPenAmount] = useState('');
+  const [penComment, setPenComment] = useState('');
+  const [penPaid, setPenPaid] = useState(false);
+  const [penMethod, setPenMethod] = useState('CASH');
+  const [penBusy, setPenBusy] = useState(false);
 
   const [editRent, setEditRent] = useState<BatteryRent | null>(null);
   const [editStart, setEditStart] = useState('');
@@ -495,6 +503,53 @@ export function BatterySection({ batteries, rents, onChanged, onError, onNotice 
     }
   };
 
+  const openPenalty = (rent: BatteryRent) => {
+    setPenRent(rent);
+    setPenAmount('');
+    setPenComment('');
+    setPenPaid(false);
+    setPenMethod('CASH');
+    onError(null);
+    onNotice(null);
+  };
+
+  const submitPenalty = async () => {
+    if (!penRent) return;
+    const amount = Number(penAmount);
+    if (!amount || amount <= 0) {
+      onError('Укажите корректную сумму штрафа');
+      return;
+    }
+    setPenBusy(true);
+    try {
+      const res = await fetch(`/api/admin/battery-rents/${penRent.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          penaltyAmount: amount,
+          penaltyComment: penComment || undefined,
+          penaltyPaid: penPaid,
+          penaltyMethod: penPaid ? penMethod : undefined,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        onError(json.error || 'Не удалось начислить штраф');
+        return;
+      }
+      let msg = `Штраф ${amount.toLocaleString('ru-RU')} ₽ начислен по аренде АКБ #${penRent.id}`;
+      if (penPaid) msg += ' (оплачен сразу)';
+      else if (json.debt > 0) msg += `, долг ${Number(json.debt).toLocaleString('ru-RU')} ₽`;
+      onNotice(msg);
+      setPenRent(null);
+      onChanged();
+    } catch {
+      onError('Нет связи с сервером');
+    } finally {
+      setPenBusy(false);
+    }
+  };
+
   return (
     <section className="bg-slate-900/50 border border-slate-800 rounded-xl p-6 mb-8">
       <h2 className="text-lg font-semibold text-slate-200 mb-4">Аккумуляторы</h2>
@@ -622,6 +677,11 @@ export function BatterySection({ batteries, rents, onChanged, onError, onNotice 
                               )}
                             </p>
                           )}
+                          {(rent.penaltiesTotal ?? 0) > 0 && (
+                            <p className="text-xs mt-0.5 text-orange-400">
+                              Штрафы: {formatMoney(Number(rent.penaltiesTotal))}
+                            </p>
+                          )}
                         </div>
                         <div className="flex gap-2 shrink-0 flex-wrap justify-end items-start">
                           <a
@@ -648,6 +708,12 @@ export function BatterySection({ batteries, rents, onChanged, onError, onNotice 
                               + Оплата
                             </button>
                           )}
+                          <button
+                            onClick={() => openPenalty(rent)}
+                            className="px-2.5 py-1.5 bg-orange-700 hover:bg-orange-600 text-white rounded text-xs transition-colors"
+                          >
+                            + Штраф
+                          </button>
                           <button
                             onClick={() => completeRent(rent)}
                             className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs transition-colors"
@@ -982,6 +1048,91 @@ export function BatterySection({ batteries, rents, onChanged, onError, onNotice 
               <button
                 onClick={() => setPayRent(null)}
                 disabled={payBusy}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-300 rounded-lg text-sm transition-colors"
+              >
+                Отмена
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {penRent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
+            <h2 className="mb-2 text-lg font-semibold text-slate-100">
+              Штраф / ущерб — аренда АКБ #{penRent.id}
+            </h2>
+            <p className="mb-4 text-sm text-slate-400">
+              {penRent.user.name} · {penRent.battery.name}
+              {' '}· {penRent.status === 'ACTIVE' ? 'активна' : 'закрыта'}
+            </p>
+
+            <div className="mb-4">
+              <label className="block text-xs font-medium text-slate-400 mb-1">Сумма штрафа, ₽</label>
+              <input
+                type="number"
+                min={0}
+                value={penAmount}
+                onChange={(e) => setPenAmount(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-xs font-medium text-slate-400 mb-1">Причина</label>
+              <input
+                type="text"
+                value={penComment}
+                onChange={(e) => setPenComment(e.target.value)}
+                placeholder="Например: ущерб — повреждён корпус"
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+
+            <div className="mb-4">
+              <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={penPaid}
+                  onChange={(e) => setPenPaid(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-600 bg-slate-900 accent-emerald-500"
+                />
+                Оплачен сразу
+              </label>
+              <p className="mt-1 text-xs text-slate-500">
+                {penPaid
+                  ? 'Штраф будет оприходован как оплата — долг не вырастет'
+                  : 'Сумма добавится к долгу по аренде'}
+              </p>
+            </div>
+
+            {penPaid && (
+              <div className="mb-4">
+                <label className="block text-xs font-medium text-slate-400 mb-1">Способ</label>
+                <select
+                  value={penMethod}
+                  onChange={(e) => setPenMethod(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500"
+                >
+                  {Object.entries(METHOD_LABELS).map(([value, label]) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={submitPenalty}
+                disabled={penBusy}
+                className="flex-1 px-4 py-2 bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors"
+              >
+                {penBusy ? 'Сохранение...' : 'Начислить штраф'}
+              </button>
+              <button
+                onClick={() => setPenRent(null)}
+                disabled={penBusy}
                 className="px-4 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-300 rounded-lg text-sm transition-colors"
               >
                 Отмена

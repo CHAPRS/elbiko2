@@ -292,7 +292,14 @@ export default function NewDocumentPage() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200">
       <style>{DOC_CSS}</style>
-      <div className="sticky top-0 z-10 bg-slate-900 border-b border-slate-800 px-6 py-3 flex flex-wrap items-center gap-3">
+      <style>{`
+        @media print {
+          .no-print { display: none !important; }
+          body { background: #fff !important; }
+          .doc-print-area { box-shadow: none !important; width: auto !important; min-height: auto !important; padding: 0 !important; }
+        }
+      `}</style>
+      <div className="no-print sticky top-0 z-10 bg-slate-900 border-b border-slate-800 px-6 py-3 flex flex-wrap items-center gap-3">
         <button
           onClick={() => router.push(backUrl)}
           className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded text-sm"
@@ -309,6 +316,12 @@ export default function NewDocumentPage() {
           placeholder="Название документа"
         />
         <button
+          onClick={() => window.print()}
+          className="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 rounded text-sm"
+        >
+          Печать / PDF
+        </button>
+        <button
           onClick={save}
           disabled={busy}
           className="px-4 py-1.5 bg-cyan-600 hover:bg-cyan-500 rounded text-sm font-medium disabled:opacity-50"
@@ -316,14 +329,14 @@ export default function NewDocumentPage() {
           {busy ? 'Сохранение…' : docId ? 'Сохранить изменения' : 'Сохранить документ'}
         </button>
       </div>
-      {error && <p className="px-6 pt-3 text-sm text-rose-400">{error}</p>}
-      <p className="px-6 pt-3 text-xs text-slate-500">
+      {error && <p className="no-print px-6 pt-3 text-sm text-rose-400">{error}</p>}
+      <p className="no-print px-6 pt-3 text-xs text-slate-500">
         Подсвеченные поля — заполняемые графы бланка. При печати подложка и рамки не выводятся.
       </p>
       <div className="flex justify-center p-6">
         <div
           ref={docRef}
-          className="bg-white text-black shadow-2xl"
+          className="doc-print-area bg-white text-black shadow-2xl"
           style={{ width: '210mm', minHeight: '297mm', padding: '15mm 15mm 15mm 20mm' }}
         >
           <Doc values={values} onChange={onChange} itemType={prefill.itemType} />

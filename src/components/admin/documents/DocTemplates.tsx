@@ -177,7 +177,7 @@ export function ContractDoc({ values, onChange, itemType }: DocProps) {
       </p>
       <p>
         2.2. Арендная плата: <F name="price" w={10} values={values} onChange={onChange} /> руб. за{' '}
-        <F name="pricePeriod" w={12} values={values} onChange={onChange} placeholder="день / неделю" />
+        {t.item} <F name="itemDesc" w="45%" values={values} onChange={onChange} />
       </p>
       <p>2.3. При продлении аренды применяется текущий тариф, если иное не согласовано Сторонами.</p>
       <p>

@@ -83,7 +83,9 @@ function buildDefaults(p: Prefill, kind: DocKind): Record<string, string> {
     contractMonth: p.dates.start.month,
     model: p.item.name,
     invNumber: p.item.externalId ?? '',
-    pricePeriod: 'день',
+    itemDesc: p.item.externalId
+      ? `${p.item.name}, инв. № ${p.item.externalId}`
+      : p.item.name,
   };
   // «серия ___ № ___» — паспорт храним одной строкой, раскладываем на серию/номер
   if (p.user.passport) {
@@ -101,7 +103,8 @@ function buildDefaults(p: Prefill, kind: DocKind): Record<string, string> {
     v.startMonth = p.dates.start.month;
     v.endDay = p.dates.end.day;
     v.endMonth = p.dates.end.month;
-    v.price = String(p.item.pricePerDay);
+    // п. 2.2 — общая сумма аренды из заявки
+    v.price = String(p.rent.totalPrice || p.item.pricePerDay);
   }
   if (kind === 'RETURN_ACT') {
     v.docNumber = String(p.rent.id);
@@ -121,8 +124,27 @@ function buildDefaults(p: Prefill, kind: DocKind): Record<string, string> {
     // Пропись подставится автоматически при вводе суммы
     v.price = '';
   }
-  if (kind === 'HANDOVER_ACT' && p.item.mileage !== null) {
-    v.mileage = String(p.item.mileage);
+  if (kind === 'HANDOVER_ACT') {
+    // Таблица 2 «Комплектность и стоимость» — состояние и цены пропечатаны по бланку
+    const prices =
+      p.itemType === 'bike'
+        ? ['60 000,00', '40 000,00', '2 000,00', '2 000,00', '500,00', '500,00']
+        : ['40 000,00', '2 000,00'];
+    prices.forEach((price, i) => {
+      v[`cond${i + 1}`] = 'Исправное';
+      v[`price${i + 1}`] = price;
+    });
+    const total = prices.reduce((s, x) => s + (parseMoney(x) ?? 0), 0);
+    v.totalSum = total.toLocaleString('ru-RU');
+    v.totalWords = numToWordsRu(total);
+
+    // Таблица 3 «Внешнее и техническое состояние» — столбец «Состояние» заполнен
+    const stateCount = p.itemType === 'bike' ? 11 : 5;
+    for (let i = 1; i <= stateCount; i++) {
+      v[`state${i}`] = 'Рабочее/ без повреждений';
+    }
+
+    if (p.item.mileage !== null) v.mileage = String(p.item.mileage);
   }
   if (p.itemType === 'battery') {
     v.batterySpec = [p.item.voltage ? `${p.item.voltage} В` : '', p.item.capacityAh ? `${p.item.capacityAh} Ah` : '']

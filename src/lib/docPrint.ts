@@ -12,8 +12,9 @@ export function printDocHtml(title: string, innerHtml: string) {
   iframe.style.border = '0';
   document.body.appendChild(iframe);
 
-  const safeTitle = title.replace(/[<>]/g, '');
-  iframe.srcdoc = `<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><title>${safeTitle}</title><style>${DOC_CSS}</style></head><body style="margin:0;background:#fff">${innerHtml}</body></html>`;
+  // Пустой <title> — чтобы браузер не печатал название в колонтитуле.
+  // Дата и URL отключаются галочкой «Колонтитулы» в диалоге печати.
+  iframe.srcdoc = `<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><title></title><style>${DOC_CSS}</style></head><body style="margin:0;background:#fff">${innerHtml}</body></html>`;
 
   const cleanup = () => {
     setTimeout(() => iframe.remove(), 100);

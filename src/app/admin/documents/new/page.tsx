@@ -146,8 +146,8 @@ export default function NewDocumentPage() {
 function NewDocumentPageInner() {
   const params = useSearchParams();
   const router = useRouter();
-  const docId = params.get('docId');
-  const kindParam = params.get('kind') as DocKind | null;
+  const docId = params?.get('docId');
+  const kindParam = params?.get('kind') as DocKind | null;
 
   const [prefill, setPrefill] = useState<Prefill | null>(null);
   const [kind, setKind] = useState<DocKind | null>(null);
@@ -160,8 +160,8 @@ function NewDocumentPageInner() {
   useEffect(() => {
     (async () => {
       try {
-        let rentId = params.get('rentId');
-        let batteryRentId = params.get('batteryRentId');
+        let rentId = params?.get('rentId');
+        let batteryRentId = params?.get('batteryRentId');
         let k: DocKind | null = kindParam && VALID_KINDS.includes(kindParam) ? kindParam : null;
         let savedFields: Record<string, string> | null = null;
         let savedTitle = '';
@@ -263,8 +263,8 @@ function NewDocumentPageInner() {
         if (!res.ok) throw new Error(doc.error || 'Не удалось сохранить');
         router.push(`/admin/documents/${doc.id}`);
       } else {
-        const rentId = params.get('rentId');
-        const batteryRentId = params.get('batteryRentId');
+        const rentId = params?.get('rentId');
+        const batteryRentId = params?.get('batteryRentId');
         payload.rentId = rentId ? Number(rentId) : undefined;
         payload.batteryRentId = batteryRentId ? Number(batteryRentId) : undefined;
         const res = await fetch('/api/admin/documents', {

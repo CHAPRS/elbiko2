@@ -41,8 +41,8 @@ export default function DocumentsPage() {
 function DocumentsPageInner() {
   const params = useSearchParams();
   const router = useRouter();
-  const rentId = params.get('rentId');
-  const batteryRentId = params.get('batteryRentId');
+  const rentId = params?.get('rentId');
+  const batteryRentId = params?.get('batteryRentId');
   const q = rentId ? `rentId=${rentId}` : `batteryRentId=${batteryRentId}`;
 
   const [docs, setDocs] = useState<DocRow[]>([]);

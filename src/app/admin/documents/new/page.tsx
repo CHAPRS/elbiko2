@@ -9,6 +9,7 @@ import {
   DocItemType,
 } from '@/components/admin/documents/DocTemplates';
 import { DOC_CSS } from '@/lib/docCss';
+import { numToWordsRu, parseMoney } from '@/lib/num2words';
 
 interface Prefill {
   itemType: DocItemType;
@@ -112,10 +113,12 @@ function buildDefaults(p: Prefill, kind: DocKind): Record<string, string> {
     v.condition = 'ok';
   }
   if (kind === 'EXTENSION') {
-    v.docNumber = String(p.numbers.extension);
+    v.docNumber = `${p.numbers.contract}/${p.numbers.extension}`;
     v.oldEndDay = p.dates.end.day;
     v.oldEndMonth = p.dates.end.month;
     v.variant = 'same';
+    // Пропись подставится автоматически при вводе суммы
+    v.price = '';
   }
   if (kind === 'HANDOVER_ACT' && p.item.mileage !== null) {
     v.mileage = String(p.item.mileage);
@@ -179,7 +182,7 @@ export default function NewDocumentPage() {
         setValues(defaults);
         setTitle(
           savedTitle ||
-            `${DOC_KIND_LABELS[k]} №${k === 'EXTENSION' ? p.numbers.extension : p.rent.id} от ${defaults.docDay} ${defaults.docMonth}`
+            `${DOC_KIND_LABELS[k]} №${defaults.docNumber ?? p.rent.id} от ${defaults.docDay} ${defaults.docMonth}`
         );
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Ошибка загрузки');
@@ -187,8 +190,34 @@ export default function NewDocumentPage() {
     })();
   }, [params, docId, kindParam]);
 
+  // Поля, для которых сумма прописью генерируется из числового поля
+  const WORDS_FROM: Record<string, string> = {
+    price: 'priceWords',
+    totalSum: 'totalWords',
+  };
+
   const onChange = (name: string, value: string) =>
-    setValues((v) => ({ ...v, [name]: value }));
+    setValues((v) => {
+      const next = { ...v, [name]: value };
+
+      // Числовое поле → пропись (договор-ДС: price→priceWords, акт: totalSum→totalWords)
+      const wordsField = WORDS_FROM[name];
+      if (wordsField) {
+        const n = parseMoney(value);
+        next[wordsField] = n === null ? '' : numToWordsRu(n);
+      }
+
+      // Комплектность в акте: price1..N → итого + пропись
+      if (/^price\d+$/.test(name) && kind === 'HANDOVER_ACT') {
+        const total = Object.keys(next)
+          .filter((k) => /^price\d+$/.test(k))
+          .reduce((s, k) => s + (parseMoney(next[k]) ?? 0), 0);
+        next.totalSum = total ? total.toLocaleString('ru-RU') : '';
+        next.totalWords = total ? numToWordsRu(total) : '';
+      }
+
+      return next;
+    });
 
   const save = async () => {
     if (!docRef.current || !kind || !prefill) return;

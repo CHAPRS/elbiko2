@@ -21,7 +21,7 @@ function toStandaloneFile(title: string, html: string): string {
 }
 
 export default function DocumentViewPage() {
-  const params = useParams();
+  const params = useParams<{ id: string }>() ?? { id: '' };
   const router = useRouter();
   const [doc, setDoc] = useState<Doc | null>(null);
   const [error, setError] = useState<string | null>(null);

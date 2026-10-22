@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { DOC_KIND_LABELS, DocKind } from '@/components/admin/documents/DocTemplates';
 
@@ -29,6 +29,16 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 export default function DocumentsPage() {
+  return (
+    <Suspense
+      fallback={<div className="min-h-screen bg-slate-950 text-slate-200 p-8">Загрузка…</div>}
+    >
+      <DocumentsPageInner />
+    </Suspense>
+  );
+}
+
+function DocumentsPageInner() {
   const params = useSearchParams();
   const router = useRouter();
   const rentId = params.get('rentId');

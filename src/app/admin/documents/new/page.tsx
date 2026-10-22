@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   DOC_COMPONENTS,
@@ -134,6 +134,16 @@ function buildDefaults(p: Prefill, kind: DocKind): Record<string, string> {
 }
 
 export default function NewDocumentPage() {
+  return (
+    <Suspense
+      fallback={<div className="min-h-screen bg-slate-950 text-slate-200 p-8">Загрузка…</div>}
+    >
+      <NewDocumentPageInner />
+    </Suspense>
+  );
+}
+
+function NewDocumentPageInner() {
   const params = useSearchParams();
   const router = useRouter();
   const docId = params.get('docId');

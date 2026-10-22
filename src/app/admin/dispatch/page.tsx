@@ -1629,6 +1629,12 @@ export default function DispatchPage() {
                         </div>
                         <div className="flex gap-2 shrink-0 flex-wrap justify-end items-start">
                           <ContactLinks user={rent.user} />
+                          <a
+                            href={`/admin/documents?rentId=${rent.id}`}
+                            className="px-2.5 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded text-xs transition-colors"
+                          >
+                            Док.
+                          </a>
                           <button
                             onClick={() => openPenalty(rent)}
                             className="px-2.5 py-1.5 bg-orange-700 hover:bg-orange-600 text-white rounded text-xs transition-colors"

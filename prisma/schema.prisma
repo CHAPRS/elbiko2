@@ -84,6 +84,12 @@ model User {
   isBlacklisted    Boolean  @default(false) // Чёрный список
   blacklistReason  String? // Причина блокировки
 
+  // Данные для документов (договор/акт): заполняются при первом документе
+  passport        String? // серия и номер паспорта
+  passportIssued  String? // кем и когда выдан
+  birthDate       String? // дата рождения
+  address         String? // адрес регистрации
+
   rentalSessions RentalSession[]
   rents          Rent[]
   batteryRents   BatteryRent[]
@@ -183,6 +189,7 @@ model Rent {
   payment        Payment?
   rentTransactions RentTransaction[]
   mileageLogs    MileageLog[]
+  documents      RentDocument[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -210,6 +217,7 @@ model BatteryRent {
   user         User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
   battery      Battery                  @relation(fields: [batteryId], references: [id], onDelete: Cascade)
   transactions BatteryRentTransaction[]
+  documents    RentDocument[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -217,6 +225,26 @@ model BatteryRent {
   @@index([userId])
   @@index([batteryId])
   @@index([status])
+}
+
+// Сохранённый документ по аренде — снапшот заполненного бланка (договор, акты, ДС)
+model RentDocument {
+  id            Int       @id @default(autoincrement())
+  kind          String    // CONTRACT, HANDOVER_ACT, RETURN_ACT, EXTENSION
+  title         String    // "Договор №5 от 22.10.2026"
+  html          String    @db.LongText // заполненный документ (снапшот)
+  fields        Json?     // значения полей — для повторного редактирования
+
+  rentId        Int?
+  rent          Rent?        @relation(fields: [rentId], references: [id], onDelete: Cascade)
+  batteryRentId Int?
+  batteryRent   BatteryRent? @relation(fields: [batteryRentId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([rentId])
+  @@index([batteryRentId])
 }
 
 // Денежный журнал аренды АКБ (аналог RentTransaction)

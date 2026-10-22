@@ -578,6 +578,12 @@ export default function RentsPage() {
             >
               Штраф
             </button>
+            <a
+              href={`/admin/documents?rentId=${rent.id}`}
+              className="px-2 py-1 bg-slate-700 hover:bg-slate-600 text-white rounded text-xs transition-colors"
+            >
+              Док.
+            </a>
             {(!rent.payment || rent.payment.status !== 'COMPLETED') && (
               <>
                 <select

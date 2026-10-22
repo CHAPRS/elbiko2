@@ -179,6 +179,10 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
         isBlacklisted: user.isBlacklisted,
         blacklistReason: user.blacklistReason,
         adminNote: user.adminNote,
+        passport: user.passport,
+        passportIssued: user.passportIssued,
+        birthDate: user.birthDate,
+        address: user.address,
         createdAt: user.createdAt,
       },
       stats: {
@@ -221,6 +225,12 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     if ('blacklistReason' in body) {
       data.blacklistReason =
         body.blacklistReason === null || body.blacklistReason === '' ? null : String(body.blacklistReason);
+    }
+    // Паспортные данные для документов
+    for (const key of ['passport', 'passportIssued', 'birthDate', 'address']) {
+      if (key in body) {
+        data[key] = body[key] === null || body[key] === '' ? null : String(body[key]);
+      }
     }
 
     if (Object.keys(data).length === 0) {

@@ -708,6 +708,12 @@ export function BatterySection({ batteries, rents, onChanged, onError, onNotice 
                               + Оплата
                             </button>
                           )}
+                          <a
+                            href={`/admin/documents?batteryRentId=${rent.id}`}
+                            className="px-2.5 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded text-xs transition-colors"
+                          >
+                            Док.
+                          </a>
                           <button
                             onClick={() => openPenalty(rent)}
                             className="px-2.5 py-1.5 bg-orange-700 hover:bg-orange-600 text-white rounded text-xs transition-colors"

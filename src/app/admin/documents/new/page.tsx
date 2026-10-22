@@ -9,6 +9,7 @@ import {
   DocItemType,
 } from '@/components/admin/documents/DocTemplates';
 import { DOC_CSS } from '@/lib/docCss';
+import { printDocHtml } from '@/lib/docPrint';
 import { numToWordsRu, parseMoney } from '@/lib/num2words';
 
 interface Prefill {
@@ -292,13 +293,6 @@ export default function NewDocumentPage() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200">
       <style>{DOC_CSS}</style>
-      <style>{`
-        @media print {
-          .no-print { display: none !important; }
-          body { background: #fff !important; }
-          .doc-print-area { box-shadow: none !important; width: auto !important; min-height: auto !important; padding: 0 !important; }
-        }
-      `}</style>
       <div className="no-print sticky top-0 z-10 bg-slate-900 border-b border-slate-800 px-6 py-3 flex flex-wrap items-center gap-3">
         <button
           onClick={() => router.push(backUrl)}
@@ -316,7 +310,7 @@ export default function NewDocumentPage() {
           placeholder="Название документа"
         />
         <button
-          onClick={() => window.print()}
+          onClick={() => docRef.current && printDocHtml(title, serialize(docRef.current))}
           className="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 rounded text-sm"
         >
           Печать / PDF
@@ -336,7 +330,7 @@ export default function NewDocumentPage() {
       <div className="flex justify-center p-6">
         <div
           ref={docRef}
-          className="doc-print-area bg-white text-black shadow-2xl"
+          className="bg-white text-black shadow-2xl"
           style={{ width: '210mm', minHeight: '297mm', padding: '15mm 15mm 15mm 20mm' }}
         >
           <Doc values={values} onChange={onChange} itemType={prefill.itemType} />

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { DOC_CSS } from '@/lib/docCss';
+import { printDocHtml } from '@/lib/docPrint';
 
 interface Doc {
   id: number;
@@ -66,7 +67,6 @@ export default function DocumentViewPage() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200">
       <style>{DOC_CSS}</style>
-      <style>{`@media print { .no-print { display: none !important; } body { background: #fff !important; } }`}</style>
       <div className="no-print sticky top-0 z-10 bg-slate-900 border-b border-slate-800 px-6 py-3 flex flex-wrap items-center gap-3">
         <button
           onClick={() => router.push(backUrl)}
@@ -92,7 +92,7 @@ export default function DocumentViewPage() {
             Скачать
           </button>
           <button
-            onClick={() => window.print()}
+            onClick={() => printDocHtml(doc.title, doc.html)}
             className="px-4 py-1.5 bg-cyan-600 hover:bg-cyan-500 rounded text-sm font-medium"
           >
             Печать / PDF
@@ -105,9 +105,6 @@ export default function DocumentViewPage() {
           style={{ width: '210mm', minHeight: '297mm', padding: '15mm 15mm 15mm 20mm' }}
           dangerouslySetInnerHTML={{ __html: doc.html }}
         />
-      </div>
-      <div className="hidden print:block">
-        <div dangerouslySetInnerHTML={{ __html: doc.html }} />
       </div>
     </div>
   );

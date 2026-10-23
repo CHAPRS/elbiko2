@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { MileagePrompt } from '@/components/admin/MileagePrompt';
+import { TxJournal } from '@/components/admin/TxJournal';
 
 interface Rent {
   id: number;
@@ -785,6 +786,18 @@ export default function RentsPage() {
                   onChange={(e) => setEditComment(e.target.value)}
                   rows={3}
                   className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+
+              <div className="mb-4">
+                <label className="mb-2 block text-xs font-medium text-slate-400">
+                  Журнал операций
+                </label>
+                <TxJournal
+                  listUrl={`/api/admin/rent-transactions?rentId=${editingRent.id}`}
+                  itemUrl={(id) => `/api/admin/rent-transactions/${id}`}
+                  onChanged={fetchRents}
+                  onTotals={(t) => setEditPrice(String(t.totalPrice))}
                 />
               </div>
 

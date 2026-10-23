@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { buildMaxLink } from '@/lib/messenger';
+import { TxJournal } from '@/components/admin/TxJournal';
 
 export interface Battery {
   id: number;
@@ -1275,6 +1276,18 @@ export function BatterySection({ batteries, rents, onChanged, onError, onNotice 
                   placeholder="Необязательно"
                 />
               </div>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-xs font-medium text-slate-400 mb-2">
+                Журнал операций
+              </label>
+              <TxJournal
+                listUrl={`/api/admin/battery-rent-transactions?batteryRentId=${editRent.id}`}
+                itemUrl={(id) => `/api/admin/battery-rent-transactions/${id}`}
+                onChanged={onChanged}
+                onTotals={(t) => setEditTotal(String(t.totalPrice))}
+              />
             </div>
 
             <div className="flex gap-3">

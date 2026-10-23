@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { ledgerDebt } from '@/lib/rentLedger';
+import { reconcileFleetStatuses } from '@/lib/fleet';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,6 +18,8 @@ export async function GET(request: Request) {
     if (userId) where.userId = Number(userId);
     if (bikeId) where.bikeId = Number(bikeId);
 
+    await reconcileFleetStatuses();
+
     const rents = await prisma.rent.findMany({
       where,
       include: {
@@ -30,17 +34,25 @@ export async function GET(request: Request) {
           select: {
             id: true,
             name: true,
+            externalId: true,
             status: true,
           },
         },
         payment: true,
+        rentTransactions: { select: { type: true, amount: true } },
       },
       orderBy: {
         createdAt: 'desc',
       },
     });
 
-    return NextResponse.json(rents);
+    // paidTotal — внесённая сумма (PAYMENT − REFUND), debt = цена + штрафы − внесено
+    const result = rents.map((r) => {
+      const { rentTransactions, ...rest } = r;
+      return { ...rest, ...ledgerDebt(Number(r.totalPrice), rentTransactions) };
+    });
+
+    return NextResponse.json(result);
   } catch (error) {
     console.error('Ошибка при получении аренд:', error);
     return NextResponse.json(

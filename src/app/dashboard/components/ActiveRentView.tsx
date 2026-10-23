@@ -28,7 +28,9 @@ export default function ActiveRentView({ rent, onRentTerminated }: ActiveRentVie
       </div>
       {/* Правая колонка: Информация (дата, статус) */}
       <div className="backdrop-blur-md bg-white/5 border border-white/10 p-6 rounded-2xl">
-        <p>{new Date(rent.createdAt).toLocaleDateString('ru-RU')}</p>
+        <p className="text-slate-300 text-sm">{rent.bike?.title}</p>
+        <p className="mt-1 text-xs text-slate-400">{new Date(rent.startDate).toLocaleDateString('ru-RU')} — {new Date(rent.endDate).toLocaleDateString('ru-RU')}</p>
+        <p className="mt-1 text-xs text-slate-500">{rent.totalPrice} ₽</p>
       </div>
     </div>
   );

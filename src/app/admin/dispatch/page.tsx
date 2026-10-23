@@ -1,0 +1,2683 @@
+'use client';
+
+import React, { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
+import { LeadForm } from '@/components/admin/LeadForm';
+import { MileagePrompt } from '@/components/admin/MileagePrompt';
+import { BuyoutSection, Buyout } from '@/components/admin/BuyoutSection';
+import { BatterySection, Battery, BatteryRent } from '@/components/admin/BatterySection';
+import { buildMaxLink } from '@/lib/messenger';
+
+interface Stats {
+  totalBikes: number;
+  rentedBikes: number;
+  freeBikes: number;
+  maintenanceBikes: number;
+  availableForRent: number;
+  occupancyRate: number;
+  totalUsers: number;
+  newLeads: number;
+  activeRents: number;
+  overdueRents: number;
+  returningToday: number;
+  returningTomorrow: number;
+  revenueToday: number;
+  revenuePeriod: number;
+  expectedRevenue: number;
+  overdueRevenue: number;
+  averageCheck: number;
+  failedRefundedRevenue: number;
+  miscIncomeToday: number;
+  miscIncomePeriod: number;
+  expensesToday: number;
+  expensesPeriod: number;
+  buyoutIncomeToday: number;
+  buyoutIncomePeriod: number;
+  batteryIncomeToday?: number;
+  batteryIncomePeriod?: number;
+  batteryDebt?: number;
+  totalBatteries?: number;
+  freeBatteries?: number;
+  activeBatteryRents?: number;
+  netProfitPeriod: number;
+  totalIncomeToday: number;
+  totalIncomePeriod: number;
+  pendingBuyoutTotal: number;
+  partsPositions: number;
+  partsValue: number;
+  partsLowStock: number;
+  incomeByMethod: Record<string, number>;
+  expenseByCategory: Record<string, number>;
+}
+
+interface Bike {
+  id: number;
+  name: string;
+  externalId?: string | null;
+  status: string;
+  pricePerDay: number;
+  mileage?: number | null;
+  serviceIntervalKm?: number | null;
+  lastServiceMileage?: number | null;
+}
+
+interface Lead {
+  id: number;
+  name: string;
+  phone: string;
+  bikeName?: string | null;
+  rentDays?: number | null;
+  totalPrice?: number | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  createdAt: string;
+  bike?: { id: number; name: string; externalId?: string | null } | null;
+  bikeId?: number | null;
+  itemType?: string | null;
+  batteryId?: number | null;
+  battery?: { id: number; name: string; serialNumber?: string | null } | null;
+}
+
+interface RentUser {
+  id: number;
+  name: string;
+  phone: string;
+  telegramChatId?: string | null;
+  maxChatId?: string | null;
+  preferredMessenger?: string | null;
+}
+
+interface RentBike {
+  id: number;
+  name: string;
+  externalId?: string | null;
+  status: string;
+}
+
+interface Rent {
+  id: number;
+  startDate: string;
+  endDate: string;
+  totalPrice: number;
+  status: string;
+  paidTotal?: number;
+  debt?: number;
+  penaltiesTotal?: number;
+  debtDueDate?: string | null;
+  user: RentUser;
+  bike: RentBike;
+}
+
+interface RevenueDay {
+  date: string;
+  revenue: number;
+  battery?: number;
+  misc?: number;
+  expense?: number;
+  buyout?: number;
+  total?: number;
+}
+
+interface MiscTransaction {
+  id: number;
+  kind: string;
+  title: string;
+  amount: number;
+  method?: string | null;
+  category?: string | null;
+  bikeId?: number | null;
+  bike?: { id: number; name: string; externalId?: string | null } | null;
+  comment?: string | null;
+  createdAt: string;
+}
+
+interface TopBike {
+  id: number;
+  externalId?: string | null;
+  name: string;
+  revenue: number;
+}
+
+interface TopClient {
+  name: string;
+  phone: string | null;
+  revenue: number;
+  count: number;
+}
+
+interface TimelineDay {
+  date: string;
+  dayOfWeek: string;
+  freeCount: number;
+  returning: Rent[];
+  returningBatteries: BatteryRent[];
+}
+
+interface DashboardData {
+  period?: { days: number; from: string; to: string };
+  stats: Stats;
+  newLeads: Lead[];
+  activeRents: Rent[];
+  overdueRents: Rent[];
+  returningToday: Rent[];
+  returningTomorrow: Rent[];
+  freeBikes: Bike[];
+  maintenanceBikes: Bike[];
+  revenueByDay: RevenueDay[];
+  topBikes: TopBike[];
+  topClients?: TopClient[];
+  timeline: TimelineDay[];
+  bikes: Bike[];
+  batteries: Battery[];
+  batteryRents: BatteryRent[];
+  recentMisc: MiscTransaction[];
+  buyouts: Buyout[];
+  archivedBuyouts?: Buyout[];
+}
+
+function formatDate(date: string): string {
+  return new Date(date).toLocaleDateString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+}
+
+function formatDateTime(date: string): string {
+  return new Date(date).toLocaleString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function formatShortDay(date: string): string {
+  const [year, month, day] = date.split('-').map(Number);
+  const d = new Date(year, month - 1, day);
+  return d.toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'short',
+  });
+}
+
+function formatMoney(value: number): string {
+  return `${Math.round(value).toLocaleString('ru-RU')} ₽`;
+}
+
+const METHOD_LABELS: Record<string, string> = {
+  CASH: 'Наличные',
+  SBP: 'СБП',
+  CARD: 'Карта',
+  TRANSFER: 'Перевод',
+};
+
+const CATEGORY_LABELS: Record<string, string> = {
+  REPAIR: 'Ремонт',
+  SERVICE: 'ТО',
+  BATTERY: 'Аккумулятор',
+  BATTERY_RENT: 'Аренда аккумулятора',
+  ACCESSORIES: 'Аксессуары',
+  GOODS: 'Сопутствующие товары',
+  PARTS: 'Запчасти',
+  SALARY: 'ЗП мастерам',
+  DELIVERY: 'Доставка',
+  TOOLS: 'Оборудование/инструменты',
+  OTHER: 'Прочее',
+  NONE: 'Без категории',
+};
+
+const CATEGORY_ORDER = ['REPAIR', 'SERVICE', 'BATTERY', 'BATTERY_RENT', 'ACCESSORIES', 'GOODS', 'PARTS', 'SALARY', 'DELIVERY', 'TOOLS', 'OTHER', 'NONE'];
+
+const MISC_TITLE_SUGGESTIONS = [
+  'Ремонт',
+  'Сопутствующие товары',
+  'Продажа',
+  'Закупка байка',
+  'Запчасти',
+  'Обслуживание',
+  'Прочее',
+];
+
+function ContactLinks({ user }: { user: RentUser }) {
+  const maxLink = buildMaxLink(user);
+
+  return (
+    <div className="flex gap-2 shrink-0 flex-wrap">
+      <a
+        href={`tel:${user.phone}`}
+        className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs transition-colors"
+      >
+        Позвонить
+      </a>
+      {maxLink && (
+        <a
+          href={maxLink}
+          target="_blank"
+          rel="noreferrer"
+          className="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded text-xs transition-colors"
+        >
+          MAX
+        </a>
+      )}
+    </div>
+  );
+}
+
+export default function DispatchPage() {
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [days, setDays] = useState(7);
+  const [markingOverdue, setMarkingOverdue] = useState(false);
+  const [searchInput, setSearchInput] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [convertingLead, setConvertingLead] = useState<Lead | null>(null);
+  const [convertBikeId, setConvertBikeId] = useState('');
+  const [convertBatteryId, setConvertBatteryId] = useState('');
+  const [convertDays, setConvertDays] = useState('1');
+  const [convertTotalPrice, setConvertTotalPrice] = useState('');
+  const [convertPriceManual, setConvertPriceManual] = useState(false);
+  const [converting, setConverting] = useState(false);
+  const [miscKind, setMiscKind] = useState<'INCOME' | 'EXPENSE'>('INCOME');
+  const [miscTitle, setMiscTitle] = useState('');
+  const [miscAmount, setMiscAmount] = useState('');
+  const [miscMethod, setMiscMethod] = useState('CASH');
+  const [miscCategory, setMiscCategory] = useState('');
+  const [miscBikeId, setMiscBikeId] = useState('');
+  const [miscComment, setMiscComment] = useState('');
+  const [miscSaving, setMiscSaving] = useState(false);
+  const [editingMisc, setEditingMisc] = useState<MiscTransaction | null>(null);
+  const [mileageAction, setMileageAction] = useState<{ type: 'complete' | 'extend'; rent: Rent } | null>(null);
+  const [mileageBike, setMileageBike] = useState<Bike | null>(null);
+  const [mileageBusy, setMileageBusy] = useState(false);
+  const [payRent, setPayRent] = useState<Rent | null>(null);
+  const [payAmount, setPayAmount] = useState('');
+  const [payMethod, setPayMethod] = useState('CASH');
+  const [payDue, setPayDue] = useState('');
+  const [payBusy, setPayBusy] = useState(false);
+  const [penRent, setPenRent] = useState<Rent | null>(null);
+  const [penAmount, setPenAmount] = useState('');
+  const [penComment, setPenComment] = useState('');
+  const [penPaid, setPenPaid] = useState(false);
+  const [penMethod, setPenMethod] = useState('CASH');
+  const [penBusy, setPenBusy] = useState(false);
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
+  const [customPeriod, setCustomPeriod] = useState<{ from: string; to: string } | null>(null);
+  const [expandedTimelineDay, setExpandedTimelineDay] = useState<string | null>(null);
+  const [expandedRevenueDay, setExpandedRevenueDay] = useState<string | null>(null);
+  const [hideEmptyRevenueDays, setHideEmptyRevenueDays] = useState(false);
+  const [revenueChartCollapsed, setRevenueChartCollapsed] = useState(false);
+  const [showMiscHistory, setShowMiscHistory] = useState(false);
+  const [histFrom, setHistFrom] = useState('');
+  const [histTo, setHistTo] = useState('');
+  const [histKind, setHistKind] = useState('');
+  const [histCategory, setHistCategory] = useState('');
+  const [histItems, setHistItems] = useState<MiscTransaction[] | null>(null);
+  const [histLoading, setHistLoading] = useState(false);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setSearchQuery(searchInput.trim());
+    }, 300);
+    return () => clearTimeout(timeout);
+  }, [searchInput]);
+
+  const fetchDashboard = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
+    try {
+      const query = customPeriod
+        ? `from=${customPeriod.from}&to=${customPeriod.to}`
+        : `days=${days}`;
+      const res = await fetch(`/api/admin/dashboard?${query}`);
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error || 'Не удалось загрузить дашборд');
+        return;
+      }
+      setData(json);
+      setError(null);
+    } catch (err) {
+      setError('Нет связи с сервером');
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  }, [days, customPeriod]);
+
+  useEffect(() => {
+    fetchDashboard();
+
+    const interval = setInterval(() => {
+      fetchDashboard(true);
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [days, customPeriod, fetchDashboard]);
+
+  const applyCustomPeriod = () => {
+    if (!customFrom || !customTo) {
+      setError('Укажите обе даты периода');
+      return;
+    }
+    setCustomPeriod({ from: customFrom, to: customTo });
+  };
+
+  const selectPresetDays = (d: number) => {
+    setCustomPeriod(null);
+    setDays(d);
+  };
+
+  const fetchMiscHistory = async () => {
+    setHistLoading(true);
+    try {
+      const params = new URLSearchParams({ take: '500' });
+      if (histFrom) params.set('from', `${histFrom}T00:00:00`);
+      if (histTo) params.set('to', `${histTo}T23:59:59`);
+      if (histKind) params.set('kind', histKind);
+      if (histCategory) params.set('category', histCategory);
+      const res = await fetch(`/api/admin/finance?${params.toString()}`);
+      const json = await res.json();
+      setHistItems(res.ok ? json : []);
+      if (!res.ok) setError(json.error || 'Не удалось загрузить историю операций');
+    } catch {
+      setHistItems([]);
+      setError('Нет связи с сервером');
+    } finally {
+      setHistLoading(false);
+    }
+  };
+
+  const periodDaysLabel = data?.period?.days ?? days;
+
+  const takeLead = async (id: number) => {
+    try {
+      const res = await fetch(`/api/admin/leads/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'IN_PROGRESS' }),
+      });
+      if (res.ok) {
+        setNotice('Заявка взята в работу');
+        fetchDashboard();
+      } else {
+        const json = await res.json();
+        setError(json.error || 'Не удалось обновить заявку');
+      }
+    } catch {
+      setError('Нет связи с сервером');
+    }
+  };
+
+  const isBatteryLead = (lead: Lead | null) =>
+    lead?.itemType === 'BATTERY' || Boolean(lead?.batteryId);
+
+  const openConvert = (lead: Lead) => {
+    setConvertingLead(lead);
+    setConvertPriceManual(false);
+    const defaultBikeId = lead.bikeId
+      ? String(lead.bikeId)
+      : lead.bike
+      ? String(lead.bike.id)
+      : '';
+    setConvertBikeId(defaultBikeId);
+    const defaultBatteryId = lead.batteryId
+      ? String(lead.batteryId)
+      : lead.battery
+      ? String(lead.battery.id)
+      : '';
+    setConvertBatteryId(defaultBatteryId);
+    const defaultDays = lead.rentDays && lead.rentDays > 0 ? String(lead.rentDays) : '1';
+    setConvertDays(defaultDays);
+
+    const bike = data?.freeBikes.find((b) => String(b.id) === defaultBikeId);
+    const battery = data?.batteries.find((b) => String(b.id) === defaultBatteryId);
+    const price =
+      lead.totalPrice !== null && lead.totalPrice !== undefined
+        ? String(lead.totalPrice)
+        : isBatteryLead(lead) && battery
+        ? String(Number(battery.pricePerDay) * Number(defaultDays))
+        : bike
+        ? String(Number(bike.pricePerDay) * Number(defaultDays))
+        : '';
+    setConvertTotalPrice(price);
+  };
+
+  const closeConvert = () => {
+    setConvertingLead(null);
+    setConvertBikeId('');
+    setConvertBatteryId('');
+    setConvertDays('1');
+    setConvertTotalPrice('');
+    setConvertPriceManual(false);
+    setConverting(false);
+  };
+
+  useEffect(() => {
+    if (!convertingLead || convertPriceManual) return;
+    const days = Number(convertDays) || 1;
+    if (isBatteryLead(convertingLead)) {
+      const battery = data?.batteries.find((b) => String(b.id) === convertBatteryId);
+      if (!battery) return;
+      setConvertTotalPrice(String(Number(battery.pricePerDay) * days));
+      return;
+    }
+    const bike = data?.freeBikes.find((b) => String(b.id) === convertBikeId);
+    if (!bike) return;
+    setConvertTotalPrice(String(Number(bike.pricePerDay) * days));
+  }, [convertBikeId, convertBatteryId, convertDays, convertingLead, data?.freeBikes, data?.batteries, convertPriceManual]);
+
+  const handleConvert = async () => {
+    if (!convertingLead) return;
+    const batteryMode = isBatteryLead(convertingLead);
+    if (!batteryMode && !convertBikeId) {
+      setError('Выберите велосипед');
+      return;
+    }
+    if (batteryMode && !convertBatteryId) {
+      setError('Выберите аккумулятор');
+      return;
+    }
+    const rentDays = Number(convertDays);
+    if (!rentDays || rentDays <= 0) {
+      setError('Укажите корректное количество дней');
+      return;
+    }
+    setConverting(true);
+    try {
+      const res = await fetch(`/api/admin/leads/${convertingLead.id}/convert`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bikeId: batteryMode ? undefined : Number(convertBikeId),
+          batteryId: batteryMode ? Number(convertBatteryId) : undefined,
+          days: rentDays,
+          totalPrice: convertTotalPrice ? Number(convertTotalPrice) : undefined,
+          startDate: convertingLead.startDate,
+          endDate: convertingLead.endDate,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error || 'Не удалось оформить аренду');
+        return;
+      }
+      setNotice(`Аренда №${json.rentId ?? json.batteryRentId} оформлена по заявке №${convertingLead.id}`);
+      closeConvert();
+      fetchDashboard();
+    } catch {
+      setError('Нет связи с сервером');
+    } finally {
+      setConverting(false);
+    }
+  };
+
+  const completeRent = (rent: Rent) => {
+    setMileageAction({ type: 'complete', rent });
+  };
+
+  const extendRent = (rent: Rent) => {
+    setMileageAction({ type: 'extend', rent });
+  };
+
+  const toInputDate = (dateString: string) => {
+    const d = new Date(dateString);
+    const offset = d.getTimezoneOffset() * 60000;
+    return new Date(d.getTime() - offset).toISOString().split('T')[0];
+  };
+
+  const openPay = (rent: Rent) => {
+    setPayRent(rent);
+    setPayAmount(String(rent.debt ?? ''));
+    setPayMethod('CASH');
+    setPayDue(rent.debtDueDate ? toInputDate(rent.debtDueDate) : '');
+    setError(null);
+    setNotice(null);
+  };
+
+  const submitPay = async () => {
+    if (!payRent) return;
+    const amount = Number(payAmount);
+    if (!amount || amount <= 0) {
+      setError('Укажите корректную сумму оплаты');
+      return;
+    }
+    setPayBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/rents/${payRent.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          paidAmount: amount,
+          paidMethod: payMethod,
+          debtDueDate: payDue || undefined,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error || 'Не удалось внести оплату');
+        return;
+      }
+      let msg = `Оплата ${amount.toLocaleString('ru-RU')} ₽ внесена по аренде #${payRent.id}`;
+      if (json.debt > 0) msg += `, остаток долга ${Number(json.debt).toLocaleString('ru-RU')} ₽`;
+      if (json.overpaid) msg += ' (сумма превышала долг)';
+      setNotice(msg);
+      setPayRent(null);
+      fetchDashboard();
+    } catch {
+      setError('Нет связи с сервером');
+    } finally {
+      setPayBusy(false);
+    }
+  };
+
+  const openPenalty = (rent: Rent) => {
+    setPenRent(rent);
+    setPenAmount('');
+    setPenComment('');
+    setPenPaid(false);
+    setPenMethod('CASH');
+    setError(null);
+    setNotice(null);
+  };
+
+  const submitPenalty = async () => {
+    if (!penRent) return;
+    const amount = Number(penAmount);
+    if (!amount || amount <= 0) {
+      setError('Укажите корректную сумму штрафа');
+      return;
+    }
+    setPenBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/rents/${penRent.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          penaltyAmount: amount,
+          penaltyComment: penComment || undefined,
+          penaltyPaid: penPaid,
+          penaltyMethod: penPaid ? penMethod : undefined,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error || 'Не удалось начислить штраф');
+        return;
+      }
+      let msg = `Штраф ${amount.toLocaleString('ru-RU')} ₽ начислен по аренде #${penRent.id}`;
+      if (penPaid) msg += ' (оплачен сразу)';
+      else if (json.debt > 0) msg += `, долг ${Number(json.debt).toLocaleString('ru-RU')} ₽`;
+      setNotice(msg);
+      setPenRent(null);
+      fetchDashboard();
+    } catch {
+      setError('Нет связи с сервером');
+    } finally {
+      setPenBusy(false);
+    }
+  };
+
+  const submitRentMileage = async (mileage: number | null) => {
+    if (!mileageAction) return;
+    const { type, rent } = mileageAction;
+    setMileageBusy(true);
+    try {
+      const body =
+        type === 'complete'
+          ? { status: 'COMPLETED' }
+          : { extendDays: 1 };
+      const res = await fetch(`/api/admin/rents/${rent.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(mileage !== null ? { ...body, mileage } : body),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error || 'Не удалось обновить аренду');
+        return;
+      }
+      setNotice(
+        type === 'complete'
+          ? 'Аренда завершена, байк освобожден'
+          : 'Аренда продлена на 1 день'
+      );
+      if (json.mileageWarning) {
+        setNotice((prev) => `${prev}. Внимание: внесённый пробег меньше предыдущего`);
+      }
+      setMileageAction(null);
+      fetchDashboard();
+    } catch {
+      setError('Нет связи с сервером');
+    } finally {
+      setMileageBusy(false);
+    }
+  };
+
+  const submitBikeMileage = async (mileage: number | null) => {
+    if (!mileageBike) return;
+    if (mileage === null) {
+      setMileageBike(null);
+      return;
+    }
+    setMileageBusy(true);
+    try {
+      const res = await fetch(`/api/admin/bikes/${mileageBike.id}/mileage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mileage }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error || 'Не удалось сохранить пробег');
+        return;
+      }
+      setNotice(
+        json.mileageWarning
+          ? `Пробег ${mileage} км записан. Внимание: он меньше предыдущего`
+          : `Пробег ${mileage} км записан для ${mileageBike.name}`
+      );
+      setMileageBike(null);
+      fetchDashboard();
+    } catch {
+      setError('Нет связи с сервером');
+    } finally {
+      setMileageBusy(false);
+    }
+  };
+
+  const markServiceDone = async (bike: Bike) => {
+    if (bike.mileage == null) {
+      setError('Сначала укажите текущий пробег байка');
+      return;
+    }
+    try {
+      const res = await fetch('/api/admin/bikes', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: bike.id, lastServiceMileage: bike.mileage }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error || 'Не удалось отметить ТО');
+        return;
+      }
+      setNotice(`ТО проведено: ${bike.name} на ${bike.mileage.toLocaleString('ru-RU')} км`);
+      fetchDashboard();
+    } catch {
+      setError('Нет связи с сервером');
+    }
+  };
+
+  const serviceInfo = (bike: Bike): { text: string; overdue: boolean } | null => {
+    if (bike.serviceIntervalKm == null || bike.serviceIntervalKm <= 0) return null;
+    if (bike.mileage == null) return { text: 'Пробег не указан', overdue: false };
+    const sinceLast = bike.mileage - (bike.lastServiceMileage ?? 0);
+    const remaining = bike.serviceIntervalKm - sinceLast;
+    return remaining <= 0
+      ? { text: `ТО просрочено на ${Math.abs(remaining).toLocaleString('ru-RU')} км`, overdue: true }
+      : { text: `до ТО ${remaining.toLocaleString('ru-RU')} км`, overdue: false };
+  };
+
+  const markOverdue = async () => {
+    setMarkingOverdue(true);
+    try {
+      const res = await fetch('/api/admin/overdue', { method: 'POST' });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error || 'Не удалось пометить просрочки');
+        return;
+      }
+      setNotice(`Просрочено аренд: ${json.count}`);
+      fetchDashboard();
+    } catch {
+      setError('Нет связи с сервером');
+    } finally {
+      setMarkingOverdue(false);
+    }
+  };
+
+  const resetMiscForm = () => {
+    setEditingMisc(null);
+    setMiscKind('INCOME');
+    setMiscTitle('');
+    setMiscAmount('');
+    setMiscMethod('CASH');
+    setMiscCategory('');
+    setMiscBikeId('');
+    setMiscComment('');
+  };
+
+  const startEditMisc = (tx: MiscTransaction) => {
+    setEditingMisc(tx);
+    setMiscKind(tx.kind === 'EXPENSE' ? 'EXPENSE' : 'INCOME');
+    setMiscTitle(tx.title);
+    setMiscAmount(String(tx.amount));
+    setMiscMethod(tx.method || 'CASH');
+    setMiscCategory(tx.category || '');
+    setMiscBikeId(tx.bikeId ? String(tx.bikeId) : '');
+    setMiscComment(tx.comment || '');
+  };
+
+  const submitMisc = async () => {
+    const amount = Number(miscAmount);
+    if (!miscTitle.trim()) {
+      setError('Укажите предмет операции');
+      return;
+    }
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError('Укажите корректную сумму');
+      return;
+    }
+    setMiscSaving(true);
+    try {
+      const payload = {
+        kind: miscKind,
+        title: miscTitle.trim(),
+        amount,
+        method: miscMethod || null,
+        category: miscCategory || null,
+        bikeId: miscBikeId ? Number(miscBikeId) : null,
+        comment: miscComment.trim() || null,
+      };
+      const res = await fetch(
+        editingMisc ? `/api/admin/finance/${editingMisc.id}` : '/api/admin/finance',
+        {
+          method: editingMisc ? 'PATCH' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }
+      );
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error || 'Не удалось сохранить операцию');
+        return;
+      }
+      setNotice(editingMisc ? 'Операция обновлена' : 'Операция добавлена');
+      resetMiscForm();
+      fetchDashboard();
+      if (histItems !== null) fetchMiscHistory();
+    } catch {
+      setError('Нет связи с сервером');
+    } finally {
+      setMiscSaving(false);
+    }
+  };
+
+  const deleteMisc = async (id: number) => {
+    if (!window.confirm('Удалить эту операцию?')) return;
+    try {
+      const res = await fetch(`/api/admin/finance/${id}`, { method: 'DELETE' });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error || 'Не удалось удалить операцию');
+        return;
+      }
+      if (editingMisc?.id === id) resetMiscForm();
+      setHistItems((prev) => (prev ? prev.filter((t) => t.id !== id) : prev));
+      setNotice('Операция удалена');
+      fetchDashboard();
+    } catch {
+      setError('Нет связи с сервером');
+    }
+  };
+
+  const renderMiscTx = (tx: MiscTransaction) => (
+    <li
+      key={tx.id}
+      className="border border-slate-800 rounded-lg p-3 bg-slate-950/50 flex items-start justify-between gap-3"
+    >
+      <div className="min-w-0">
+        <p className="text-sm font-medium text-slate-100 truncate">
+          {tx.title}
+          {tx.bike && (
+            <span className="text-slate-400 font-normal">
+              {' '}· {tx.bike.name}{tx.bike.externalId ? ` (ID: ${tx.bike.externalId})` : ''}
+            </span>
+          )}
+        </p>
+        <p className="text-xs text-slate-500 mt-0.5">
+          {formatDateTime(tx.createdAt)}
+          {tx.category ? ` · ${CATEGORY_LABELS[tx.category] || tx.category}` : ''}
+          {tx.method ? ` · ${METHOD_LABELS[tx.method] || tx.method}` : ''}
+          {tx.comment ? ` · ${tx.comment}` : ''}
+        </p>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <span
+          className={`text-sm font-semibold ${
+            tx.kind === 'INCOME' ? 'text-emerald-400' : 'text-rose-400'
+          }`}
+        >
+          {tx.kind === 'INCOME' ? '+' : '−'}{formatMoney(Number(tx.amount))}
+        </span>
+        <button
+          type="button"
+          onClick={() => startEditMisc(tx)}
+          className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs transition-colors"
+        >
+          Изм.
+        </button>
+        <button
+          type="button"
+          onClick={() => deleteMisc(tx.id)}
+          className="px-2 py-1 bg-slate-800 hover:bg-rose-900 text-slate-300 rounded text-xs transition-colors"
+        >
+          ✕
+        </button>
+      </div>
+    </li>
+  );
+
+  const nowTsEarly = Date.now();
+  const DAY_MS_EARLY = 24 * 60 * 60 * 1000;
+  const searchQ = searchQuery.toLowerCase().trim();
+  const batteryReturnMatch = (rent: BatteryRent) =>
+    !searchQ ||
+    [rent.user.name, rent.user.phone, rent.battery.name].some((v) =>
+      String(v ?? '').toLowerCase().includes(searchQ)
+    );
+  const batteryReturningOn = (key: string) =>
+    (data?.batteryRents ?? []).filter(
+      (rent) => new Date(rent.endDate).toDateString() === key && batteryReturnMatch(rent)
+    );
+  const batteryReturningToday = batteryReturningOn(new Date().toDateString());
+  const batteryReturningTomorrow = batteryReturningOn(new Date(nowTsEarly + DAY_MS_EARLY).toDateString());
+
+  const operationalStats: { label: string; value: number; color: string; suffix?: string }[] = data
+    ? [
+        { label: 'Новые заявки', value: data.stats.newLeads, color: 'text-emerald-400' },
+        { label: 'Активные аренды', value: data.stats.activeRents, color: 'text-amber-400' },
+        { label: 'Просроченные', value: data.stats.overdueRents, color: 'text-rose-400' },
+        { label: 'Свободные байки', value: data.stats.freeBikes, color: 'text-cyan-400' },
+        { label: 'Возврат сегодня', value: data.stats.returningToday + batteryReturningToday.length, color: 'text-blue-400' },
+        { label: 'Возврат завтра', value: data.stats.returningTomorrow + batteryReturningTomorrow.length, color: 'text-violet-400' },
+        { label: 'Загруженность', value: data.stats.occupancyRate, color: 'text-amber-500', suffix: '%' },
+        { label: 'Доступно для аренды', value: data.stats.availableForRent, color: 'text-emerald-300' },
+        { label: 'Аренды АКБ', value: data.stats.activeBatteryRents ?? 0, color: 'text-sky-400' },
+        { label: 'Свободные АКБ', value: data.stats.freeBatteries ?? 0, color: 'text-cyan-300' },
+      ]
+    : [];
+
+  const financialStats: { label: string; value: number; color: string }[] = data
+    ? [
+        { label: 'Выручка всего сегодня', value: data.stats.totalIncomeToday, color: 'text-emerald-400' },
+        { label: `Выручка всего за ${periodDaysLabel} дн.`, value: data.stats.totalIncomePeriod, color: 'text-amber-400' },
+        { label: `Аренда за ${periodDaysLabel} дн.`, value: data.stats.revenuePeriod, color: 'text-sky-400' },
+        { label: `АКБ за ${periodDaysLabel} дн.`, value: data.stats.batteryIncomePeriod ?? 0, color: 'text-sky-300' },
+        { label: 'Ожидаемая выручка', value: data.stats.expectedRevenue, color: 'text-cyan-400' },
+        { label: 'Просроченная выручка', value: data.stats.overdueRevenue, color: 'text-rose-400' },
+        { label: 'Средний чек', value: data.stats.averageCheck, color: 'text-slate-200' },
+        { label: 'Неудачи / возвраты', value: data.stats.failedRefundedRevenue, color: 'text-slate-400' },
+        { label: `Прочие доходы за ${periodDaysLabel} дн.`, value: data.stats.miscIncomePeriod, color: 'text-emerald-300' },
+        { label: `Доход по выкупам за ${periodDaysLabel} дн.`, value: data.stats.buyoutIncomePeriod, color: 'text-cyan-300' },
+        { label: `Расходы за ${periodDaysLabel} дн.`, value: data.stats.expensesPeriod, color: 'text-rose-300' },
+        { label: `Прибыль за ${periodDaysLabel} дн.`, value: data.stats.netProfitPeriod, color: 'text-lime-400' },
+        { label: 'Осталось по выкупам', value: data.stats.pendingBuyoutTotal, color: 'text-violet-400' },
+        { label: `Склад: ${data.stats.partsPositions} поз.${data.stats.partsLowStock > 0 ? ` · мало: ${data.stats.partsLowStock}` : ''}`, value: data.stats.partsValue, color: data.stats.partsLowStock > 0 ? 'text-rose-300' : 'text-orange-300' },
+      ]
+    : [];
+
+  const maxRevenue = data && data.revenueByDay.length > 0
+    ? Math.max(...data.revenueByDay.map((d) => Math.max(d.total ?? 0, d.expense ?? 0)), 1)
+    : 1;
+
+  const query = searchQuery.toLowerCase().trim();
+
+  const matchesSearch = (...values: (string | number | null | undefined)[]) => {
+    if (!query) return true;
+    return values.some((value) =>
+      String(value ?? '').toLowerCase().includes(query)
+    );
+  };
+
+  const filteredNewLeads = data?.newLeads.filter((lead) =>
+    matchesSearch(lead.name, lead.phone, lead.bike?.name, lead.bikeName, lead.battery?.name)
+  ) ?? [];
+
+  const filteredActiveRents = data?.activeRents.filter((rent) =>
+    matchesSearch(rent.user.name, rent.user.phone, rent.bike.name)
+  ) ?? [];
+
+  const nowTs = Date.now();
+  const DAY_MS = 24 * 60 * 60 * 1000;
+
+  // Возврат просрочен: срок вчера и раньше — сразу; срок сегодня — только после 16:00
+  const RETURN_CUTOFF_HOUR = 16;
+  const dayStartTs = (d: Date | string) => {
+    const x = new Date(d);
+    x.setHours(0, 0, 0, 0);
+    return x.getTime();
+  };
+  const todayTs = dayStartTs(new Date());
+  const isReturnOverdue = (endDate: Date | string) => {
+    const end = dayStartTs(endDate);
+    if (end < todayTs) return true;
+    if (end === todayTs) return new Date().getHours() >= RETURN_CUTOFF_HOUR;
+    return false;
+  };
+  type Debtor = {
+    key: string;
+    kind: 'Аренда' | 'Выкуп' | 'Доплата';
+    name: string;
+    phone?: string | null;
+    target: string;
+    amount: number;
+    dueDate: string;
+    daysOverdue: number;
+    notOverdue?: boolean;
+  };
+  const debtors: Debtor[] = [];
+
+  (data?.activeRents ?? [])
+    .filter((rent) =>
+      isReturnOverdue(rent.endDate) &&
+      matchesSearch(rent.user.name, rent.user.phone, rent.bike.name)
+    )
+    .forEach((rent) => {
+      debtors.push({
+        key: `rent-${rent.id}`,
+        kind: 'Аренда',
+        name: rent.user.name,
+        phone: rent.user.phone,
+        target: rent.bike.name + (rent.bike.externalId ? ` (ID: ${rent.bike.externalId})` : ''),
+        amount: (rent.debt ?? 0) > 0 ? Number(rent.debt) : Number(rent.totalPrice) || 0,
+        dueDate: rent.endDate,
+        daysOverdue: Math.floor((nowTs - new Date(rent.endDate).getTime()) / DAY_MS),
+      });
+    });
+
+  // «Доплата»: частично оплаченные аренды с остатком долга или непогашенный штраф
+  (data?.activeRents ?? [])
+    .filter((rent) =>
+      (rent.debt ?? 0) > 0 &&
+      ((rent.paidTotal ?? 0) > 0 || Boolean(rent.debtDueDate) || (rent.penaltiesTotal ?? 0) > 0) &&
+      !isReturnOverdue(rent.endDate) &&
+      matchesSearch(rent.user.name, rent.user.phone, rent.bike.name)
+    )
+    .forEach((rent) => {
+      const dueTs = rent.debtDueDate ? new Date(rent.debtDueDate).getTime() : null;
+      const overdue = dueTs !== null && dueTs < nowTs;
+      debtors.push({
+        key: `debt-${rent.id}`,
+        kind: 'Доплата',
+        name: rent.user.name,
+        phone: rent.user.phone,
+        target: rent.bike.name + (rent.bike.externalId ? ` (ID: ${rent.bike.externalId})` : ''),
+        amount: Number(rent.debt),
+        dueDate: rent.debtDueDate || rent.endDate,
+        daysOverdue: overdue ? Math.floor((nowTs - dueTs!) / DAY_MS) : 0,
+        notOverdue: !overdue,
+      });
+    });
+
+  // Просроченные аренды АКБ
+  (data?.batteryRents ?? [])
+    .filter((rent) =>
+      isReturnOverdue(rent.endDate) &&
+      matchesSearch(rent.user.name, rent.user.phone, rent.battery.name)
+    )
+    .forEach((rent) => {
+      debtors.push({
+        key: `brent-${rent.id}`,
+        kind: 'Аренда',
+        name: rent.user.name,
+        phone: rent.user.phone,
+        target: `АКБ ${rent.battery.name}`,
+        amount: (rent.debt ?? 0) > 0 ? Number(rent.debt) : Number(rent.totalPrice) || 0,
+        dueDate: rent.endDate,
+        daysOverdue: Math.floor((nowTs - new Date(rent.endDate).getTime()) / DAY_MS),
+      });
+    });
+
+  // «Доплата» по АКБ: непогашенный долг или штраф, аренда ещё не просрочена
+  (data?.batteryRents ?? [])
+    .filter((rent) =>
+      (rent.debt ?? 0) > 0 &&
+      ((rent.paidTotal ?? 0) > 0 || Boolean(rent.debtDueDate) || (rent.penaltiesTotal ?? 0) > 0) &&
+      !isReturnOverdue(rent.endDate) &&
+      matchesSearch(rent.user.name, rent.user.phone, rent.battery.name)
+    )
+    .forEach((rent) => {
+      const dueTs = rent.debtDueDate ? new Date(rent.debtDueDate).getTime() : null;
+      const overdue = dueTs !== null && dueTs < nowTs;
+      debtors.push({
+        key: `bdebt-${rent.id}`,
+        kind: 'Доплата',
+        name: rent.user.name,
+        phone: rent.user.phone,
+        target: `АКБ ${rent.battery.name}`,
+        amount: Number(rent.debt),
+        dueDate: rent.debtDueDate || rent.endDate,
+        daysOverdue: overdue ? Math.floor((nowTs - dueTs!) / DAY_MS) : 0,
+        notOverdue: !overdue,
+      });
+    });
+
+  (data?.buyouts ?? [])
+    .filter((b) => matchesSearch(b.clientName, b.clientPhone, b.title))
+    .forEach((b) => {
+      const overduePayments = b.payments.filter(
+        (p) => p.status === 'PENDING' && new Date(p.dueDate).getTime() < nowTs
+      );
+      if (overduePayments.length === 0) return;
+      const earliest = overduePayments.reduce((min, p) =>
+        new Date(p.dueDate) < new Date(min) ? p.dueDate : min,
+      overduePayments[0].dueDate);
+      debtors.push({
+        key: `buyout-${b.id}`,
+        kind: 'Выкуп',
+        name: b.clientName,
+        phone: b.clientPhone,
+        target: b.title,
+        amount: overduePayments.reduce((s, p) => s + Number(p.amount), 0),
+        dueDate: earliest,
+        daysOverdue: Math.floor((nowTs - new Date(earliest).getTime()) / DAY_MS),
+      });
+    });
+
+  debtors.sort((a, b) => b.daysOverdue - a.daysOverdue);
+  const totalDebt = debtors.reduce((sum, d) => sum + d.amount, 0);
+
+  const upcomingBuyoutPayments = (data?.buyouts ?? [])
+    .flatMap((b) =>
+      b.payments
+        .filter((p) => p.status === 'PENDING' && new Date(p.dueDate).getTime() < nowTs + 7 * DAY_MS)
+        .map((p) => ({
+          key: `bp-${p.id}`,
+          client: b.clientName,
+          phone: b.clientPhone,
+          title: b.title,
+          dueDate: p.dueDate,
+          amount: Number(p.amount),
+          overdue: new Date(p.dueDate).getTime() < nowTs,
+        }))
+    )
+    .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+
+  const filteredReturningToday = data?.returningToday.filter((rent) =>
+    matchesSearch(rent.user.name, rent.user.phone, rent.bike.name)
+  ) ?? [];
+
+  const filteredReturningTomorrow = data?.returningTomorrow.filter((rent) =>
+    matchesSearch(rent.user.name, rent.user.phone, rent.bike.name)
+  ) ?? [];
+
+
+
+  const filteredFreeBikes = data?.freeBikes.filter((bike) =>
+    matchesSearch(bike.name)
+  ) ?? [];
+
+  const filteredMaintenanceBikes = data?.maintenanceBikes.filter((bike) =>
+    matchesSearch(bike.name)
+  ) ?? [];
+
+  const filteredTimeline = data?.timeline.filter((day) =>
+    matchesSearch(day.date) ||
+    day.returning.some((rent) =>
+      matchesSearch(rent.user.name, rent.user.phone, rent.bike.name)
+    ) ||
+    (day.returningBatteries ?? []).some((rent) =>
+      matchesSearch(rent.user.name, rent.user.phone, rent.battery.name)
+    )
+  ) ?? [];
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100 p-6 font-sans">
+      <div className="max-w-7xl mx-auto">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-amber-500 to-orange-500 bg-clip-text text-transparent">
+            Диспетчерская
+          </h1>
+          <button
+            onClick={markOverdue}
+            disabled={markingOverdue}
+            className="px-4 py-2 bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors"
+          >
+            {markingOverdue ? 'Проверка...' : 'Пометить просрочки'}
+          </button>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-3 mb-6">
+          <div className="relative flex-1">
+            <input
+              type="text"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  setSearchQuery(searchInput.trim());
+                }
+              }}
+              placeholder="Поиск по имени, телефону, модели..."
+              className="w-full bg-slate-900 border border-slate-800 rounded-lg pl-4 pr-10 py-2.5 text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-amber-500"
+            />
+            {searchInput && (
+              <button
+                onClick={() => {
+                  setSearchInput('');
+                  setSearchQuery('');
+                }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 text-xs"
+              >
+                Сбросить
+              </button>
+            )}
+          </div>
+          <button
+            onClick={() => setSearchQuery(searchInput.trim())}
+            className="px-4 py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-sm font-medium transition-colors"
+          >
+            Найти
+          </button>
+        </div>
+
+        {error && (
+          <div className="mb-6 px-4 py-3 rounded-lg bg-rose-950/60 border border-rose-800 text-rose-300 text-sm">
+            {error}
+          </div>
+        )}
+        {notice && (
+          <div className="mb-6 px-4 py-3 rounded-lg bg-emerald-950/60 border border-emerald-800 text-emerald-300 text-sm">
+            {notice}
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          {loading
+            ? Array.from({ length: 6 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 animate-pulse h-24"
+                />
+              ))
+            : operationalStats.map((item) => (
+                <div
+                  key={item.label}
+                  className="bg-slate-900/50 border border-slate-800 rounded-xl p-4"
+                >
+                  <div className={`text-2xl font-bold ${item.color}`}>
+                    {item.suffix ? `${Number(item.value).toFixed(1)}${item.suffix}` : item.value}
+                  </div>
+                  <div className="text-xs text-slate-400 mt-1">{item.label}</div>
+                </div>
+              ))}
+        </div>
+
+        <section className="bg-slate-900/50 border border-slate-800 rounded-xl p-6 mb-8">
+          <h2 className="text-lg font-semibold text-slate-200 mb-4">Новая заявка</h2>
+          <LeadForm
+            bikes={data?.freeBikes ?? []}
+            batteries={(data?.batteries ?? []).filter((b) => b.status === 'FREE')}
+            onSuccess={() => fetchDashboard()}
+          />
+        </section>
+
+        <section className="bg-slate-900/50 border border-slate-800 rounded-xl p-6 mb-8">
+          <h2 className="text-lg font-semibold text-slate-200 mb-4">Прочие операции</h2>
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setMiscKind('INCOME')}
+                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    miscKind === 'INCOME'
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  Доход
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMiscKind('EXPENSE')}
+                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    miscKind === 'EXPENSE'
+                      ? 'bg-rose-600 text-white'
+                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  Расход
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Предмет</label>
+                  <input
+                    type="text"
+                    list="misc-titles"
+                    value={miscTitle}
+                    onChange={(e) => setMiscTitle(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500"
+                    placeholder="Например: ремонт, аренда аккумулятора"
+                  />
+                  <datalist id="misc-titles">
+                    {MISC_TITLE_SUGGESTIONS.map((t) => (
+                      <option key={t} value={t} />
+                    ))}
+                  </datalist>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Сумма, ₽</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={miscAmount}
+                    onChange={(e) => setMiscAmount(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Способ оплаты</label>
+                  <select
+                    value={miscMethod}
+                    onChange={(e) => setMiscMethod(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="CASH">Наличные</option>
+                    <option value="SBP">СБП</option>
+                    <option value="CARD">Карта</option>
+                    <option value="TRANSFER">Перевод</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Категория</label>
+                  <select
+                    value={miscCategory}
+                    onChange={(e) => setMiscCategory(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="">— без категории —</option>
+                    <option value="REPAIR">Ремонт</option>
+                    <option value="SERVICE">ТО</option>
+                    <option value="BATTERY">Аккумулятор</option>
+                    <option value="ACCESSORIES">Аксессуары</option>
+                    <option value="GOODS">Сопутствующие товары</option>
+                    <option value="PARTS">Запчасти</option>
+                    <option value="SALARY">ЗП мастерам</option>
+                    <option value="DELIVERY">Доставка</option>
+                    <option value="TOOLS">Оборудование/инструменты</option>
+                    <option value="OTHER">Прочее</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Байк (необязательно)</label>
+                  <select
+                    value={miscBikeId}
+                    onChange={(e) => setMiscBikeId(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="">— без привязки —</option>
+                    {(data?.bikes ?? []).map((bike) => (
+                      <option key={bike.id} value={bike.id}>
+                        {bike.name}{bike.externalId ? ` (ID: ${bike.externalId})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Комментарий</label>
+                  <input
+                    type="text"
+                    value={miscComment}
+                    onChange={(e) => setMiscComment(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500"
+                    placeholder="Доп. информация"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={submitMisc}
+                  disabled={miscSaving}
+                  className="px-4 py-2.5 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors"
+                >
+                  {miscSaving ? 'Сохраняем...' : editingMisc ? 'Сохранить изменения' : 'Добавить операцию'}
+                </button>
+                {editingMisc && (
+                  <button
+                    type="button"
+                    onClick={resetMiscForm}
+                    className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm transition-colors"
+                  >
+                    Отмена
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold text-slate-300 mb-3">Последние операции</h3>
+              {loading ? (
+                <p className="text-slate-400 text-sm">Загрузка...</p>
+              ) : !data || data.recentMisc.length === 0 ? (
+                <p className="text-slate-400 text-sm">Операций пока нет</p>
+              ) : (
+                <ul className="space-y-2">
+                  {data.recentMisc.map((tx) => renderMiscTx(tx))}
+                </ul>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-6 border-t border-slate-800 pt-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-slate-300">История операций</h3>
+              <button
+                type="button"
+                onClick={() => {
+                  const next = !showMiscHistory;
+                  setShowMiscHistory(next);
+                  if (next && histItems === null) fetchMiscHistory();
+                }}
+                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs transition-colors"
+              >
+                {showMiscHistory ? 'Скрыть' : 'Показать всю историю →'}
+              </button>
+            </div>
+            {showMiscHistory && (
+              <>
+                <div className="flex flex-wrap items-center gap-2 mb-3">
+                  <input
+                    type="date"
+                    value={histFrom}
+                    onChange={(e) => setHistFrom(e.target.value)}
+                    className="px-2 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-amber-500 [color-scheme:dark]"
+                  />
+                  <span className="text-slate-500 text-xs">—</span>
+                  <input
+                    type="date"
+                    value={histTo}
+                    onChange={(e) => setHistTo(e.target.value)}
+                    className="px-2 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-amber-500 [color-scheme:dark]"
+                  />
+                  <select
+                    value={histKind}
+                    onChange={(e) => setHistKind(e.target.value)}
+                    className="px-2 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="">Все операции</option>
+                    <option value="INCOME">Доходы</option>
+                    <option value="EXPENSE">Расходы</option>
+                  </select>
+                  <select
+                    value={histCategory}
+                    onChange={(e) => setHistCategory(e.target.value)}
+                    className="px-2 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="">Все категории</option>
+                    {CATEGORY_ORDER.map((c) => (
+                      <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={fetchMiscHistory}
+                    className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-medium transition-colors"
+                  >
+                    Показать
+                  </button>
+                  <a
+                    href={`/api/admin/finance/export?${[
+                      histFrom ? `from=${histFrom}` : '',
+                      histTo ? `to=${histTo}` : '',
+                    ].filter(Boolean).join('&')}`}
+                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium transition-colors"
+                  >
+                    Скачать CSV
+                  </a>
+                </div>
+                {histLoading ? (
+                  <p className="text-slate-400 text-sm">Загрузка...</p>
+                ) : !histItems || histItems.length === 0 ? (
+                  <p className="text-slate-400 text-sm">Операций за выбранный период нет</p>
+                ) : (
+                  <>
+                    <p className="text-xs text-slate-500 mb-2">
+                      Найдено: {histItems.length} · Доходов:{' '}
+                      <span className="text-emerald-400 font-semibold">
+                        {formatMoney(histItems.filter((t) => t.kind === 'INCOME').reduce((s, t) => s + Number(t.amount), 0))}
+                      </span>
+                      {' '}· Расходов:{' '}
+                      <span className="text-rose-400 font-semibold">
+                        {formatMoney(histItems.filter((t) => t.kind === 'EXPENSE').reduce((s, t) => s + Number(t.amount), 0))}
+                      </span>
+                    </p>
+                    <ul className="space-y-2 max-h-[32rem] overflow-y-auto pr-1">
+                      {histItems.map((tx) => renderMiscTx(tx))}
+                    </ul>
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        </section>
+
+        {upcomingBuyoutPayments.length > 0 && (
+          <section className="bg-slate-900/50 border border-cyan-900/60 rounded-xl p-6 mb-8">
+            <h2 className="text-lg font-semibold text-slate-200 mb-4">Платежи по выкупам на ближайшие 7 дней</h2>
+            <ul className="space-y-2">
+              {upcomingBuyoutPayments.map((p) => (
+                <li
+                  key={p.key}
+                  className={`border rounded-lg p-3 flex items-center justify-between gap-4 text-sm ${
+                    p.overdue ? 'bg-rose-950/20 border-rose-900' : 'bg-slate-950/50 border-slate-800'
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <span className="font-medium text-slate-100">{p.client}</span>
+                    {p.phone && <span className="text-slate-400"> · {p.phone}</span>}
+                    <span className="block text-xs text-slate-500 mt-0.5">
+                      {p.title} · {formatDate(p.dueDate)}
+                      {p.overdue && <span className="text-rose-400 font-medium"> (просрочен)</span>}
+                    </span>
+                  </div>
+                  <span className={`font-semibold whitespace-nowrap ${p.overdue ? 'text-rose-300' : 'text-cyan-300'}`}>
+                    {formatMoney(p.amount)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        <BuyoutSection
+          buyouts={data?.buyouts ?? []}
+          archivedBuyouts={data?.archivedBuyouts ?? []}
+          bikes={data?.bikes ?? []}
+          onChanged={() => fetchDashboard()}
+          onError={setError}
+          onNotice={setNotice}
+        />
+
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
+          <section className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-slate-200">Новые заявки</h2>
+              <Link
+                href="/admin/leads"
+                className="text-xs text-amber-500 hover:text-amber-400 transition-colors"
+              >
+                Все заявки
+              </Link>
+            </div>
+
+            {loading ? (
+              <p className="text-slate-400 text-sm">Загрузка...</p>
+            ) : filteredNewLeads.length === 0 ? (
+              <p className="text-slate-400 text-sm">Новых заявок нет</p>
+            ) : (
+              <ul className="space-y-3">
+                {filteredNewLeads.map((lead) => (
+                  <li
+                    key={lead.id}
+                    className="border border-slate-800 rounded-lg p-3 bg-slate-950/50"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="font-medium text-slate-100">
+                          {lead.name}
+                          {isBatteryLead(lead) && (
+                            <span className="ml-2 px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-400 border border-sky-500/30 text-[10px] font-semibold uppercase">
+                              АКБ
+                            </span>
+                          )}
+                        </p>
+                        <p className="text-sm text-slate-400">{lead.phone}</p>
+                        <p className="text-xs text-slate-500 mt-1">
+                          {isBatteryLead(lead)
+                            ? `АКБ: ${lead.battery ? lead.battery.name : (lead.bikeName || 'не выбран')}`
+                            : lead.bike
+                            ? `${lead.bike.name}${lead.bike.externalId ? ` (ID: ${lead.bike.externalId})` : ''}`
+                            : (lead.bikeName || 'Байк не выбран')} · {formatDateTime(lead.createdAt)}
+                        </p>
+                      </div>
+                      <div className="flex gap-2 shrink-0 flex-wrap justify-end">
+                        <button
+                          onClick={() => takeLead(lead.id)}
+                          className="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded text-xs transition-colors"
+                        >
+                          В работу
+                        </button>
+                        <button
+                          onClick={() => openConvert(lead)}
+                          className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs transition-colors"
+                        >
+                          Оформить
+                        </button>
+                        <Link
+                          href="/admin/leads"
+                          className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs transition-colors"
+                        >
+                          Открыть
+                        </Link>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-slate-200">Активные и просроченные аренды</h2>
+              <Link
+                href="/admin/rents"
+                className="text-xs text-amber-500 hover:text-amber-400 transition-colors"
+              >
+                Все аренды
+              </Link>
+            </div>
+
+            {loading ? (
+              <p className="text-slate-400 text-sm">Загрузка...</p>
+            ) : filteredActiveRents.length === 0 ? (
+              <p className="text-slate-400 text-sm">Активных аренд нет</p>
+            ) : (
+              <ul className="space-y-3">
+                {filteredActiveRents.map((rent) => {
+                  const overdue = new Date(rent.endDate) < new Date();
+                  return (
+                    <li
+                      key={rent.id}
+                      className={`border rounded-lg p-3 ${
+                        overdue
+                          ? 'bg-rose-950/20 border-rose-900'
+                          : 'bg-slate-950/50 border-slate-800'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <p className="font-medium text-slate-100">
+                            <Link href={`/admin/clients/${rent.user.id}`} className="hover:text-cyan-400 transition-colors">
+                              {rent.user.name}
+                            </Link>
+                          </p>
+                          <p className="text-sm text-slate-400">{rent.user.phone}</p>
+                          <p className="text-xs text-slate-500 mt-1">
+                            {rent.bike.name}{rent.bike.externalId ? ` (ID: ${rent.bike.externalId})` : ''} · до {formatDate(rent.endDate)}
+                            {overdue && (
+                              <span className="ml-2 text-rose-400 font-medium">(просрочена)</span>
+                            )}
+                          </p>
+                          {(rent.debt ?? 0) > 0 && ((rent.paidTotal ?? 0) > 0 || Boolean(rent.debtDueDate) || (rent.penaltiesTotal ?? 0) > 0) && (
+                            <p className="text-xs mt-0.5 text-rose-400 font-medium">
+                              Долг {formatMoney(Number(rent.debt))}
+                              {rent.debtDueDate ? ` до ${formatDate(rent.debtDueDate)}` : ''}
+                              {(rent.paidTotal ?? 0) > 0 && (
+                                <span className="text-slate-500 font-normal">
+                                  {' '}· внесено {formatMoney(Number(rent.paidTotal))}
+                                </span>
+                              )}
+                            </p>
+                          )}
+                          {(rent.penaltiesTotal ?? 0) > 0 && (
+                            <p className="text-xs mt-0.5 text-orange-400">
+                              Штрафы: {formatMoney(Number(rent.penaltiesTotal))}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex gap-2 shrink-0 flex-wrap justify-end items-start">
+                          <ContactLinks user={rent.user} />
+                          <a
+                            href={`/admin/documents?rentId=${rent.id}`}
+                            className="px-2.5 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded text-xs transition-colors"
+                          >
+                            Док.
+                          </a>
+                          <button
+                            onClick={() => openPenalty(rent)}
+                            className="px-2.5 py-1.5 bg-orange-700 hover:bg-orange-600 text-white rounded text-xs transition-colors"
+                          >
+                            + Штраф
+                          </button>
+                          {(rent.debt ?? 0) > 0 && ((rent.paidTotal ?? 0) > 0 || Boolean(rent.debtDueDate) || (rent.penaltiesTotal ?? 0) > 0) && (
+                            <button
+                              onClick={() => openPay(rent)}
+                              className="px-2.5 py-1.5 bg-violet-600 hover:bg-violet-500 text-white rounded text-xs transition-colors"
+                            >
+                              + Оплата
+                            </button>
+                          )}
+                          <button
+                            onClick={() => completeRent(rent)}
+                            className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs transition-colors"
+                          >
+                            Завершить
+                          </button>
+                          <button
+                            onClick={() => extendRent(rent)}
+                            className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs transition-colors"
+                          >
+                            +1 день
+                          </button>
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+        </div>
+
+        <BatterySection
+          batteries={data?.batteries ?? []}
+          rents={data?.batteryRents ?? []}
+          onChanged={() => fetchDashboard()}
+          onError={setError}
+          onNotice={setNotice}
+        />
+
+        <section className={`border rounded-xl p-6 mb-8 ${
+          debtors.length > 0
+            ? 'bg-rose-950/20 border-rose-900/60'
+            : 'bg-slate-900/50 border-slate-800'
+        }`}>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-slate-200">Должники</h2>
+            {debtors.length > 0 && (
+              <span className="text-sm font-semibold text-rose-400">
+                Итого долг: {formatMoney(totalDebt)}
+              </span>
+            )}
+          </div>
+
+          {loading ? (
+            <p className="text-slate-400 text-sm">Загрузка...</p>
+          ) : debtors.length === 0 ? (
+            <p className="text-slate-400 text-sm">Просроченных долгов нет</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="text-xs text-slate-500 uppercase border-b border-slate-800">
+                    <th className="pb-2 pr-4 font-medium">Тип</th>
+                    <th className="pb-2 pr-4 font-medium">Клиент</th>
+                    <th className="pb-2 pr-4 font-medium">Предмет</th>
+                    <th className="pb-2 pr-4 font-medium">Срок был</th>
+                    <th className="pb-2 pr-4 font-medium">Просрочено</th>
+                    <th className="pb-2 font-medium text-right">Долг</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {debtors.map((d) => (
+                    <tr key={d.key} className="border-b border-slate-800/60 last:border-0">
+                      <td className="py-2.5 pr-4">
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                          d.kind === 'Аренда'
+                            ? 'bg-amber-500/15 text-amber-400'
+                            : d.kind === 'Доплата'
+                              ? 'bg-violet-500/15 text-violet-400'
+                              : 'bg-cyan-500/15 text-cyan-400'
+                        }`}>
+                          {d.kind}
+                        </span>
+                      </td>
+                      <td className="py-2.5 pr-4">
+                        <span className="text-slate-100 font-medium">{d.name}</span>
+                        {d.phone && <span className="block text-xs text-slate-400">{d.phone}</span>}
+                      </td>
+                      <td className="py-2.5 pr-4 text-slate-300">{d.target}</td>
+                      <td className="py-2.5 pr-4 text-slate-400 whitespace-nowrap">{formatDate(d.dueDate)}</td>
+                      <td className="py-2.5 pr-4 text-rose-400 font-medium whitespace-nowrap">
+                        {d.notOverdue ? '—' : `${d.daysOverdue} дн.`}
+                      </td>
+                      <td className="py-2.5 text-right text-rose-300 font-semibold whitespace-nowrap">
+                        {formatMoney(d.amount)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
+          <section className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
+            <h2 className="text-lg font-semibold text-slate-200 mb-4">Возвращаются сегодня</h2>
+            {loading ? (
+              <p className="text-slate-400 text-sm">Загрузка...</p>
+            ) : filteredReturningToday.length === 0 && batteryReturningToday.length === 0 ? (
+              <p className="text-slate-400 text-sm">Сегодня никто не возвращается</p>
+            ) : (
+              <ul className="space-y-3">
+                {filteredReturningToday.map((rent) => (
+                  <li
+                    key={rent.id}
+                    className={`border rounded-lg p-3 ${
+                      isReturnOverdue(rent.endDate)
+                        ? 'border-rose-900 bg-rose-950/20'
+                        : 'border-slate-800 bg-slate-950/50'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="font-medium text-slate-100">
+                          <Link href={`/admin/clients/${rent.user.id}`} className="hover:text-cyan-400 transition-colors">
+                            {rent.user.name}
+                          </Link>
+                        </p>
+                        <p className="text-sm text-slate-400">{rent.user.phone}</p>
+                        <p className="text-xs text-slate-500 mt-1">
+                          {rent.bike.name}{rent.bike.externalId ? ` (ID: ${rent.bike.externalId})` : ''} · {formatDate(rent.endDate)}
+                          {isReturnOverdue(rent.endDate) ? (
+                            <span className="ml-2 text-rose-400 font-medium">должник</span>
+                          ) : (
+                            <span className="ml-2 text-amber-400 font-medium">возврат сегодня</span>
+                          )}
+                        </p>
+                      </div>
+                      <ContactLinks user={rent.user} />
+                    </div>
+                  </li>
+                ))}
+                {batteryReturningToday.map((rent) => (
+                  <li
+                    key={`b-${rent.id}`}
+                    className={`border rounded-lg p-3 ${
+                      isReturnOverdue(rent.endDate)
+                        ? 'border-rose-900 bg-rose-950/20'
+                        : 'border-sky-900/60 bg-sky-950/20'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="font-medium text-slate-100">
+                          <Link href={`/admin/clients/${rent.user.id}`} className="hover:text-cyan-400 transition-colors">
+                            {rent.user.name}
+                          </Link>
+                          <span className="ml-2 px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-400 border border-sky-500/30 text-[10px] font-semibold uppercase">АКБ</span>
+                        </p>
+                        <p className="text-sm text-slate-400">{rent.user.phone}</p>
+                        <p className="text-xs text-slate-500 mt-1">
+                          {rent.battery.name} · {formatDate(rent.endDate)}
+                          {isReturnOverdue(rent.endDate) ? (
+                            <span className="ml-2 text-rose-400 font-medium">должник</span>
+                          ) : (
+                            <span className="ml-2 text-amber-400 font-medium">возврат сегодня</span>
+                          )}
+                        </p>
+                      </div>
+                      <ContactLinks user={rent.user} />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
+            <h2 className="text-lg font-semibold text-slate-200 mb-4">Возвращаются завтра</h2>
+            {loading ? (
+              <p className="text-slate-400 text-sm">Загрузка...</p>
+            ) : filteredReturningTomorrow.length === 0 && batteryReturningTomorrow.length === 0 ? (
+              <p className="text-slate-400 text-sm">Завтра никто не возвращается</p>
+            ) : (
+              <ul className="space-y-3">
+                {filteredReturningTomorrow.map((rent) => (
+                  <li
+                    key={rent.id}
+                    className="border border-slate-800 rounded-lg p-3 bg-slate-950/50"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="font-medium text-slate-100">
+                          <Link href={`/admin/clients/${rent.user.id}`} className="hover:text-cyan-400 transition-colors">
+                            {rent.user.name}
+                          </Link>
+                        </p>
+                        <p className="text-sm text-slate-400">{rent.user.phone}</p>
+                        <p className="text-xs text-slate-500 mt-1">{rent.bike.name}{rent.bike.externalId ? ` (ID: ${rent.bike.externalId})` : ''} · {formatDate(rent.endDate)}</p>
+                      </div>
+                      <ContactLinks user={rent.user} />
+                    </div>
+                  </li>
+                ))}
+                {batteryReturningTomorrow.map((rent) => (
+                  <li
+                    key={`b-${rent.id}`}
+                    className="border border-sky-900/60 rounded-lg p-3 bg-sky-950/20"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="font-medium text-slate-100">
+                          {rent.user.name}
+                          <span className="ml-2 px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-400 border border-sky-500/30 text-[10px] font-semibold uppercase">АКБ</span>
+                        </p>
+                        <p className="text-sm text-slate-400">{rent.user.phone}</p>
+                        <p className="text-xs text-slate-500 mt-1">{rent.battery.name} · {formatDate(rent.endDate)}</p>
+                      </div>
+                      <ContactLinks user={rent.user} />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
+
+        <section className="bg-slate-900/50 border border-slate-800 rounded-xl p-6 mb-8">
+          <h2 className="text-lg font-semibold text-slate-200 mb-1">Таймлайн загруженности на 14 дней</h2>
+          <p className="text-xs text-slate-500 mb-4">Нажмите на день, чтобы увидеть все планируемые возвраты</p>
+          {loading ? (
+            <p className="text-slate-400 text-sm">Загрузка...</p>
+          ) : filteredTimeline.length === 0 ? (
+            <p className="text-slate-400 text-sm">Нет данных</p>
+          ) : (
+            <>
+              <div className="overflow-x-auto pb-2">
+                <div className="flex gap-3 min-w-max">
+                  {filteredTimeline.map((day) => {
+                    const totalReturns = day.returning.length + (day.returningBatteries?.length ?? 0);
+                    const isExpanded = expandedTimelineDay === day.date;
+                    return (
+                      <button
+                        type="button"
+                        key={day.date}
+                        onClick={() => setExpandedTimelineDay(isExpanded ? null : day.date)}
+                        className={`min-w-[12rem] max-w-[12rem] text-left border rounded-lg p-3 flex flex-col transition-colors cursor-pointer ${
+                          isExpanded
+                            ? 'bg-slate-900 border-amber-500/60'
+                            : 'bg-slate-950/50 border-slate-800 hover:border-slate-600'
+                        }`}
+                      >
+                        <div className="text-sm font-medium text-slate-200 mb-1">
+                          {day.dayOfWeek}, {formatShortDay(day.date)}
+                        </div>
+                        <div className="text-2xl font-bold text-emerald-400 mb-1">{day.freeCount}</div>
+                        <div className="text-xs text-slate-500 mb-3">свободных байков</div>
+                        {totalReturns > 0 ? (
+                          <div className="mt-auto">
+                            <div className="text-xs font-medium text-amber-400 mb-1">
+                              Возвратов: {totalReturns}
+                            </div>
+                            <ul className="space-y-1 text-xs text-slate-400 max-h-16 overflow-y-auto pr-1">
+                              {day.returning.map((rent) => (
+                                <li key={`b-${rent.id}`} className="truncate">
+                                  {rent.bike.name}{rent.bike.externalId ? ` (ID: ${rent.bike.externalId})` : ''} · {rent.user.name}
+                                </li>
+                              ))}
+                              {(day.returningBatteries ?? []).map((rent) => (
+                                <li key={`a-${rent.id}`} className="truncate">
+                                  🔋 {rent.battery.name} · {rent.user.name}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : (
+                          <div className="mt-auto text-xs text-slate-600">Без возвратов</div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              {expandedTimelineDay && (() => {
+                const day = filteredTimeline.find((d) => d.date === expandedTimelineDay);
+                if (!day) return null;
+                const total = day.returning.length + (day.returningBatteries?.length ?? 0);
+                return (
+                  <div className="mt-4 bg-slate-950/50 border border-amber-500/30 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-sm font-semibold text-slate-200">
+                        Возвраты {day.dayOfWeek}, {formatShortDay(day.date)} — {total}
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => setExpandedTimelineDay(null)}
+                        className="text-slate-500 hover:text-slate-300 text-xs"
+                      >
+                        Свернуть ✕
+                      </button>
+                    </div>
+                    {total === 0 ? (
+                      <p className="text-sm text-slate-500">В этот день возвратов нет</p>
+                    ) : (
+                      <ul className="space-y-2">
+                        {day.returning.map((rent) => (
+                          <li key={`exp-b-${rent.id}`} className="flex items-center justify-between gap-3 text-sm border border-slate-800 rounded-lg px-3 py-2">
+                            <span className="text-slate-200">
+                              {rent.bike.name}{rent.bike.externalId ? ` (ID: ${rent.bike.externalId})` : ''}
+                              <span className="text-slate-400"> · {rent.user.name} · {rent.user.phone}</span>
+                            </span>
+                            <ContactLinks user={rent.user} />
+                          </li>
+                        ))}
+                        {(day.returningBatteries ?? []).map((rent) => (
+                          <li key={`exp-a-${rent.id}`} className="flex items-center justify-between gap-3 text-sm border border-indigo-900/50 rounded-lg px-3 py-2">
+                            <span className="text-slate-200">
+                              🔋 АКБ {rent.battery.name}{rent.battery.serialNumber ? ` (№${rent.battery.serialNumber})` : ''}
+                              <span className="text-slate-400"> · {rent.user.name} · {rent.user.phone}</span>
+                            </span>
+                            <ContactLinks user={rent.user} />
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                );
+              })()}
+            </>
+          )}
+        </section>
+
+        <section className="bg-slate-900/50 border border-slate-800 rounded-xl p-6 mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+            <h2 className="text-lg font-semibold text-slate-200">Финансы</h2>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => selectPresetDays(7)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  !customPeriod && days === 7
+                    ? 'bg-amber-500 text-slate-950'
+                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                }`}
+              >
+                7 дней
+              </button>
+              <button
+                onClick={() => selectPresetDays(30)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  !customPeriod && days === 30
+                    ? 'bg-amber-500 text-slate-950'
+                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                }`}
+              >
+                30 дней
+              </button>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="date"
+                  value={customFrom}
+                  onChange={(e) => setCustomFrom(e.target.value)}
+                  className="px-2 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-amber-500 [color-scheme:dark]"
+                />
+                <span className="text-slate-500 text-xs">—</span>
+                <input
+                  type="date"
+                  value={customTo}
+                  onChange={(e) => setCustomTo(e.target.value)}
+                  className="px-2 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-amber-500 [color-scheme:dark]"
+                />
+                <button
+                  onClick={applyCustomPeriod}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    customPeriod
+                      ? 'bg-amber-500 text-slate-950'
+                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  Показать
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
+            {loading
+              ? Array.from({ length: 6 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="bg-slate-950/50 border border-slate-800 rounded-xl p-4 animate-pulse h-20"
+                  />
+                ))
+              : financialStats.map((item) => (
+                  <div
+                    key={item.label}
+                    className="bg-slate-950/50 border border-slate-800 rounded-xl p-4"
+                  >
+                    <div className={`text-xl font-bold ${item.color}`}>{formatMoney(item.value)}</div>
+                    <div className="text-xs text-slate-400 mt-1">{item.label}</div>
+                  </div>
+                ))}
+          </div>
+
+          {data && (Object.keys(data.stats.incomeByMethod).length > 0 || Object.keys(data.stats.expenseByCategory ?? {}).length > 0) && (
+            <div className="mb-8 bg-slate-950/50 border border-slate-800 rounded-xl p-4 space-y-4">
+              {Object.keys(data.stats.incomeByMethod).length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-200 mb-3">Доходы по способам оплаты за {periodDaysLabel} дн.</h3>
+                  <div className="flex flex-wrap gap-3">
+                    {['CASH', 'SBP', 'CARD', 'TRANSFER', 'NONE']
+                      .filter((m) => (data.stats.incomeByMethod[m] ?? 0) > 0)
+                      .map((m) => (
+                        <div
+                          key={m}
+                          className="flex items-center gap-2 bg-slate-900/70 border border-slate-800 rounded-lg px-4 py-2"
+                        >
+                          <span className="text-xs text-slate-400">
+                            {m === 'NONE' ? 'Без указания' : (METHOD_LABELS[m] ?? m)}
+                          </span>
+                          <span className="text-sm font-bold text-emerald-400">
+                            {formatMoney(data.stats.incomeByMethod[m])}
+                          </span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+              {Object.keys(data.stats.expenseByCategory ?? {}).length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-200 mb-3">Расходы по категориям за {periodDaysLabel} дн.</h3>
+                  <div className="flex flex-wrap gap-3">
+                    {CATEGORY_ORDER
+                      .filter((c) => (data.stats.expenseByCategory[c] ?? 0) > 0)
+                      .map((c) => (
+                        <div
+                          key={c}
+                          className="flex items-center gap-2 bg-slate-900/70 border border-slate-800 rounded-lg px-4 py-2"
+                        >
+                          <span className="text-xs text-slate-400">{CATEGORY_LABELS[c] ?? c}</span>
+                          <span className="text-sm font-bold text-rose-400">
+                            {formatMoney(data.stats.expenseByCategory[c])}
+                          </span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 bg-slate-950/50 border border-slate-800 rounded-xl p-4">
+              <div className="flex items-center justify-between gap-4 mb-4">
+                <h3 className="text-sm font-semibold text-slate-200">Выручка по дням</h3>
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-1.5 text-[10px] text-slate-400 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={hideEmptyRevenueDays}
+                      onChange={(e) => setHideEmptyRevenueDays(e.target.checked)}
+                      className="accent-amber-500"
+                    />
+                    Скрыть пустые
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setRevenueChartCollapsed((v) => !v)}
+                    className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px] transition-colors"
+                  >
+                    {revenueChartCollapsed ? 'Развернуть' : 'Свернуть'}
+                  </button>
+                </div>
+              </div>
+
+              {!revenueChartCollapsed && (
+                <div className="flex flex-wrap gap-3 text-[10px] text-slate-400 mb-3">
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-sky-500" /> Аренда
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-indigo-400" /> АКБ
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" /> Прочее
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-cyan-500" /> Выкупы
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-rose-500" /> Расходы
+                  </span>
+                  <span className="text-slate-500 ml-auto">клик по дню — детализация</span>
+                </div>
+              )}
+
+              {loading ? (
+                <p className="text-slate-400 text-sm">Загрузка...</p>
+              ) : data && data.revenueByDay.length === 0 ? (
+                <p className="text-slate-400 text-sm">Нет данных за период</p>
+              ) : revenueChartCollapsed ? null : (
+                <div className="space-y-1.5">
+                  {data?.revenueByDay
+                    .filter((day) =>
+                      !hideEmptyRevenueDays ||
+                      (day.total ?? 0) > 0 || (day.expense ?? 0) > 0
+                    )
+                    .map((day) => {
+                      const total = day.total ?? 0;
+                      const seg = (v: number | undefined) =>
+                        `${((v ?? 0) / maxRevenue) * 100}%`;
+                      const isExpanded = expandedRevenueDay === day.date;
+                      return (
+                        <div key={day.date}>
+                          <button
+                            type="button"
+                            onClick={() => setExpandedRevenueDay(isExpanded ? null : day.date)}
+                            className={`w-full flex items-center gap-3 text-sm rounded-lg px-1 py-1 transition-colors cursor-pointer ${
+                              isExpanded ? 'bg-slate-900' : 'hover:bg-slate-900/60'
+                            }`}
+                          >
+                            <div className="w-14 shrink-0 text-xs text-slate-400 text-left">{formatShortDay(day.date)}</div>
+                            <div className="flex-1">
+                              <div className="h-3 bg-slate-800 rounded-full overflow-hidden flex" title={`Всего: ${formatMoney(total)}`}>
+                                {(day.revenue ?? 0) > 0 && (
+                                  <div className="h-full bg-sky-500" style={{ width: seg(day.revenue) }} />
+                                )}
+                                {(day.battery ?? 0) > 0 && (
+                                  <div className="h-full bg-indigo-400" style={{ width: seg(day.battery) }} />
+                                )}
+                                {(day.misc ?? 0) > 0 && (
+                                  <div className="h-full bg-emerald-500" style={{ width: seg(day.misc) }} />
+                                )}
+                                {(day.buyout ?? 0) > 0 && (
+                                  <div className="h-full bg-cyan-500" style={{ width: seg(day.buyout) }} />
+                                )}
+                              </div>
+                              {(day.expense ?? 0) > 0 && (
+                                <div className="h-1 bg-slate-800 rounded-full overflow-hidden mt-0.5">
+                                  <div
+                                    className="h-full bg-rose-500"
+                                    style={{ width: `${Math.min(((day.expense ?? 0) / maxRevenue) * 100, 100)}%` }}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                            <div className="w-24 text-right text-xs text-slate-200 font-medium">
+                              {formatMoney(total)}
+                            </div>
+                          </button>
+                          {isExpanded && (
+                            <div className="ml-16 mr-28 mt-1 mb-2 text-xs text-slate-400 space-y-0.5 border-l-2 border-slate-700 pl-3">
+                              {(day.revenue ?? 0) > 0 && <div><span className="text-sky-400">Аренда:</span> {formatMoney(day.revenue!)}</div>}
+                              {(day.battery ?? 0) > 0 && <div><span className="text-indigo-300">АКБ:</span> {formatMoney(day.battery!)}</div>}
+                              {(day.misc ?? 0) > 0 && <div><span className="text-emerald-400">Прочие доходы:</span> {formatMoney(day.misc!)}</div>}
+                              {(day.buyout ?? 0) > 0 && <div><span className="text-cyan-400">Выкупы:</span> {formatMoney(day.buyout!)}</div>}
+                              {(day.expense ?? 0) > 0 && <div><span className="text-rose-400">Расходы:</span> −{formatMoney(day.expense!)}</div>}
+                              <div className="text-slate-300 font-medium pt-0.5">Итого доход: {formatMoney(total)}</div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+            </div>
+
+            <div className="bg-slate-950/50 border border-slate-800 rounded-xl p-4">
+              <h3 className="text-sm font-semibold text-slate-200 mb-4">Топ байков по доходу</h3>
+
+              {loading ? (
+                <p className="text-slate-400 text-sm">Загрузка...</p>
+              ) : data && data.topBikes.length === 0 ? (
+                <p className="text-slate-400 text-sm">Нет завершённых аренд</p>
+              ) : (
+                <ul className="space-y-3">
+                  {data?.topBikes.map((bike, index) => (
+                    <li key={bike.id} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="w-5 h-5 rounded bg-slate-800 text-slate-400 text-xs flex items-center justify-center shrink-0">
+                          {index + 1}
+                        </span>
+                        <span className="text-slate-200 truncate">
+                          {bike.name}
+                          {bike.externalId && (
+                            <span className="text-xs text-slate-500"> · ID: {bike.externalId}</span>
+                          )}
+                        </span>
+                      </div>
+                      <span className="font-medium text-amber-500 shrink-0">{formatMoney(bike.revenue)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div className="bg-slate-950/50 border border-slate-800 rounded-xl p-4">
+              <h3 className="text-sm font-semibold text-slate-200 mb-4">Топ клиентов за {periodDaysLabel} дн.</h3>
+
+              {loading ? (
+                <p className="text-slate-400 text-sm">Загрузка...</p>
+              ) : !data || !data.topClients || data.topClients.length === 0 ? (
+                <p className="text-slate-400 text-sm">Нет оплат за период</p>
+              ) : (
+                <ul className="space-y-3">
+                  {data.topClients.map((client, index) => (
+                    <li key={`${client.phone ?? client.name}-${index}`} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="w-5 h-5 rounded bg-slate-800 text-slate-400 text-xs flex items-center justify-center shrink-0">
+                          {index + 1}
+                        </span>
+                        <div className="min-w-0">
+                          <span className="text-slate-200 block truncate">{client.name}</span>
+                          {client.phone && <span className="text-xs text-slate-500">{client.phone}</span>}
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className="font-medium text-emerald-400 block">{formatMoney(client.revenue)}</span>
+                        <span className="text-xs text-slate-500">{client.count} плат.</span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </section>
+
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <section className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
+            <h2 className="text-lg font-semibold text-slate-200 mb-4">Свободный транспорт</h2>
+            {loading ? (
+              <p className="text-slate-400 text-sm">Загрузка...</p>
+            ) : filteredFreeBikes.length === 0 ? (
+              <p className="text-slate-400 text-sm">Нет свободных байков</p>
+            ) : (
+              <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {filteredFreeBikes.map((bike) => {
+                  const svc = serviceInfo(bike);
+                  return (
+                    <li
+                      key={bike.id}
+                      className="border border-slate-800 rounded-lg p-3 bg-slate-950/50 text-sm"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="font-medium text-slate-100">{bike.name}{bike.externalId ? ` (ID: ${bike.externalId})` : ''}</p>
+                          <p className="text-slate-400">{Number(bike.pricePerDay)} ₽/сут</p>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            Пробег: {bike.mileage != null ? `${bike.mileage.toLocaleString('ru-RU')} км` : '—'}
+                          </p>
+                          {svc && (
+                            <p className={`text-xs mt-0.5 ${svc.overdue ? 'text-rose-400 font-medium' : 'text-slate-500'}`}>
+                              {svc.text}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex flex-col gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setMileageBike(bike)}
+                            className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs transition-colors"
+                          >
+                            Пробег
+                          </button>
+                          {bike.serviceIntervalKm != null && bike.serviceIntervalKm > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => markServiceDone(bike)}
+                              className="px-2 py-1 bg-slate-800 hover:bg-emerald-800 text-slate-300 rounded text-xs transition-colors"
+                            >
+                              ТО проведено
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+
+          <section className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
+            <h2 className="text-lg font-semibold text-slate-200 mb-4">На сервисе</h2>
+            {loading ? (
+              <p className="text-slate-400 text-sm">Загрузка...</p>
+            ) : filteredMaintenanceBikes.length === 0 ? (
+              <p className="text-slate-400 text-sm">Нет байков на сервисе</p>
+            ) : (
+              <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {filteredMaintenanceBikes.map((bike) => {
+                  const svc = serviceInfo(bike);
+                  return (
+                    <li
+                      key={bike.id}
+                      className="border border-slate-800 rounded-lg p-3 bg-slate-950/50 text-sm"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="font-medium text-slate-100">{bike.name}{bike.externalId ? ` (ID: ${bike.externalId})` : ''}</p>
+                          <p className="text-slate-400">{Number(bike.pricePerDay)} ₽/сут</p>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            Пробег: {bike.mileage != null ? `${bike.mileage.toLocaleString('ru-RU')} км` : '—'}
+                          </p>
+                          {svc && (
+                            <p className={`text-xs mt-0.5 ${svc.overdue ? 'text-rose-400 font-medium' : 'text-slate-500'}`}>
+                              {svc.text}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex flex-col gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setMileageBike(bike)}
+                            className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs transition-colors"
+                          >
+                            Пробег
+                          </button>
+                          {bike.serviceIntervalKm != null && bike.serviceIntervalKm > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => markServiceDone(bike)}
+                              className="px-2 py-1 bg-slate-800 hover:bg-emerald-800 text-slate-300 rounded text-xs transition-colors"
+                            >
+                              ТО проведено
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+        </div>
+      </div>
+
+      {convertingLead && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
+            <h2 className="mb-2 text-lg font-semibold text-slate-100">
+              Оформить аренду {isBatteryLead(convertingLead) ? 'АКБ' : ''} по заявке #{convertingLead.id}
+            </h2>
+            <p className="mb-4 text-sm text-slate-400">
+              {convertingLead.name} · {convertingLead.phone}
+            </p>
+
+            {isBatteryLead(convertingLead) ? (
+              <div className="mb-4">
+                <label className="block text-xs font-medium text-slate-400 mb-1">Аккумулятор</label>
+                <select
+                  value={convertBatteryId}
+                  onChange={(e) => setConvertBatteryId(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500"
+                >
+                  <option value="">— выберите —</option>
+                  {(data?.batteries ?? [])
+                    .filter((b) => b.status === 'FREE')
+                    .map((battery) => (
+                      <option key={battery.id} value={battery.id}>
+                        {battery.name}{battery.serialNumber ? ` (SN: ${battery.serialNumber})` : ''} — {Number(battery.pricePerDay)} ₽/сут
+                      </option>
+                    ))}
+                  {convertingLead.batteryId &&
+                    !(data?.batteries ?? []).some((b) => b.id === convertingLead.batteryId && b.status === 'FREE') &&
+                    convertingLead.battery && (
+                      <option value={convertingLead.battery.id}>
+                        {convertingLead.battery.name}{convertingLead.battery.serialNumber ? ` (SN: ${convertingLead.battery.serialNumber})` : ''} — текущий выбор
+                      </option>
+                    )}
+                </select>
+              </div>
+            ) : (
+            <div className="mb-4">
+              <label className="block text-xs font-medium text-slate-400 mb-1">Велосипед</label>
+              <select
+                value={convertBikeId}
+                onChange={(e) => setConvertBikeId(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500"
+              >
+                <option value="">— выберите —</option>
+                {data?.freeBikes.map((bike) => (
+                  <option key={bike.id} value={bike.id}>
+                    {bike.name}{bike.externalId ? ` (ID: ${bike.externalId})` : ''} — {Number(bike.pricePerDay)} ₽/сут
+                  </option>
+                ))}
+                {convertingLead.bikeId && !data?.freeBikes.some((b) => b.id === convertingLead.bikeId) && convertingLead.bike && (
+                  <option value={convertingLead.bike.id}>
+                    {convertingLead.bike.name}{convertingLead.bike.externalId ? ` (ID: ${convertingLead.bike.externalId})` : ''} — текущий выбор
+                  </option>
+                )}
+              </select>
+            </div>
+            )}
+
+            <div className="mb-4 grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">Срок, дней</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={convertDays}
+                  onChange={(e) => setConvertDays(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">Стоимость, ₽</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={convertTotalPrice}
+                  onChange={(e) => {
+                    setConvertPriceManual(true);
+                    setConvertTotalPrice(e.target.value);
+                  }}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={handleConvert}
+                disabled={converting}
+                className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors"
+              >
+                {converting ? 'Оформление...' : 'Оформить аренду'}
+              </button>
+              <button
+                onClick={closeConvert}
+                disabled={converting}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-300 rounded-lg text-sm transition-colors"
+              >
+                Отмена
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {mileageAction && (
+        <MileagePrompt
+          title={
+            mileageAction.type === 'complete'
+              ? `Завершение аренды #${mileageAction.rent.id}`
+              : `Продление аренды #${mileageAction.rent.id}`
+          }
+          subtitle={`${mileageAction.rent.user.name} · ${mileageAction.rent.bike.name}${mileageAction.rent.bike.externalId ? ` (ID: ${mileageAction.rent.bike.externalId})` : ''}`}
+          currentMileage={
+            data?.bikes?.find((b) => b.id === mileageAction.rent.bike.id)?.mileage ?? null
+          }
+          busy={mileageBusy}
+          onSubmit={submitRentMileage}
+          onCancel={() => !mileageBusy && setMileageAction(null)}
+        />
+      )}
+
+      {mileageBike && (
+        <MileagePrompt
+          title={`Пробег: ${mileageBike.name}${mileageBike.externalId ? ` (ID: ${mileageBike.externalId})` : ''}`}
+          currentMileage={mileageBike.mileage ?? null}
+          busy={mileageBusy}
+          onSubmit={submitBikeMileage}
+          onCancel={() => !mileageBusy && setMileageBike(null)}
+        />
+      )}
+
+      {payRent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
+            <h2 className="mb-4 text-lg font-semibold text-slate-100">
+              Внесение оплаты — аренда #{payRent.id}
+            </h2>
+            <p className="mb-4 text-sm text-slate-400">
+              {payRent.user.name} · {payRent.user.phone}
+              <br />
+              {payRent.bike.name}{payRent.bike.externalId ? ` (ID: ${payRent.bike.externalId})` : ''}
+            </p>
+            <p className="mb-4 text-sm">
+              <span className="text-slate-400">Внесено {formatMoney(Number(payRent.paidTotal ?? 0))} из {formatMoney(Number(payRent.totalPrice))} · </span>
+              <span className="text-rose-400 font-medium">долг {formatMoney(Number(payRent.debt ?? 0))}</span>
+            </p>
+
+            <div className="mb-4">
+              <label className="mb-1 block text-xs font-medium text-slate-400">Сумма, ₽</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={payAmount}
+                onChange={(e) => setPayAmount(e.target.value)}
+                className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+              />
+              {Number(payAmount) > 0 && Number(payAmount) < Number(payRent.debt ?? 0) && (
+                <p className="mt-1 text-xs text-violet-400">
+                  Останется долг: {formatMoney(Number(payRent.debt ?? 0) - Number(payAmount))}
+                </p>
+              )}
+            </div>
+
+            <div className="mb-4 grid grid-cols-2 gap-4">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-400">Способ оплаты</label>
+                <select
+                  value={payMethod}
+                  onChange={(e) => setPayMethod(e.target.value)}
+                  className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+                >
+                  <option value="CASH">Наличные</option>
+                  <option value="SBP">СБП</option>
+                  <option value="CARD">Карта</option>
+                  <option value="TRANSFER">Перевод</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-400">
+                  Погасить до (если останется долг)
+                </label>
+                <input
+                  type="date"
+                  value={payDue}
+                  onChange={(e) => setPayDue(e.target.value)}
+                  className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-white focus:outline-none focus:border-cyan-500 [color-scheme:dark]"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => !payBusy && setPayRent(null)}
+                disabled={payBusy}
+                className="rounded-lg bg-slate-800 px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 disabled:opacity-50 transition-colors"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={submitPay}
+                disabled={payBusy}
+                className="rounded-lg bg-violet-600 px-4 py-2 text-sm text-white hover:bg-violet-500 disabled:opacity-50 transition-colors"
+              >
+                {payBusy ? 'Сохранение...' : 'Внести'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {penRent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
+            <h2 className="mb-4 text-lg font-semibold text-slate-100">
+              Штраф / ущерб — аренда #{penRent.id}
+            </h2>
+            <p className="mb-4 text-sm text-slate-400">
+              {penRent.user.name} · {penRent.user.phone}
+              <br />
+              {penRent.bike.name}{penRent.bike.externalId ? ` (ID: ${penRent.bike.externalId})` : ''}
+              {' '}· {penRent.status === 'ACTIVE' ? 'активна' : 'закрыта'}
+            </p>
+
+            <div className="mb-4">
+              <label className="mb-1 block text-xs font-medium text-slate-400">Сумма штрафа, ₽</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={penAmount}
+                onChange={(e) => setPenAmount(e.target.value)}
+                className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+              />
+            </div>
+
+            <div className="mb-4">
+              <label className="mb-1 block text-xs font-medium text-slate-400">Причина</label>
+              <input
+                type="text"
+                value={penComment}
+                onChange={(e) => setPenComment(e.target.value)}
+                placeholder="Например: ущерб — разбита фара"
+                className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+              />
+            </div>
+
+            <div className="mb-4">
+              <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={penPaid}
+                  onChange={(e) => setPenPaid(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-600 bg-slate-900 accent-cyan-500"
+                />
+                Оплачен сразу
+              </label>
+              <p className="mt-1 text-xs text-slate-500">
+                {penPaid
+                  ? 'Штраф будет оприходован как оплата — долг не вырастет'
+                  : 'Сумма добавится к долгу по аренде'}
+              </p>
+            </div>
+
+            {penPaid && (
+              <div className="mb-4">
+                <label className="mb-1 block text-xs font-medium text-slate-400">Способ оплаты</label>
+                <select
+                  value={penMethod}
+                  onChange={(e) => setPenMethod(e.target.value)}
+                  className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+                >
+                  <option value="CASH">Наличные</option>
+                  <option value="SBP">СБП</option>
+                  <option value="CARD">Карта</option>
+                  <option value="TRANSFER">Перевод</option>
+                </select>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => !penBusy && setPenRent(null)}
+                disabled={penBusy}
+                className="rounded-lg bg-slate-800 px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 disabled:opacity-50 transition-colors"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={submitPenalty}
+                disabled={penBusy}
+                className="rounded-lg bg-orange-600 px-4 py-2 text-sm text-white hover:bg-orange-500 disabled:opacity-50 transition-colors"
+              >
+                {penBusy ? 'Сохранение...' : 'Начислить'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

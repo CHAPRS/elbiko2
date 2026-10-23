@@ -4,6 +4,14 @@ export default {
   type: 'document',
   fields: [
     {
+      name: 'backgroundImage',
+      title: 'Фоновое изображение',
+      type: 'image',
+      options: {
+        hotspot: true,
+      },
+    },
+    {
       name: 'title',
       title: 'Заголовок',
       type: 'string',

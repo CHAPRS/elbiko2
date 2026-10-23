@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import Link from 'next/link';
+import { LeadForm } from '@/components/admin/LeadForm';
 import { LEAD_STATUSES, LEAD_STATUS_LABELS, LeadStatus } from '@/lib/leadStatus';
 
 interface Lead {
@@ -16,10 +16,24 @@ interface Lead {
   processedAt?: string | null;
   rentId?: number | null;
   bikeId?: number | null;
+  itemType?: string | null;
+  batteryId?: number | null;
+  batteryRentId?: number | null;
+  rentDays?: number | null;
+  totalPrice?: number | null;
+  startDate?: string | null;
+  endDate?: string | null;
   createdAt: string;
   bike?: {
     id: number;
     name: string;
+    externalId?: string | null;
+    status: string;
+  } | null;
+  battery?: {
+    id: number;
+    name: string;
+    serialNumber?: string | null;
     status: string;
   } | null;
 }
@@ -27,7 +41,17 @@ interface Lead {
 interface Bike {
   id: number;
   name: string;
+  externalId?: string | null;
   status: string;
+  pricePerDay: number;
+}
+
+interface Battery {
+  id: number;
+  name: string;
+  serialNumber?: string | null;
+  status: string;
+  pricePerDay: number | string;
 }
 
 const STATUS_BADGE: Record<LeadStatus, string> = {
@@ -45,6 +69,7 @@ const FILTERS: Array<{ value: 'ALL' | LeadStatus; label: string }> = [
 export default function LeadsPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [bikes, setBikes] = useState<Bike[]>([]);
+  const [batteries, setBatteries] = useState<Battery[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<'ALL' | LeadStatus>('ALL');
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
@@ -52,6 +77,7 @@ export default function LeadsPage() {
   const [rejectReason, setRejectReason] = useState('');
   const [rentDays, setRentDays] = useState('1');
   const [rentBikeId, setRentBikeId] = useState('');
+  const [rentBatteryId, setRentBatteryId] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -87,14 +113,24 @@ export default function LeadsPage() {
         if (Array.isArray(data)) setBikes(data);
       })
       .catch((err) => console.error('Ошибка загрузки автопарка:', err));
+    fetch('/api/admin/batteries')
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => {
+        if (Array.isArray(data)) setBatteries(data);
+      })
+      .catch((err) => console.error('Ошибка загрузки парка АКБ:', err));
   }, []);
+
+  const isBatteryLead = (lead: Lead | null) =>
+    lead?.itemType === 'BATTERY' || Boolean(lead?.batteryId);
 
   const openLead = (lead: Lead) => {
     setSelectedLead(lead);
     setComment(lead.comment || '');
     setRejectReason(lead.rejectReason || '');
     setRentBikeId(lead.bikeId ? String(lead.bikeId) : '');
-    setRentDays('1');
+    setRentBatteryId(lead.batteryId ? String(lead.batteryId) : '');
+    setRentDays(lead.rentDays ? String(lead.rentDays) : '1');
     setNotice(null);
     setError(null);
   };
@@ -142,14 +178,27 @@ export default function LeadsPage() {
 
   const handleConvert = async () => {
     if (!selectedLead) return;
+    const batteryMode = isBatteryLead(selectedLead);
+
+    if (batteryMode && !rentBatteryId) {
+      setError('Выберите аккумулятор');
+      return;
+    }
+    if (!batteryMode && !rentBikeId) {
+      setError('Выберите велосипед');
+      return;
+    }
 
     try {
       const res = await fetch(`/api/admin/leads/${selectedLead.id}/convert`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          days: Number(rentDays) || 1,
-          bikeId: rentBikeId ? Number(rentBikeId) : null,
+          bikeId: !batteryMode && rentBikeId ? Number(rentBikeId) : null,
+          batteryId: batteryMode && rentBatteryId ? Number(rentBatteryId) : null,
+          days: Number(rentDays) || undefined,
+          startDate: selectedLead.startDate,
+          endDate: selectedLead.endDate,
         }),
       });
       const data = await res.json();
@@ -160,7 +209,7 @@ export default function LeadsPage() {
       }
 
       setError(null);
-      setNotice(`Аренда №${data.rentId} оформлена`);
+      setNotice(`Аренда №${data.rentId ?? data.batteryRentId} оформлена`);
       setSelectedLead(data.lead);
       fetchLeads();
     } catch (err) {
@@ -216,7 +265,13 @@ export default function LeadsPage() {
           <td className="p-4 font-medium text-white">{lead.id}</td>
           <td className="p-4 text-white">{lead.name}</td>
           <td className="p-4 text-slate-300">{lead.phone}</td>
-          <td className="p-4 text-slate-300">{lead.bike?.name || lead.bikeName || '-'}</td>
+          <td className="p-4 text-slate-300">
+            {isBatteryLead(lead)
+              ? (lead.battery ? `АКБ ${lead.battery.name}` : 'АКБ — не выбран')
+              : lead.bike
+              ? `${lead.bike.name}${lead.bike.externalId ? ` (ID: ${lead.bike.externalId})` : ''}`
+              : (lead.bikeName || '-')}
+          </td>
           <td className="p-4 text-slate-400 text-xs whitespace-nowrap">
             {new Date(lead.createdAt).toLocaleString('ru-RU')}
           </td>
@@ -224,8 +279,8 @@ export default function LeadsPage() {
             <span className={`px-2 py-1 rounded text-xs ${STATUS_BADGE[lead.status]}`}>
               {LEAD_STATUS_LABELS[lead.status] ?? lead.status}
             </span>
-            {lead.rentId && (
-              <span className="ml-2 text-xs text-slate-400">аренда №{lead.rentId}</span>
+            {(lead.rentId || lead.batteryRentId) && (
+              <span className="ml-2 text-xs text-slate-400">аренда №{lead.rentId ?? lead.batteryRentId}</span>
             )}
           </td>
           <td className="p-4 text-right space-x-2 whitespace-nowrap">
@@ -265,25 +320,13 @@ export default function LeadsPage() {
           Управление заявками
         </h1>
 
-        <div className="mb-8 flex gap-4 flex-wrap">
-          <Link
-            href="/admin"
-            className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg font-medium hover:bg-slate-700 transition-colors"
-          >
-            🚲 Велосипеды
-          </Link>
-          <Link
-            href="/admin/leads"
-            className="px-4 py-2 bg-emerald-500 text-slate-950 rounded-lg font-medium hover:bg-emerald-400 transition-colors"
-          >
-            📋 Заявки
-          </Link>
-          <Link
-            href="/admin/rents"
-            className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg font-medium hover:bg-slate-700 transition-colors"
-          >
-            📊 Аренды
-          </Link>
+        <div className="mb-8 bg-slate-900/50 border border-slate-800 rounded-xl p-6">
+          <h2 className="text-lg font-semibold text-slate-200 mb-4">Новая заявка</h2>
+          <LeadForm
+            bikes={bikes.filter((b) => b.status === 'FREE')}
+            batteries={batteries.filter((b) => b.status === 'FREE')}
+            onSuccess={fetchLeads}
+          />
         </div>
 
         <div className="mb-6 flex gap-3 flex-wrap">
@@ -321,7 +364,7 @@ export default function LeadsPage() {
                   <th className="p-4 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">ID</th>
                   <th className="p-4 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Имя</th>
                   <th className="p-4 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Телефон</th>
-                  <th className="p-4 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Велосипед</th>
+                  <th className="p-4 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Предмет</th>
                   <th className="p-4 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Создана</th>
                   <th className="p-4 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Статус</th>
                   <th className="p-4 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">Действия</th>
@@ -343,6 +386,13 @@ export default function LeadsPage() {
                   </p>
                   {selectedLead.message && (
                     <p className="text-sm text-slate-400 mt-2 whitespace-pre-wrap">{selectedLead.message}</p>
+                  )}
+                  {selectedLead.startDate && selectedLead.endDate && (
+                    <p className="text-sm text-slate-400 mt-2">
+                      Период: {new Date(selectedLead.startDate).toLocaleDateString('ru-RU')} — {new Date(selectedLead.endDate).toLocaleDateString('ru-RU')}
+                      {selectedLead.rentDays ? ` (${selectedLead.rentDays} дн.)` : ''}
+                      {selectedLead.totalPrice ? ` · ${Number(selectedLead.totalPrice).toLocaleString()} ₽` : ''}
+                    </p>
                   )}
                   {selectedLead.processedAt && (
                     <p className="text-xs text-slate-500 mt-2">
@@ -393,14 +443,35 @@ export default function LeadsPage() {
                 </div>
 
                 <div className="pt-4 border-t border-slate-800 space-y-3">
-                  <h3 className="text-sm font-semibold text-slate-200">Оформить аренду</h3>
+                  <h3 className="text-sm font-semibold text-slate-200">
+                    Оформить аренду{isBatteryLead(selectedLead) ? ' АКБ' : ''}
+                  </h3>
 
-                  {selectedLead.rentId ? (
+                  {(selectedLead.rentId || selectedLead.batteryRentId) ? (
                     <p className="text-xs text-slate-400">
-                      По заявке уже оформлена аренда №{selectedLead.rentId}
+                      По заявке уже оформлена аренда №{selectedLead.rentId ?? selectedLead.batteryRentId}
                     </p>
                   ) : (
                     <>
+                      {isBatteryLead(selectedLead) ? (
+                        <div>
+                          <label className="block text-xs font-medium text-slate-400 mb-1">Аккумулятор</label>
+                          <select
+                            value={rentBatteryId}
+                            onChange={(e) => setRentBatteryId(e.target.value)}
+                            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm"
+                          >
+                            <option value="">— выберите —</option>
+                            {batteries
+                              .filter((b) => b.status === 'FREE' || b.id === selectedLead.batteryId)
+                              .map((b) => (
+                                <option key={b.id} value={b.id}>
+                                  {b.name}{b.serialNumber ? ` (SN: ${b.serialNumber})` : ''}
+                                </option>
+                              ))}
+                          </select>
+                        </div>
+                      ) : (
                       <div>
                         <label className="block text-xs font-medium text-slate-400 mb-1">Велосипед</label>
                         <select
@@ -413,11 +484,12 @@ export default function LeadsPage() {
                             .filter((bike) => bike.status === 'FREE' || bike.id === selectedLead.bikeId)
                             .map((bike) => (
                               <option key={bike.id} value={bike.id}>
-                                {bike.name}
+                                {bike.name}{bike.externalId ? ` (ID: ${bike.externalId})` : ''}
                               </option>
                             ))}
                         </select>
                       </div>
+                      )}
 
                       <div>
                         <label className="block text-xs font-medium text-slate-400 mb-1">Срок, дней</label>
